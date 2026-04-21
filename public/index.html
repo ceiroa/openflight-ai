@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenFlight AI - Navigation Log</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #3498db;
+            --border-color: #bdc3c7;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            color: var(--primary-color);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .no-print {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        input, select {
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        /* Nav Log Styles */
+        #nav-log-container {
+            display: none; /* Hidden by default */
+        }
+
+        .nav-log-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .nav-log-table th, .nav-log-table td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .nav-log-table th {
+            background-color: #f2f2f2;
+        }
+
+        .header-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        @media print {
+            .no-print {
+                display: none;
+            }
+            #nav-log-container {
+                display: block !important;
+            }
+            body {
+                margin: 0;
+            }
+            .container {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="no-print">
+            <h1>Flight Planner</h1>
+            <form id="flight-form">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label for="departure">Departure (ICAO)</label>
+                        <input type="text" id="departure" placeholder="e.g. KLAX" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="destination">Destination (ICAO)</label>
+                        <input type="text" id="destination" placeholder="e.g. KSFO" required>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label for="aircraft">Aircraft</label>
+                        <input type="text" id="aircraft" placeholder="e.g. Rotax 912" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="date">Date</label>
+                        <input type="date" id="date" required>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button type="button" onclick="generateLog()">Generate Log</button>
+                    <button type="button" onclick="window.print()" style="background-color: #27ae60;">Print to PDF</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="nav-log-container">
+            <h2 style="text-align: center;">NAVIGATION LOG</h2>
+            <div class="header-info">
+                <div id="display-aircraft">Aircraft: </div>
+                <div id="display-date">Date: </div>
+            </div>
+            <div class="header-info">
+                <div id="display-route">Route: </div>
+            </div>
+            
+            <table class="nav-log-table">
+                <thead>
+                    <tr>
+                        <th>CHECKPOINT</th>
+                        <th>TC</th>
+                        <th>WCA</th>
+                        <th>TH</th>
+                        <th>VAR</th>
+                        <th>MH</th>
+                        <th>TAS</th>
+                        <th>WIND</th>
+                        <th>GS</th>
+                        <th>DIST</th>
+                        <th>ETE</th>
+                        <th>ATE</th>
+                        <th>ETA</th>
+                        <th>ATA</th>
+                        <th>GPH</th>
+                        <th>FUEL</th>
+                    </tr>
+                </thead>
+                <tbody id="log-body">
+                    <!-- Sample Row -->
+                    <tr>
+                        <td>DEPARTURE</td>
+                        <td>---</td>
+                        <td>---</td>
+                        <td>---</td>
+                        <td>---</td>
+                        <td>---</td>
+                        <td>---</td>
+                        <td>---</td>
+                        <td>---</td>
+                        <td>---</td>
+                        <td>---</td>
+                        <td>---</td>
+                        <td>---</td>
+                        <td>---</td>
+                        <td>---</td>
+                        <td>---</td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                    </tr>
+                    <tr>
+                        <td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                    </tr>
+                    <tr>
+                        <td>DESTINATION</td>
+                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function generateLog() {
+            const departure = document.getElementById('departure').value;
+            const destination = document.getElementById('destination').value;
+            const aircraft = document.getElementById('aircraft').value;
+            const date = document.getElementById('date').value;
+
+            document.getElementById('display-aircraft').innerText = 'Aircraft: ' + aircraft;
+            document.getElementById('display-date').innerText = 'Date: ' + date;
+            document.getElementById('display-route').innerText = 'Route: ' + departure + ' to ' + destination;
+
+            document.getElementById('nav-log-container').style.display = 'block';
+        }
+    </script>
+</body>
+</html>

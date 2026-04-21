@@ -115,7 +115,7 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     <div class="form-group">
                         <label for="departure">Departure (ICAO)</label>
-                        <input type="text" id="departure" placeholder="e.g. KLAX" required>
+                        <input type="text" id="departure" placeholder="e.g. KLAX" required onblur="updateWeather()">
                     </div>
                     <div class="form-group">
                         <label for="destination">Destination (ICAO)</label>
@@ -124,8 +124,21 @@
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     <div class="form-group">
+                        <label for="temperature">Temperature (°C)</label>
+                        <input type="number" id="temperature" placeholder="e.g. 15" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="altimeter">Altimeter (inHg)</label>
+                        <input type="number" step="0.01" id="altimeter" placeholder="e.g. 29.92" required>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
                         <label for="aircraft">Aircraft</label>
-                        <input type="text" id="aircraft" placeholder="e.g. Rotax 912" required>
+                        <select id="aircraft" required>
+                            <option value="Evektor Harmony LSA" selected>Evektor Harmony LSA</option>
+                            <option value="Rotax 912">Rotax 912</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="date">Date</label>
@@ -222,15 +235,79 @@
     </div>
 
     <script>
+        // Set today's date as default
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('date').value = today;
+        });
+
+        async function updateWeather() {
+            const departure = document.getElementById('departure').value.trim().toUpperCase();
+            // Trigger weather fetch only for 4-letter ICAO codes (standard for North America)
+            if (departure.length !== 4) return;
+
+            try {
+                const response = await fetch(`/api/weather?icao=${departure}`);
+                if (!response.ok) throw new Error('Weather fetch failed');
+                
+                const data = await response.json();
+                if (data.temperature !== undefined) {
+                    document.getElementById('temperature').value = data.temperature;
+                }
+                if (data.altimeter !== undefined) {
+                    // Assuming API returns altim as an integer (e.g. 2992 for 29.92)
+                    document.getElementById('altimeter').value = (data.altimeter / 100).toFixed(2);
+                }
+            } catch (error) {
+                console.error('Error auto-filling weather:', error);
+            }
+        }
+
         function generateLog() {
-            const departure = document.getElementById('departure').value;
-            const destination = document.getElementById('destination').value;
+            const departure = document.getElementById('departure').value.trim().toUpperCase();
+            const destinationInput = document.getElementById('destination').value;
             const aircraft = document.getElementById('aircraft').value;
             const date = document.getElementById('date').value;
 
+            // Parse destinations (can be a comma-separated list)
+            const destinations = destinationInput.split(',')
+                .map(d => d.trim().toUpperCase())
+                .filter(d => d.length > 0);
+
+            if (destinations.length === 0) {
+                alert('Please enter at least one destination.');
+                return;
+            }
+
             document.getElementById('display-aircraft').innerText = 'Aircraft: ' + aircraft;
             document.getElementById('display-date').innerText = 'Date: ' + date;
-            document.getElementById('display-route').innerText = 'Route: ' + departure + ' to ' + destination;
+            
+            const routeText = [departure, ...destinations].join(' ➔ ');
+            document.getElementById('display-route').innerText = 'Route: ' + routeText;
+
+            // Generate Legs
+            const logBody = document.getElementById('log-body');
+            logBody.innerHTML = ''; // Clear existing rows
+
+            // Initial Departure Row
+            const departureRow = document.createElement('tr');
+            departureRow.innerHTML = `
+                <td>${departure}</td>
+                ${'<td>---</td>'.repeat(15)}
+            `;
+            logBody.appendChild(departureRow);
+
+            // Generate leg rows
+            let currentFrom = departure;
+            destinations.forEach((dest, index) => {
+                const legRow = document.createElement('tr');
+                legRow.innerHTML = `
+                    <td>${dest}</td>
+                    ${'<td></td>'.repeat(15)}
+                `;
+                logBody.appendChild(legRow);
+                currentFrom = dest;
+            });
 
             document.getElementById('nav-log-container').style.display = 'block';
         }

@@ -11,7 +11,7 @@
  *                   windCorrectionAngle is in degrees (positive = right correction).
  *                   groundspeed is in knots.
  */
-function calculateWindTriangle(trueCourse, trueAirspeed, windDirection, windSpeed) {
+export function calculateWindTriangle(trueCourse, trueAirspeed, windDirection, windSpeed) {
     const tcRad = (trueCourse * Math.PI) / 180;
     const wdRad = (windDirection * Math.PI) / 180;
     
@@ -21,7 +21,7 @@ function calculateWindTriangle(trueCourse, trueAirspeed, windDirection, windSpee
     const windAngle = wdRad - tcRad;
 
     // Law of Sines: sin(WCA) / windSpeed = sin(windAngle) / trueAirspeed
-    // sin(WCA) = (windSpeed / trueAirspeed) * sin(windAngle)
+    // sin(WCA) = (windSpeed / trueAirspeed) * Math.sin(windAngle)
     const sinWCA = (windSpeed / trueAirspeed) * Math.sin(windAngle);
     
     // Check for impossible flight conditions (wind too strong)
@@ -45,6 +45,41 @@ function calculateWindTriangle(trueCourse, trueAirspeed, windDirection, windSpee
     };
 }
 
-module.exports = {
-    calculateWindTriangle
-};
+/**
+ * Calculates Pressure Altitude.
+ * 
+ * @param {number} altitude - Indicated altitude (feet).
+ * @param {number} altimeterSetting - Current altimeter setting (inHg).
+ * @returns {number} Pressure Altitude (feet).
+ */
+export function calculatePressureAltitude(altitude, altimeterSetting) {
+    return Math.round(altitude + (29.92 - altimeterSetting) * 1000);
+}
+
+/**
+ * Calculates Density Altitude.
+ * 
+ * @param {number} pressureAltitude - Pressure Altitude (feet).
+ * @param {number} temperature - Outside Air Temperature (Celsius).
+ * @returns {number} Density Altitude (feet).
+ */
+export function calculateDensityAltitude(pressureAltitude, temperature) {
+    const isaTemperature = 15 - (pressureAltitude / 1000) * 2;
+    return Math.round(pressureAltitude + 120 * (temperature - isaTemperature));
+}
+
+/**
+ * Calculates Time to Climb.
+ * 
+ * @param {number} altToReach - Target altitude (feet).
+ * @param {number} airportAlt - Departure altitude (feet).
+ * @param {number} climbRate - Rate of climb (fpm).
+ * @returns {number} Time to climb (minutes).
+ */
+export function calculateTimeToClimb(altToReach, airportAlt, climbRate) {
+    if (climbRate <= 0) {
+        throw new Error("Climb rate must be greater than zero.");
+    }
+    return Math.round(((altToReach - airportAlt) / climbRate) * 10) / 10;
+}
+

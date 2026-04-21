@@ -83,3 +83,70 @@ export function calculateTimeToClimb(altToReach, airportAlt, climbRate) {
     return Math.round(((altToReach - airportAlt) / climbRate) * 10) / 10;
 }
 
+/**
+ * Calculates the interpolated rate of climb for a given altitude.
+ * 
+ * @param {number} altitude - Altitude (feet).
+ * @param {Array} climbTable - Array of objects { altitude_ft, rate_of_climb_fpm }.
+ * @returns {number} Rate of climb (fpm).
+ */
+export function getClimbRateForAlt(altitude, climbTable) {
+    if (!climbTable || climbTable.length === 0) {
+        throw new Error("Climb table is missing or empty.");
+    }
+
+    // Sort table by altitude just in case
+    const sortedTable = [...climbTable].sort((a, b) => a.altitude_ft - b.altitude_ft);
+
+    // Handle out of bounds
+    if (altitude <= sortedTable[0].altitude_ft) return sortedTable[0].rate_of_climb_fpm;
+    if (altitude >= sortedTable[sortedTable.length - 1].altitude_ft) return sortedTable[sortedTable.length - 1].rate_of_climb_fpm;
+
+    // Find the two points to interpolate between
+    for (let i = 0; i < sortedTable.length - 1; i++) {
+        const p1 = sortedTable[i];
+        const p2 = sortedTable[i + 1];
+
+        if (altitude >= p1.altitude_ft && altitude <= p2.altitude_ft) {
+            // Linear interpolation: y = y1 + (x - x1) * (y2 - y1) / (x2 - x1)
+            const rate = p1.rate_of_climb_fpm + (altitude - p1.altitude_ft) * (p2.rate_of_climb_fpm - p1.rate_of_climb_fpm) / (p2.altitude_ft - p1.altitude_ft);
+            return Math.round(rate);
+        }
+    }
+
+    return sortedTable[sortedTable.length - 1].rate_of_climb_fpm;
+}
+
+/**
+ * Calculates complete climb performance using Density Altitude for lookup.
+ * 
+ * @param {number} altToReach - Target altitude (feet).
+ * @param {number} airportAlt - Departure altitude (feet).
+ * @param {number} temperature - Outside Air Temperature at average altitude (Celsius).
+ * @param {number} altimeterSetting - Current altimeter setting (inHg).
+ * @param {Array} climbTable - Climb performance table.
+ * @returns {Object} { timeMinutes, rateOfClimb, densityAltitude }
+ */
+export function calculateClimb(altToReach, airportAlt, temperature, altimeterSetting, climbTable) {
+    // 1. Find the average altitude for the climb
+    const averageAlt = (altToReach + airportAlt) / 2;
+
+    // 2. Calculate Pressure Altitude at that average altitude
+    const pressureAlt = calculatePressureAltitude(averageAlt, altimeterSetting);
+
+    // 3. Calculate Density Altitude based on Temperature and Pressure Altitude
+    const densityAlt = calculateDensityAltitude(pressureAlt, temperature);
+    
+    // 4. Use Density Altitude to look up the performance rate from the table
+    const climbRate = getClimbRateForAlt(densityAlt, climbTable);
+    
+    const time = calculateTimeToClimb(altToReach, airportAlt, climbRate);
+    
+    return {
+        timeMinutes: time,
+        rateOfClimb: climbRate,
+        densityAltitude: densityAlt
+    };
+}
+
+

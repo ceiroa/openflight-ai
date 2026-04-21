@@ -45,3 +45,32 @@ describe('calculateWindTriangle', () => {
         expect(result.groundspeed).toBe(98);
     });
 });
+
+import { calculateClimb } from '../src/logic/navigation.js';
+
+describe('calculateClimb', () => {
+    const climbTable = [
+        { altitude_ft: 0, speed_kts: 67, rate_of_climb_fpm: 900 },
+        { altitude_ft: 2000, speed_kts: 65, rate_of_climb_fpm: 780 },
+        { altitude_ft: 4000, speed_kts: 64, rate_of_climb_fpm: 660 },
+        { altitude_ft: 6000, speed_kts: 63, rate_of_climb_fpm: 540 }
+    ];
+
+    test('interpolates climb rate correctly at sea level (ISA)', () => {
+        // ISA sea level: Temp 15C, Altimeter 29.92
+        const result = calculateClimb(2000, 0, 15, 29.92, climbTable);
+        
+        // Average alt = 1000ft. 
+        // Pressure Alt = 1000 + (29.92 - 29.92) * 1000 = 1000ft.
+        // ISA Temp at 1000ft = 15 - (1000/1000)*2 = 13C.
+        // Density Alt = 1000 + 120 * (15 - 13) = 1000 + 240 = 1240ft.
+        // Interpolation between 0 (900) and 2000 (780):
+        // 900 + (1240 - 0) * (780 - 900) / (2000 - 0)
+        // 900 + 1240 * (-120) / 2000 = 900 - 1240 * 0.06 = 900 - 74.4 = 825.6 -> 826 fpm.
+        
+        expect(result.rateOfClimb).toBe(826);
+        // Time = 2000 / 826 = 2.42 -> 2.4 min
+        expect(result.timeMinutes).toBe(2.4);
+    });
+});
+

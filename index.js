@@ -34,6 +34,7 @@ app.get('/api/weather/:icao', async (req, res) => {
         const weather = await getWeatherData(icao.toUpperCase());
         res.json(weather);
     } catch (error) {
+        console.error(`Error in /api/weather/${icao}:`, error);
         if (error.message.includes('No METAR found')) {
             res.status(404).json({ error: error.message });
         } else {
@@ -51,6 +52,7 @@ app.get('/api/weather', async (req, res) => {
         const weather = await getWeatherData(icao.toUpperCase());
         res.json(weather);
     } catch (error) {
+        console.error(`Error in /api/weather?icao=${icao}:`, error);
         res.status(error.message.includes('No METAR') ? 404 : 500).json({ error: error.message });
     }
 });

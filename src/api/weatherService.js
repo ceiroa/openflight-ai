@@ -5,51 +5,44 @@
  * @returns {Promise<Object>} { temperature, altimeter, windSpeed, windDirection, forecast: { temperature, windSpeed, windDirection } }
  */
 export async function getWeatherData(icao) {
+    console.log(`[getWeatherData] START for ${icao}`);
     const metarUrl = `https://aviationweather.gov/api/data/metar?ids=${icao}&format=json`;
-    const tafUrl = `https://aviationweather.gov/api/data/taf?ids=${icao}&format=json`;
     
     try {
-        const [metarRes, tafRes] = await Promise.all([
-            fetch(metarUrl),
-            fetch(tafUrl)
-        ]);
-
-        if (!metarRes.ok) throw new Error(`METAR API returned ${metarRes.status}`);
+        console.log(`[getWeatherData] Fetching METAR from: ${metarUrl}`);
+        const response = await fetch(metarUrl);
         
-        const metarData = await metarRes.json();
+        if (!response.ok) {
+            console.error(`[getWeatherData] METAR Fetch Failed: ${response.status}`);
+            throw new Error(`METAR API returned ${response.status}`);
+        }
+        
+        const metarData = await response.json();
+        console.log(`[getWeatherData] METAR Data Received: ${JSON.stringify(metarData).substring(0, 100)}`);
+        
         const metar = Array.isArray(metarData) ? metarData[0] : metarData;
-        
-        if (!metar) throw new Error('No METAR found for this airport');
+        if (!metar || (Array.isArray(metarData) && metarData.length === 0)) {
+            console.warn(`[getWeatherData] No METAR found for ${icao}`);
+            throw new Error(`No METAR found for ${icao}`);
+        }
 
-        // Altimeter from AviationWeather JSON is in hPa. Convert to inHg: 1 inHg = 33.8639 hPa
-        const altimeterInHg = metar.altim / 33.8639;
+        let altimeter = metar.altim;
+        if (altimeter > 50) { 
+            altimeter = altimeter / 33.8639;
+        }
 
         const result = {
             temperature: metar.temp,
-            altimeter: Number(altimeterInHg.toFixed(2)),
+            altimeter: Number(altimeter.toFixed(2)),
             windSpeed: metar.wspd,
             windDirection: metar.wdir,
             forecast: null
         };
-
-        if (tafRes.ok) {
-            const tafData = await tafRes.json();
-            const taf = Array.isArray(tafData) ? tafData[0] : tafData;
-            if (taf && taf.fcsts && taf.fcsts.length > 0) {
-                // Simplified: use the first forecast period
-                const f = taf.fcsts[0];
-                result.forecast = {
-                    windSpeed: f.wspd,
-                    windDirection: f.wdir,
-                    // TAFs rarely have temp, but we include it if present
-                    temperature: f.temp !== undefined ? f.temp : metar.temp 
-                };
-            }
-        }
         
+        console.log(`[getWeatherData] SUCCESS for ${icao}`);
         return result;
     } catch (error) {
-        console.error(`Error fetching weather for ${icao}:`, error);
+        console.error(`[getWeatherData] CRITICAL ERROR for ${icao}:`, error);
         throw error;
     }
 }

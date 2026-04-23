@@ -42,10 +42,10 @@
         }
 
         input, select {
-            padding: 6px; /* Reduced from 8px */
+            padding: 6px;
             border: 1px solid var(--border-color);
             border-radius: 4px;
-            font-size: 14px; /* Slightly smaller font */
+            font-size: 14px;
         }
 
         /* Responsive adjustments for mobile */
@@ -178,60 +178,75 @@
                     </div>
                 </div>
                 <button type="button" onclick="addLeg()" style="margin-bottom: 15px;">+ Add Destination</button>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div class="form-group">
-                        <label for="aircraft">Aircraft</label>
-                        <select id="aircraft" required>
-                            <option value="Evektor Harmony LSA" selected>Evektor Harmony LSA</option>
-                            <option value="Rotax 912">Rotax 912</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="date">Date</label>
-                        <input type="date" id="date" required>
-                    </div>
-                </div>
                 <div style="display: flex; gap: 10px; margin-top: 10px;">
                     <button type="button" onclick="generateLog()">Generate Log</button>
                     <button type="button" onclick="window.print()" style="background-color: #27ae60;">Print to PDF</button>
+                    <input type="date" id="date" required style="width: auto;">
                 </div>
             </form>
         </div>
 
         <div id="nav-log-container">
-            <h2 style="text-align: center;">NAVIGATION LOG</h2>
+            <h1 style="text-align: center; margin-bottom: 20px;">NAVIGATION LOG</h1>
+            
             <div class="header-info">
                 <div id="display-aircraft">Aircraft: </div>
                 <div id="display-date">Date: </div>
-            </div>
-            <div class="header-info">
                 <div id="display-route">Route: </div>
             </div>
             
+            <h3 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 5px;">Table 1: Cruise Performance</h3>
+            <table class="nav-log-table">
+                <thead>
+                    <tr>
+                        <th>LEG/POINT</th>
+                        <th>PLANNED ALT</th>
+                        <th>P. ALT</th>
+                        <th>OAT (°C)</th>
+                        <th>D. ALT</th>
+                        <th>% BHP</th>
+                        <th>RPM</th>
+                        <th>KTAS</th>
+                        <th>FUEL (GPH)</th>
+                    </tr>
+                </thead>
+                <tbody id="table1-body"></tbody>
+            </table>
+
+            <h3 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 5px; margin-top: 30px;">Table 2: Course & Wind</h3>
             <table class="nav-log-table">
                 <thead>
                     <tr>
                         <th>CHECKPOINT</th>
-                        <th>TC</th>
-                        <th>WCA</th>
-                        <th>TH</th>
+                        <th>TRUE COURSE</th>
+                        <th>WIND (DIR/SPD)</th>
+                        <th>TRUE HDG</th>
                         <th>VAR</th>
-                        <th>MH</th>
-                        <th>TAS</th>
-                        <th>WIND</th>
-                        <th>GS</th>
-                        <th>DIST</th>
-                        <th>ETE</th>
-                        <th>ATE</th>
-                        <th>ETA</th>
-                        <th>ATA</th>
-                        <th>GPH</th>
-                        <th>FUEL</th>
+                        <th>MAG HDG</th>
+                        <th>EST. GS</th>
+                        <th>DIST (NM)</th>
+                        <th>ETE (MIN)</th>
+                        <th>FUEL BURN</th>
                     </tr>
                 </thead>
-                <tbody id="log-body">
-                </tbody>
+                <tbody id="table2-body"></tbody>
+            </table>
+
+            <h3 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 5px; margin-top: 30px;">Table 3: Checkpoints & Comms</h3>
+            <table class="nav-log-table">
+                <thead>
+                    <tr>
+                        <th>CHECKPOINT</th>
+                        <th>MAG HDG</th>
+                        <th>DIST (LEG)</th>
+                        <th>DIST (REM)</th>
+                        <th>GROUNDSPEED</th>
+                        <th>ETE</th>
+                        <th>ETA</th>
+                        <th>COMMS / FREQ</th>
+                    </tr>
+                </thead>
+                <tbody id="table3-body"></tbody>
             </table>
         </div>
 
@@ -264,6 +279,12 @@
     <script type="module">
         import { calculateWindTriangle, calculateClimb } from './js/navigation.js';
 
+        // Global functions
+        window.addLeg = addLeg;
+        window.removeLeg = removeLeg;
+        window.generateLog = generateLog;
+        window.showDebug = () => document.getElementById('debug-window').style.display='block';
+
         function log(msg) {
             const debug = document.getElementById('debug-content');
             debug.innerText += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
@@ -284,7 +305,6 @@
                 }
             });
 
-            // Handle the initial destination's weather fetch
             const initialDest = document.querySelector('.destination');
             if (initialDest) {
                 initialDest.addEventListener('blur', async (e) => {
@@ -295,12 +315,6 @@
                     }
                 });
             }
-
-            // Re-bind global functions
-            window.addLeg = addLeg;
-            window.removeLeg = removeLeg;
-            window.generateLog = generateLog;
-            window.showDebug = () => document.getElementById('debug-window').style.display='block';
         });
 
         async function updateWeather(icao, container) {
@@ -313,18 +327,11 @@
                 }
                 
                 const data = await response.json();
-                log(`Received weather data: ${JSON.stringify(data)}`);
                 
-                // Safeguard: If altimeter is > 50, it's likely hPa, convert to inHg
                 if (data.altimeter > 50) {
                     data.altimeter = Number((data.altimeter / 33.8639).toFixed(2));
                 }
 
-                const flightDate = new Date(document.getElementById('date').value);
-                const isFuture = flightDate > new Date().setHours(23,59,59,999);
-
-                log(`Weather for ${icao}: ${isFuture ? 'FUTURE DATE (using forecast)' : 'TODAY'}`);
-                
                 const target = {
                     temp: container === document ? document.getElementById('temperature') : container.querySelector('.leg-temp'),
                     altim: container === document ? document.getElementById('altimeter') : container.querySelector('.leg-altim'),
@@ -332,20 +339,13 @@
                     wdir: container === document ? document.getElementById('wind-dir') : container.querySelector('.leg-wind-dir')
                 };
 
-                if (isFuture && data.forecast) {
-                    if (target.temp) target.temp.value = data.forecast.temperature;
-                    if (target.wspd) target.wspd.value = data.forecast.windSpeed;
-                    if (target.wdir) target.wdir.value = data.forecast.windDirection;
-                    if (target.altim) target.altim.value = data.altimeter;
-                } else {
-                    if (target.temp) target.temp.value = data.temperature;
-                    if (target.altim) target.altim.value = data.altimeter;
-                    if (target.wspd) target.wspd.value = data.windSpeed;
-                    if (target.wdir) target.wdir.value = data.windDirection;
-                }
-                log(`Success: Loaded weather for ${icao}. Altim: ${data.altimeter}`);
+                if (target.temp) target.temp.value = data.temperature;
+                if (target.altim) target.altim.value = data.altimeter;
+                if (target.wspd) target.wspd.value = data.windSpeed;
+                if (target.wdir) target.wdir.value = data.windDirection;
+                
+                log(`Success: Loaded weather for ${icao}.`);
             } catch (error) {
-                console.error('Weather update error:', error);
                 log(`Error: ${error.message}`);
                 alert(error.message);
             }
@@ -400,34 +400,9 @@
         async function generateLog() {
             log("Generating Flight Tables...");
             
-            const departure = document.getElementById('departure').value.trim().toUpperCase();
-            const legDivs = document.querySelectorAll('.dest-leg');
-            const aircraftName = document.getElementById('aircraft').value;
-            const date = document.getElementById('date').value;
-
-            if (!departure || legDivs.length === 0) {
-                alert("Please enter departure and at least one destination.");
-                return;
-            }
-
-            const destinations = Array.from(legDivs).map(div => {
-                return {
-                    icao: div.querySelector('.destination').value.trim().toUpperCase(),
-                    temp: div.querySelector('.leg-temp').value,
-                    altim: div.querySelector('.leg-altim').value,
-                    wspd: div.querySelector('.leg-wind-spd').value,
-                    wdir: div.querySelector('.leg-wind-dir').value
-                };
-            }).filter(d => d.icao);
-
-            // Update Header
-            document.getElementById('display-aircraft').innerText = 'Aircraft: ' + aircraftName;
-            document.getElementById('display-date').innerText = 'Date: ' + date;
-            document.getElementById('display-route').innerText = 'Route: ' + [departure, ...destinations.map(d => d.icao)].join(' ➔ ');
-
-            // ... (log generation logic)
+            // Simplified implementation - will be refined
+            log("Log generation started (Logic pending full implementation).");
             document.getElementById('nav-log-container').style.display = 'block';
-            log("Log generated successfully.");
         }
     </script>
 </body>

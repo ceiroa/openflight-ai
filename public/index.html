@@ -6,201 +6,151 @@
     <title>OpenFlight AI - Navigation Log</title>
     <style>
         :root {
-            --primary-color: #2c3e50;
-            --accent-color: #3498db;
-            --border-color: #bdc3c7;
+            --bg-color: #0f172a;
+            --container-bg: #1e293b;
+            --field-bg: #334155;
+            --text-color: #f1f5f9;
+            --accent-color: #38bdf8;
+            --border-color: #475569;
+            --danger-color: #ef4444;
         }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 20px;
-            color: var(--primary-color);
+        body { font-family: 'Inter', sans-serif; margin: 20px; background-color: var(--bg-color); color: var(--text-color); line-height: 1.5; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        
+        .no-print { background: var(--container-bg); padding: 24px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); margin-bottom: 32px; }
+        
+        h1 { margin-top: 0; color: var(--accent-color); font-size: 1.5rem; }
+        
+        .form-group { margin-bottom: 12px; display: flex; flex-direction: column; }
+        label { font-weight: 600; margin-bottom: 4px; color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+        
+        input, select { 
+            padding: 10px; 
+            background: var(--field-bg); 
+            border: 1px solid var(--border-color); 
+            border-radius: 6px; 
+            color: white; 
+            width: 100%; 
+            box-sizing: border-box;
+            font-size: 13px;
         }
-
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-        }
-
-        .no-print {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        label {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-
-        input, select {
-            padding: 6px;
+        input:focus { border-color: var(--accent-color); outline: none; }
+        
+        #flightGraph { 
+            width: 100%; 
+            height: 160px; 
+            background: #020617; 
+            border-radius: 8px; 
+            margin-bottom: 24px; 
             border: 1px solid var(--border-color);
-            border-radius: 4px;
-            font-size: 14px;
+            display: block;
         }
+        
+        .dest-leg { border: 1px solid var(--border-color); padding: 16px; margin-bottom: 16px; border-radius: 8px; background: #1e293b; position: relative; }
+        .dest-leg.departure { border-left: 4px solid var(--accent-color); background: rgba(56, 189, 248, 0.05); }
+        .dest-leg.destination { border-left: 4px solid #10b981; }
+        
+        .leg-header { display: flex; gap: 12px; margin-bottom: 12px; align-items: flex-end; }
+        .leg-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        
+        button { 
+            background-color: var(--accent-color); 
+            color: #0f172a; 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: 700;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        
+        .btn-remove { background-color: var(--danger-color); color: white; padding: 10px; width: 40px; }
+        .btn-add { background-color: transparent; border: 2px dashed var(--border-color); color: #94a3b8; width: 100%; margin-bottom: 24px; }
+        .btn-add:hover { border-color: var(--accent-color); color: var(--accent-color); background: rgba(56, 189, 248, 0.05); }
 
-        /* Responsive adjustments for mobile */
-        @media screen and (max-width: 600px) {
-            body { margin: 10px; }
-            .container { width: 100%; }
-            .no-print { padding: 10px; }
-            .form-group { margin-bottom: 10px; }
-            input, select { padding: 4px; font-size: 13px; }
-            label { font-size: 12px !important; }
-        }
-
-        button {
-            background-color: var(--accent-color);
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background 0.3s;
-        }
-
-        button:hover {
-            background-color: #2980b9;
-        }
-
-        /* Nav Log Styles */
-        #nav-log-container {
-            display: none; /* Hidden by default */
-        }
-
-        .nav-log-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-
-        .nav-log-table th, .nav-log-table td {
-            border: 1px solid black;
-            padding: 8px;
-            text-align: center;
-            font-size: 12px;
-        }
-
-        .nav-log-table th {
-            background-color: #f2f2f2;
-        }
-
-        .header-info {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
+        #nav-log-container { display: none; background: #fff; color: #000; padding: 40px; border-radius: 4px; margin-top: 20px; }
+        .nav-log-table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 25px; }
+        .nav-log-table th, .nav-log-table td { border: 1px solid #000; padding: 5px; text-align: center; font-size: 10px; }
+        .nav-log-table th { background-color: #f1f5f9; }
 
         @media print {
-            .no-print {
-                display: none;
-            }
-            #nav-log-container {
-                display: block !important;
-            }
-            body {
-                margin: 0;
-            }
-            .container {
-                max-width: 100%;
-            }
+            .no-print, canvas { display: none !important; }
+            #nav-log-container { display: block !important; padding: 0; }
+            body { background: white; margin: 0; }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <canvas id="flightGraph" width="1000" height="200"></canvas>
+        
         <div class="no-print">
-            <h1>Flight Planner</h1>
+            <h1 style="display: flex; align-items: center; gap: 10px;">
+                ✈️ OpenFlight AI <span style="font-size: 0.8rem; font-weight: normal; opacity: 0.7;">v2.0 Dark Mode</span>
+            </h1>
+            
             <form id="flight-form">
-                <div class="form-group">
-                    <label for="departure">Departure (ICAO)</label>
-                    <input type="text" id="departure" placeholder="e.g. KLAX" required>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+                    <div class="form-group">
+                        <label>Airplane Type</label>
+                        <input type="text" id="aircraft" value="Evektor Harmony LSA" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Global Cruise Altitude (ft)</label>
+                        <input type="number" id="cruise-alt" required value="4500">
+                    </div>
+                    <div class="form-group">
+                        <label>Flight Date</label>
+                        <input type="date" id="date" required>
+                    </div>
                 </div>
 
-                <div id="departure-weather" style="border: 1px solid #ddd; padding: 8px; margin-bottom: 15px; border-radius: 4px; background: #fff;">
-                    <div style="font-size: 11px; font-weight: bold; margin-bottom: 5px; color: var(--accent-color);">Departure Weather</div>
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label style="font-size: 9px;">Temp</label>
-                            <input type="number" id="temperature" placeholder="°C" required style="width: 100%; box-sizing: border-box;">
+                <div id="departure-section" class="dest-leg departure">
+                    <label style="color: var(--accent-color); font-size: 13px;">Departure Airport</label>
+                    <div class="leg-header" style="margin-top: 10px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Departure (ICAO)</label>
+                            <input type="text" id="departure-icao" placeholder="e.g. KORD" required onblur="handleWeather(this, 'dep')">
                         </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label style="font-size: 9px;">Altim</label>
-                            <input type="number" step="0.01" id="altimeter" placeholder="inHg" required style="width: 100%; box-sizing: border-box;">
+                        <div class="form-group" style="width: 100px;">
+                            <label>Airport Alt (ft)</label>
+                            <input type="number" id="dep-airport-alt" placeholder="0" value="0">
                         </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label style="font-size: 9px;">Wind Spd</label>
-                            <input type="number" id="wind-speed" placeholder="Kts" required style="width: 100%; box-sizing: border-box;">
-                        </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label style="font-size: 9px;">Wind Dir</label>
-                            <input type="number" id="wind-dir" placeholder="Deg" required style="width: 100%; box-sizing: border-box;">
-                        </div>
+                    </div>
+                    <div class="leg-row">
+                        <div class="form-group"><label>Temp (°C)</label><input type="number" id="dep-temp" class="weather-field"></div>
+                        <div class="form-group"><label>Altim (inHg)</label><input type="number" step="0.01" id="dep-altim" class="weather-field"></div>
+                        <div class="form-group"><label>Wind Spd (kt)</label><input type="number" id="dep-wind-spd" class="weather-field"></div>
+                        <div class="form-group"><label>Wind Dir (°)</label><input type="number" id="dep-wind-dir" class="weather-field"></div>
                     </div>
                 </div>
                 
-                <div id="destinations-container">
-                    <label>Destinations</label>
-                    <div class="dest-leg" style="border: 1px solid #ddd; padding: 8px; margin-bottom: 8px; border-radius: 4px; background: #fff;">
-                        <div style="display: flex; gap: 8px; margin-bottom: 5px;">
-                            <input type="text" class="destination" placeholder="ICAO" required style="flex: 1; min-width: 60px;">
-                            <button type="button" onclick="removeLeg(this)" style="background: #e74c3c; font-size: 11px; padding: 4px 8px;">Remove</button>
-                        </div>
-                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label style="font-size: 9px;">Temp</label>
-                                <input type="number" class="leg-temp" placeholder="°C" required style="width: 100%; box-sizing: border-box;">
-                            </div>
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label style="font-size: 9px;">Altim</label>
-                                <input type="number" step="0.01" class="leg-altim" placeholder="inHg" required style="width: 100%; box-sizing: border-box;">
-                            </div>
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label style="font-size: 9px;">Wind Spd</label>
-                                <input type="number" class="leg-wind-spd" placeholder="Kts" required style="width: 100%; box-sizing: border-box;">
-                            </div>
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label style="font-size: 9px;">Wind Dir</label>
-                                <input type="number" class="leg-wind-dir" placeholder="Deg" required style="width: 100%; box-sizing: border-box;">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <button type="button" onclick="addLeg()" style="margin-bottom: 15px;">+ Add Destination</button>
-                <div style="display: flex; gap: 10px; margin-top: 10px;">
-                    <button type="button" onclick="generateLog()">Generate Log</button>
-                    <button type="button" onclick="window.print()" style="background-color: #27ae60;">Print to PDF</button>
-                    <input type="date" id="date" required style="width: auto;">
+                <div id="destinations-container"></div>
+                
+                <button type="button" class="btn-add" onclick="addLeg()">+ ADD DESTINATION LEG</button>
+                
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button type="button" onclick="generateLog()" style="background-color: #10b981; color: white;">GENERATE NAV LOG</button>
+                    <button type="button" onclick="window.print()" style="background-color: #64748b; color: white;">PRINT PDF</button>
                 </div>
             </form>
         </div>
 
         <div id="nav-log-container">
-            <h1 style="text-align: center; margin-bottom: 20px;">NAVIGATION LOG</h1>
-            
-            <div class="header-info">
-                <div id="display-aircraft">Aircraft: </div>
-                <div id="display-date">Date: </div>
-                <div id="display-route">Route: </div>
+            <h2 style="text-align: center; margin: 0; text-transform: uppercase;">Aeronautical Navigation Log</h2>
+            <div style="display: flex; justify-content: space-between; margin-top: 10px; margin-bottom: 20px; font-size: 12px; border-bottom: 1px solid #000; padding-bottom: 5px;">
+                <span id="out-aircraft"></span>
+                <span id="out-date"></span>
             </div>
-            
-            <h3 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 5px;">Table 1: Cruise Performance</h3>
+
+            <h4 style="margin: 0;">Table 1: Cruise Performance</h4>
             <table class="nav-log-table">
                 <thead>
                     <tr>
-                        <th>LEG/POINT</th>
-                        <th>PLANNED ALT</th>
+                        <th>POINT</th>
+                        <th>ALTITUDE (ft)</th>
                         <th>P. ALT</th>
                         <th>OAT (°C)</th>
                         <th>D. ALT</th>
@@ -213,26 +163,26 @@
                 <tbody id="table1-body"></tbody>
             </table>
 
-            <h3 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 5px; margin-top: 30px;">Table 2: Course & Wind</h3>
+            <h4 style="margin: 0;">Table 2: Course & Wind</h4>
             <table class="nav-log-table">
                 <thead>
                     <tr>
-                        <th>CHECKPOINT</th>
+                        <th>LEG SEGMENT</th>
                         <th>TRUE COURSE</th>
                         <th>WIND (DIR/SPD)</th>
                         <th>TRUE HDG</th>
                         <th>VAR</th>
                         <th>MAG HDG</th>
-                        <th>EST. GS</th>
-                        <th>DIST (NM)</th>
-                        <th>ETE (MIN)</th>
+                        <th>GS</th>
+                        <th>DIST</th>
+                        <th>ETE</th>
                         <th>FUEL BURN</th>
                     </tr>
                 </thead>
                 <tbody id="table2-body"></tbody>
             </table>
 
-            <h3 style="border-bottom: 2px solid var(--primary-color); padding-bottom: 5px; margin-top: 30px;">Table 3: Checkpoints & Comms</h3>
+            <h4 style="margin: 0;">Table 3: Checkpoints & Comms</h4>
             <table class="nav-log-table">
                 <thead>
                     <tr>
@@ -249,160 +199,212 @@
                 <tbody id="table3-body"></tbody>
             </table>
         </div>
-
-        <div id="debug-window" class="no-print" style="margin-top: 20px; background: #eee; padding: 10px; border: 1px solid #ccc; display: none;">
-            <div style="display: flex; justify-content: space-between; font-weight: bold;">
-                <span>System Log</span>
-                <button onclick="document.getElementById('debug-window').style.display='none'">Close</button>
-            </div>
-            <pre id="debug-content" style="font-size: 11px; max-height: 150px; overflow-y: auto;"></pre>
-        </div>
-
-        <div class="no-print" style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
-            <h3>Flight Planning Resources</h3>
-            <button onclick="document.getElementById('debug-window').style.display='block'">Show System Log</button>
-            <ul style="list-style: none; padding: 0;">
-                <li style="margin-bottom: 10px;">
-                    <a href="https://www.youtube.com/watch?v=e5j909RjsD0" target="_blank" style="color: var(--accent-color); text-decoration: none; font-weight: bold;">
-                        📺 Understanding Rate of Climb Charts (YouTube)
-                    </a>
-                </li>
-                <li>
-                    <a href="https://www.aviationweather.gov/" target="_blank" style="color: var(--accent-color); text-decoration: none; font-weight: bold;">
-                        ☁️ AviationWeather.gov
-                    </a>
-                </li>
-            </ul>
-        </div>
     </div>
 
     <script type="module">
-        import { calculateWindTriangle, calculateClimb } from './js/navigation.js';
+        import { calculateWindTriangle, calculatePressureAltitude, calculateDensityAltitude } from './js/navigation.js';
 
-        // Global functions
         window.addLeg = addLeg;
         window.removeLeg = removeLeg;
+        window.handleWeather = handleWeather;
         window.generateLog = generateLog;
-        window.showDebug = () => document.getElementById('debug-window').style.display='block';
-
-        function log(msg) {
-            const debug = document.getElementById('debug-content');
-            debug.innerText += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
-            debug.scrollTop = debug.scrollHeight;
-        }
 
         document.addEventListener('DOMContentLoaded', () => {
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('date').value = today;
-
-            const departureInput = document.getElementById('departure');
-            departureInput.addEventListener('blur', async (e) => {
-                const icao = e.target.value.trim().toUpperCase();
-                if (icao.length === 4) {
-                    await updateWeather(icao, document);
-                } else if (icao.length > 0) {
-                    alert('Please enter a valid 4-letter ICAO code.');
-                }
-            });
-
-            const initialDest = document.querySelector('.destination');
-            if (initialDest) {
-                initialDest.addEventListener('blur', async (e) => {
-                    const icao = e.target.value.trim().toUpperCase();
-                    const container = e.target.closest('.dest-leg');
-                    if (icao.length === 4) {
-                        await updateWeather(icao, container);
-                    }
-                });
-            }
+            document.getElementById('date').value = new Date().toISOString().split('T')[0];
+            addLeg(); // Default destination
+            drawGraph();
         });
 
-        async function updateWeather(icao, container) {
-            log(`Fetching weather for ${icao}...`);
-            try {
-                const response = await fetch(`/api/weather/${icao}`);
-                if (!response.ok) {
-                    if (response.status === 404) throw new Error(`ICAO ${icao} not found.`);
-                    throw new Error('Weather fetch failed');
-                }
-                
-                const data = await response.json();
-                
-                if (data.altimeter > 50) {
-                    data.altimeter = Number((data.altimeter / 33.8639).toFixed(2));
-                }
+        function drawGraph() {
+            const canvas = document.getElementById('flightGraph');
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
 
-                const target = {
-                    temp: container === document ? document.getElementById('temperature') : container.querySelector('.leg-temp'),
-                    altim: container === document ? document.getElementById('altimeter') : container.querySelector('.leg-altim'),
-                    wspd: container === document ? document.getElementById('wind-speed') : container.querySelector('.leg-wind-spd'),
-                    wdir: container === document ? document.getElementById('wind-dir') : container.querySelector('.leg-wind-dir')
-                };
+            // Gradient background
+            const grad = ctx.createLinearGradient(0, 0, 0, h);
+            grad.addColorStop(0, '#020617');
+            grad.addColorStop(1, '#0f172a');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
 
-                if (target.temp) target.temp.value = data.temperature;
-                if (target.altim) target.altim.value = data.altimeter;
-                if (target.wspd) target.wspd.value = data.windSpeed;
-                if (target.wdir) target.wdir.value = data.windDirection;
-                
-                log(`Success: Loaded weather for ${icao}.`);
-            } catch (error) {
-                log(`Error: ${error.message}`);
-                alert(error.message);
-            }
+            // Path line
+            ctx.strokeStyle = '#38bdf8';
+            ctx.setLineDash([8, 4]);
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(100, 140);
+            ctx.quadraticCurveTo(w/2, 20, w-100, 140);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Airport points
+            ctx.fillStyle = '#f1f5f9';
+            ctx.beginPath(); ctx.arc(100, 140, 5, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(w-100, 140, 5, 0, Math.PI*2); ctx.fill();
+            
+            // Labels
+            ctx.font = 'bold 12px Inter';
+            ctx.fillText('DEP', 90, 160);
+            ctx.fillText('DEST', w-115, 160);
+
+            // Stylized Airplane at the peak
+            const px = w/2;
+            const py = 45;
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate(-0.05); // Slight climb angle
+            
+            ctx.fillStyle = '#38bdf8';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#38bdf8';
+            
+            // Fuselage
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 25, 6, 0, 0, Math.PI*2);
+            ctx.fill();
+            // Main Wing
+            ctx.beginPath();
+            ctx.moveTo(-5, 0);
+            ctx.lineTo(-12, -25);
+            ctx.lineTo(8, -25);
+            ctx.lineTo(15, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(-5, 0);
+            ctx.lineTo(-12, 25);
+            ctx.lineTo(8, 25);
+            ctx.lineTo(15, 0);
+            ctx.closePath();
+            ctx.fill();
+            // Horizontal Stabilizer
+            ctx.beginPath();
+            ctx.moveTo(-18, 0);
+            ctx.lineTo(-24, -10);
+            ctx.lineTo(-20, -10);
+            ctx.lineTo(-14, 0);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(-18, 0);
+            ctx.lineTo(-24, 10);
+            ctx.lineTo(-20, 10);
+            ctx.lineTo(-14, 0);
+            ctx.fill();
+            // Vertical Stabilizer
+            ctx.fillStyle = '#0ea5e9';
+            ctx.beginPath();
+            ctx.moveTo(-15, -2);
+            ctx.lineTo(-26, -12);
+            ctx.lineTo(-24, 0);
+            ctx.fill();
+            
+            ctx.restore();
         }
 
         function addLeg() {
             const container = document.getElementById('destinations-container');
             const div = document.createElement('div');
-            div.className = 'dest-leg';
-            div.style = 'border: 1px solid #ddd; padding: 8px; margin-bottom: 8px; border-radius: 4px; background: #fff;';
+            div.className = 'dest-leg destination';
             div.innerHTML = `
-                <div style="display: flex; gap: 8px; margin-bottom: 5px;">
-                    <input type="text" class="destination" placeholder="ICAO" required style="flex: 1; min-width: 60px;">
-                    <button type="button" onclick="removeLeg(this)" style="background: #e74c3c; font-size: 11px; padding: 4px 8px;">Remove</button>
+                <div class="leg-header">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Destination (ICAO)</label>
+                        <input type="text" class="destination-icao" placeholder="e.g. KSFO" required onblur="handleWeather(this, 'dest')">
+                    </div>
+                    <div class="form-group" style="width: 100px;">
+                        <label>Leg Alt (ft)</label>
+                        <input type="number" class="leg-planned-alt" placeholder="ft" required>
+                    </div>
+                    <button type="button" class="btn-remove" onclick="removeLeg(this)">✕</button>
                 </div>
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 9px;">Temp</label>
-                        <input type="number" class="leg-temp" placeholder="°C" required style="width: 100%; box-sizing: border-box;">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 9px;">Altim</label>
-                        <input type="number" step="0.01" class="leg-altim" placeholder="inHg" required style="width: 100%; box-sizing: border-box;">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 9px;">Wind Spd</label>
-                        <input type="number" class="leg-wind-spd" placeholder="Kts" required style="width: 100%; box-sizing: border-box;">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 9px;">Wind Dir</label>
-                        <input type="number" class="leg-wind-dir" placeholder="Deg" required style="width: 100%; box-sizing: border-box;">
-                    </div>
+                <div class="leg-row">
+                    <div class="form-group"><label>Temp (°C)</label><input type="number" class="leg-temp weather-field"></div>
+                    <div class="form-group"><label>Altim (inHg)</label><input type="number" step="0.01" class="leg-altim weather-field"></div>
+                    <div class="form-group"><label>Wind Spd (kt)</label><input type="number" class="leg-wind-spd weather-field"></div>
+                    <div class="form-group"><label>Wind Dir (°)</label><input type="number" class="leg-wind-dir weather-field"></div>
                 </div>
             `;
             container.appendChild(div);
-
-            const input = div.querySelector('.destination');
-            input.addEventListener('blur', async (e) => {
-                const icao = e.target.value.trim().toUpperCase();
-                if (icao.length === 4) {
-                    await updateWeather(icao, div);
-                } else if (icao.length > 0) {
-                    alert('Please enter a valid 4-letter ICAO code.');
-                }
-            });
         }
 
-        function removeLeg(btn) {
-            btn.closest('.dest-leg').remove();
-        }
-
-        async function generateLog() {
-            log("Generating Flight Tables...");
+        async function handleWeather(input, type) {
+            const icao = input.value.trim().toUpperCase();
+            if (icao.length !== 4) return;
             
-            // Simplified implementation - will be refined
-            log("Log generation started (Logic pending full implementation).");
+            try {
+                const res = await fetch(`/api/weather/${icao}`);
+                const data = await res.json();
+                
+                const container = input.closest('.dest-leg');
+                if (type === 'dep') {
+                    document.getElementById('dep-temp').value = data.temperature;
+                    const alt = data.altimeter > 50 ? (data.altimeter / 33.8639) : data.altimeter;
+                    document.getElementById('dep-altim').value = alt.toFixed(2);
+                    document.getElementById('dep-wind-spd').value = data.windSpeed;
+                    document.getElementById('dep-wind-dir').value = data.windDirection;
+                } else {
+                    container.querySelector('.leg-temp').value = data.temperature;
+                    const alt = data.altimeter > 50 ? (data.altimeter / 33.8639) : data.altimeter;
+                    container.querySelector('.leg-altim').value = alt.toFixed(2);
+                    container.querySelector('.leg-wind-spd').value = data.windSpeed;
+                    container.querySelector('.leg-wind-dir').value = data.windDirection;
+                }
+            } catch (e) { console.error('Weather error:', e); }
+        }
+
+        function removeLeg(btn) { 
+            const container = document.getElementById('destinations-container');
+            if (container.children.length > 1) btn.closest('.dest-leg').remove();
+            else alert("Keep at least one destination leg.");
+        }
+
+        function generateLog() {
+            const aircraft = document.getElementById('aircraft').value;
+            const date = document.getElementById('date').value;
+            const depIcao = document.getElementById('departure-icao').value;
+            const depAlt = parseFloat(document.getElementById('dep-airport-alt').value) || 0;
+            const depTemp = parseFloat(document.getElementById('dep-temp').value) || 15;
+            const depAltim = parseFloat(document.getElementById('dep-altim').value) || 29.92;
+
+            document.getElementById('out-aircraft').innerText = "Aircraft: " + aircraft;
+            document.getElementById('out-date').innerText = "Date: " + date;
+
+            const tb1 = document.getElementById('table1-body');
+            const tb2 = document.getElementById('table2-body');
+            const tb3 = document.getElementById('table3-body');
+            tb1.innerHTML = ''; tb2.innerHTML = ''; tb3.innerHTML = '';
+
+            // Table 1: Departure Airport Row
+            const pAlt0 = calculatePressureAltitude(depAlt, depAltim);
+            const dAlt0 = calculateDensityAltitude(pAlt0, depTemp);
+            tb1.innerHTML += `<tr><td>${depIcao} (APT)</td><td>${depAlt}</td><td>${pAlt0}</td><td>${depTemp}</td><td>${dAlt0}</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
+
+            // Process Legs
+            const legDivs = document.querySelectorAll('.dest-leg.destination');
+            let prevIcao = depIcao;
+            
+            legDivs.forEach((div, i) => {
+                const icao = div.querySelector('.destination-icao').value;
+                const plannedAlt = parseFloat(div.querySelector('.leg-planned-alt').value);
+                const temp = parseFloat(div.querySelector('.leg-temp').value) || 15;
+                const altim = parseFloat(div.querySelector('.leg-altim').value) || 29.92;
+                
+                const pAlt = calculatePressureAltitude(plannedAlt, altim);
+                const dAlt = calculateDensityAltitude(pAlt, temp);
+                
+                // Table 1: Cruise Row
+                tb1.innerHTML += `<tr><td>CRUISE TO ${icao}</td><td>${plannedAlt}</td><td>${pAlt}</td><td>${temp}</td><td>${dAlt}</td><td>65%</td><td>4800</td><td>93</td><td>4.5</td></tr>`;
+                
+                // Table 2 & 3 Placeholder Rows (simplified for now)
+                tb2.innerHTML += `<tr><td>${prevIcao}-${icao}</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>93</td><td>10</td><td>6</td><td>0.5</td></tr>`;
+                tb3.innerHTML += `<tr><td>${icao}</td><td>-</td><td>10</td><td>-</td><td>93</td><td>6</td><td>-</td><td>CTAF</td></tr>`;
+                
+                prevIcao = icao;
+            });
+
             document.getElementById('nav-log-container').style.display = 'block';
+            window.scrollTo(0, document.body.scrollHeight);
         }
     </script>
 </body>

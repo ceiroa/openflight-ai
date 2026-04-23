@@ -42,9 +42,20 @@
         }
 
         input, select {
-            padding: 8px;
+            padding: 6px; /* Reduced from 8px */
             border: 1px solid var(--border-color);
             border-radius: 4px;
+            font-size: 14px; /* Slightly smaller font */
+        }
+
+        /* Responsive adjustments for mobile */
+        @media screen and (max-width: 600px) {
+            body { margin: 10px; }
+            .container { width: 100%; }
+            .no-print { padding: 10px; }
+            .form-group { margin-bottom: 10px; }
+            input, select { padding: 4px; font-size: 13px; }
+            label { font-size: 12px !important; }
         }
 
         button {
@@ -117,51 +128,51 @@
                     <input type="text" id="departure" placeholder="e.g. KLAX" required>
                 </div>
 
-                <div id="departure-weather" style="border: 1px solid #ddd; padding: 10px; margin-bottom: 20px; border-radius: 4px; background: #fff;">
-                    <div style="font-size: 12px; font-weight: bold; margin-bottom: 5px; color: var(--accent-color);">Departure Weather</div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px;">
+                <div id="departure-weather" style="border: 1px solid #ddd; padding: 8px; margin-bottom: 15px; border-radius: 4px; background: #fff;">
+                    <div style="font-size: 11px; font-weight: bold; margin-bottom: 5px; color: var(--accent-color);">Departure Weather</div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label style="font-size: 10px;">Temp (°C)</label>
-                            <input type="number" id="temperature" placeholder="Temp" required>
+                            <label style="font-size: 9px;">Temp</label>
+                            <input type="number" id="temperature" placeholder="°C" required style="width: 100%; box-sizing: border-box;">
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label style="font-size: 10px;">Altim (inHg)</label>
-                            <input type="number" step="0.01" id="altimeter" placeholder="Altim" required>
+                            <label style="font-size: 9px;">Altim</label>
+                            <input type="number" step="0.01" id="altimeter" placeholder="inHg" required style="width: 100%; box-sizing: border-box;">
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label style="font-size: 10px;">Wind Spd</label>
-                            <input type="number" id="wind-speed" placeholder="Spd" required>
+                            <label style="font-size: 9px;">Wind Spd</label>
+                            <input type="number" id="wind-speed" placeholder="Kts" required style="width: 100%; box-sizing: border-box;">
                         </div>
                         <div class="form-group" style="margin-bottom: 0;">
-                            <label style="font-size: 10px;">Wind Dir</label>
-                            <input type="number" id="wind-dir" placeholder="Dir" required>
+                            <label style="font-size: 9px;">Wind Dir</label>
+                            <input type="number" id="wind-dir" placeholder="Deg" required style="width: 100%; box-sizing: border-box;">
                         </div>
                     </div>
                 </div>
                 
                 <div id="destinations-container">
                     <label>Destinations</label>
-                    <div class="dest-leg" style="border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 4px; background: #fff;">
-                        <div style="display: flex; gap: 10px; margin-bottom: 5px;">
-                            <input type="text" class="destination" placeholder="ICAO (e.g. KSFO)" required style="flex: 1;">
-                            <button type="button" onclick="removeLeg(this)" style="background: #e74c3c; font-size: 12px; padding: 5px 10px;">Remove Destination</button>
+                    <div class="dest-leg" style="border: 1px solid #ddd; padding: 8px; margin-bottom: 8px; border-radius: 4px; background: #fff;">
+                        <div style="display: flex; gap: 8px; margin-bottom: 5px;">
+                            <input type="text" class="destination" placeholder="ICAO" required style="flex: 1; min-width: 60px;">
+                            <button type="button" onclick="removeLeg(this)" style="background: #e74c3c; font-size: 11px; padding: 4px 8px;">Remove</button>
                         </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px;">
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
                             <div class="form-group" style="margin-bottom: 0;">
-                                <label style="font-size: 10px;">Temp (°C)</label>
-                                <input type="number" class="leg-temp" placeholder="Temp" required>
+                                <label style="font-size: 9px;">Temp</label>
+                                <input type="number" class="leg-temp" placeholder="°C" required style="width: 100%; box-sizing: border-box;">
                             </div>
                             <div class="form-group" style="margin-bottom: 0;">
-                                <label style="font-size: 10px;">Altim (inHg)</label>
-                                <input type="number" step="0.01" class="leg-altim" placeholder="Altim" required>
+                                <label style="font-size: 9px;">Altim</label>
+                                <input type="number" step="0.01" class="leg-altim" placeholder="inHg" required style="width: 100%; box-sizing: border-box;">
                             </div>
                             <div class="form-group" style="margin-bottom: 0;">
-                                <label style="font-size: 10px;">Wind Spd</label>
-                                <input type="number" class="leg-wind-spd" placeholder="Spd" required>
+                                <label style="font-size: 9px;">Wind Spd</label>
+                                <input type="number" class="leg-wind-spd" placeholder="Kts" required style="width: 100%; box-sizing: border-box;">
                             </div>
                             <div class="form-group" style="margin-bottom: 0;">
-                                <label style="font-size: 10px;">Wind Dir</label>
-                                <input type="number" class="leg-wind-dir" placeholder="Dir" required>
+                                <label style="font-size: 9px;">Wind Dir</label>
+                                <input type="number" class="leg-wind-dir" placeholder="Deg" required style="width: 100%; box-sizing: border-box;">
                             </div>
                         </div>
                     </div>
@@ -273,6 +284,18 @@
                 }
             });
 
+            // Handle the initial destination's weather fetch
+            const initialDest = document.querySelector('.destination');
+            if (initialDest) {
+                initialDest.addEventListener('blur', async (e) => {
+                    const icao = e.target.value.trim().toUpperCase();
+                    const container = e.target.closest('.dest-leg');
+                    if (icao.length === 4) {
+                        await updateWeather(icao, container);
+                    }
+                });
+            }
+
             // Re-bind global functions
             window.addLeg = addLeg;
             window.removeLeg = removeLeg;
@@ -290,6 +313,13 @@
                 }
                 
                 const data = await response.json();
+                log(`Received weather data: ${JSON.stringify(data)}`);
+                
+                // Safeguard: If altimeter is > 50, it's likely hPa, convert to inHg
+                if (data.altimeter > 50) {
+                    data.altimeter = Number((data.altimeter / 33.8639).toFixed(2));
+                }
+
                 const flightDate = new Date(document.getElementById('date').value);
                 const isFuture = flightDate > new Date().setHours(23,59,59,999);
 
@@ -306,15 +336,16 @@
                     if (target.temp) target.temp.value = data.forecast.temperature;
                     if (target.wspd) target.wspd.value = data.forecast.windSpeed;
                     if (target.wdir) target.wdir.value = data.forecast.windDirection;
-                    if (target.altim) target.altim.value = data.altimeter.toFixed(2);
+                    if (target.altim) target.altim.value = data.altimeter;
                 } else {
                     if (target.temp) target.temp.value = data.temperature;
-                    if (target.altim) target.altim.value = data.altimeter.toFixed(2);
+                    if (target.altim) target.altim.value = data.altimeter;
                     if (target.wspd) target.wspd.value = data.windSpeed;
                     if (target.wdir) target.wdir.value = data.windDirection;
                 }
-                log(`Success: Loaded weather for ${icao}.`);
+                log(`Success: Loaded weather for ${icao}. Altim: ${data.altimeter}`);
             } catch (error) {
+                console.error('Weather update error:', error);
                 log(`Error: ${error.message}`);
                 alert(error.message);
             }
@@ -324,28 +355,28 @@
             const container = document.getElementById('destinations-container');
             const div = document.createElement('div');
             div.className = 'dest-leg';
-            div.style = 'border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 4px; background: #fff;';
+            div.style = 'border: 1px solid #ddd; padding: 8px; margin-bottom: 8px; border-radius: 4px; background: #fff;';
             div.innerHTML = `
-                <div style="display: flex; gap: 10px; margin-bottom: 5px;">
-                    <input type="text" class="destination" placeholder="ICAO (e.g. KSFO)" required style="flex: 1;">
-                    <button type="button" onclick="removeLeg(this)" style="background: #e74c3c; font-size: 12px; padding: 5px 10px;">Remove Destination</button>
+                <div style="display: flex; gap: 8px; margin-bottom: 5px;">
+                    <input type="text" class="destination" placeholder="ICAO" required style="flex: 1; min-width: 60px;">
+                    <button type="button" onclick="removeLeg(this)" style="background: #e74c3c; font-size: 11px; padding: 4px 8px;">Remove</button>
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px;">
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 10px;">Temp (°C)</label>
-                        <input type="number" class="leg-temp" placeholder="Temp" required>
+                        <label style="font-size: 9px;">Temp</label>
+                        <input type="number" class="leg-temp" placeholder="°C" required style="width: 100%; box-sizing: border-box;">
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 10px;">Altim (inHg)</label>
-                        <input type="number" step="0.01" class="leg-altim" placeholder="Altim" required>
+                        <label style="font-size: 9px;">Altim</label>
+                        <input type="number" step="0.01" class="leg-altim" placeholder="inHg" required style="width: 100%; box-sizing: border-box;">
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 10px;">Wind Spd</label>
-                        <input type="number" class="leg-wind-spd" placeholder="Spd" required>
+                        <label style="font-size: 9px;">Wind Spd</label>
+                        <input type="number" class="leg-wind-spd" placeholder="Kts" required style="width: 100%; box-sizing: border-box;">
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
-                        <label style="font-size: 10px;">Wind Dir</label>
-                        <input type="number" class="leg-wind-dir" placeholder="Dir" required>
+                        <label style="font-size: 9px;">Wind Dir</label>
+                        <input type="number" class="leg-wind-dir" placeholder="Deg" required style="width: 100%; box-sizing: border-box;">
                     </div>
                 </div>
             `;

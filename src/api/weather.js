@@ -16,9 +16,12 @@ export async function fetchWeather(icao) {
         
         const metar = data[0];
         
+        let altim = metar.altim;
+        if (altim > 50) altim = altim / 33.8639;
+
         return {
             temperature: metar.temp, // Celsius
-            altimeter: metar.altim     // inHg
+            altimeter: Number(altim.toFixed(2)) // inHg
         };
     } catch (error) {
         console.error('Error fetching weather:', error);

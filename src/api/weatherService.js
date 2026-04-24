@@ -37,6 +37,8 @@ export async function getWeatherData(icao) {
             windSpeed: metar.wspd,
             windDirection: metar.wdir,
             elevation: Math.round(metar.elev * 3.28084), // Convert meters to feet
+            lat: metar.lat,
+            lon: metar.lon,
             forecast: null
         };
         

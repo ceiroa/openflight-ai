@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --no-transform"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --no-transform",
+    "test:ui": "npx playwright test"
   },
   "repository": {
     "type": "git",
@@ -24,6 +25,8 @@
     "luxon": "^3.7.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@types/node": "^25.6.0",
     "jest": "^30.3.0"
   }
 }

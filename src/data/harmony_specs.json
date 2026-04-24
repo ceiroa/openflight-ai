@@ -4,7 +4,7 @@
     "climb": {
       "speed_kts": 65,
       "rpm": 5500,
-      "fuel_burn_gph": 6.0,
+      "fuel_burn_gph": 6.6,
       "rate_of_climb_fpm": 850,
       "climbTable": [
         { "altitude_ft": 0, "speed_kts": 67, "rate_of_climb_fpm": 900 },
@@ -16,7 +16,7 @@
     "cruise65": {
       "speed_kts": 93,
       "rpm": 4800,
-      "fuel_burn_gph": 4.5
+      "fuel_burn_gph": 4.3
     }
   },
   "limits": {

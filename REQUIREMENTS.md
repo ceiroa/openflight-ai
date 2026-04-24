@@ -1,61 +1,85 @@
 # OpenFlight AI - Project Requirements & Specification
 
 ## 1. Core Vision
-OpenFlight AI is a stylized, dark-themed flight planning and navigation log generator designed for GA (General Aviation) pilots, specifically focusing on Light Sport Aircraft like the Evektor Harmony LSA.
+OpenFlight AI is a dark-themed flight planning and navigation log generator for GA pilots, with an initial focus on Light Sport Aircraft such as the Evektor Harmony LSA.
 
 ## 2. UI/UX Standards
-- **Theme:** High-contrast Dark Mode (Slate/Blue/Zinc palette).
-- **Aesthetics:** 
-    - Interactive "Flight Path" canvas at the top with a recognizable stylized airplane icon flying along a dashed path.
-    - Responsive layout that fits well on smaller screens.
-    - Distinct grouping for Departure and Destination legs with background contrast for field readability.
+- **Theme:** High-contrast dark mode using a slate/blue palette.
+- **Aesthetics:**
+    - A stylized flight-path canvas appears at the top of the page with a dashed route and aircraft icon.
+    - Departure and destination legs are visually grouped and easy to scan.
+    - The layout remains usable on smaller screens.
 - **Interactivity:**
-    - ICAO fields trigger automatic weather fetching on "blur" (tab out).
-    - Weather data includes Temperature (°C), Altimeter (inHg), Wind Speed (kt), Wind Direction (°), and Airport Elevation (ft).
-    - **Global Altitude Prepopulation:** Changing the 'Global Cruise Altitude' field automatically updates all existing leg altitudes. New legs default to this value.
-    - Automatic conversion of hPa to inHg for altimeter settings (detect if > 50).
-    - Dynamic addition/removal of destination legs.
+    - ICAO fields trigger automatic weather lookup on blur.
+    - Weather population fills temperature, altimeter, wind speed, wind direction, airport elevation, latitude, and longitude.
+    - The global cruise altitude updates all existing leg altitudes and is used as the default for newly added legs.
+    - Users can dynamically add and remove destination legs, but at least one destination leg must remain.
+    - A status banner displays validation and fetch failures.
+    - A debug log window shows weather fetches and navigation log generation events.
+    - Navigation log generation is blocked until required aircraft, weather, and coordinate inputs exist for every leg.
 
 ## 3. Data Sources & Logic
-- **Weather & Elevation:** Real-time data from `aviationweather.gov`.
-    - **Airport Elevation:** Official field `elev` is provided in meters; converted automatically to feet using the 3.28084 multiplier.
-- **Aircraft Performance:** 
-    - Sourced from POH data (e.g., `src/data/harmony_specs.json`).
-    - **Climb:** 100% BHP, 5500 RPM, 65 VY KTAS.
-    - **Cruise:** 65% BHP, 4800 RPM, 93 KTAS (typical).
-    - **Fuel:** Consumption rates mapped to BHP/RPM profiles.
+- **Weather and airport data:** Real-time data from `aviationweather.gov`.
+    - Weather is fetched from the official METAR endpoint.
+    - If METAR data does not contain usable coordinates or elevation, the app falls back to the official `stationinfo` endpoint and then the official `airport` endpoint.
+    - Airport elevation is converted from meters to feet using `3.28084`.
+- **Aircraft performance:**
+    - Aircraft profiles are loaded from project data files such as `src/data/harmony_specs.json`.
+    - Climb and cruise values are taken from the selected aircraft profile rather than hardcoded in the UI.
+    - Climb profiles require a climb-performance table for interpolation.
 - **Calculations:**
-    - **Pressure Altitude:** Calculated from airport/planned altitude and current altimeter setting.
-    - **Density Altitude:** Calculated from Pressure Altitude and OAT.
-    - **TOC (Top of Climb):** Time = (Planned Alt - Airport Alt) / Climb Rate. Distance = Time * Climb Groundspeed.
-    - **Wind Triangle:** Groundspeed and True Heading calculated via WCA (Wind Correction Angle).
-    - **Magnetic Heading:** True Heading adjusted by local Magnetic Variation (sourced automatically).
+    - Pressure altitude is calculated from airport or planned altitude and the current altimeter setting.
+    - Density altitude is calculated from pressure altitude and outside air temperature.
+    - Climb performance is interpolated from the aircraft climb table.
+    - Wind triangle calculations determine wind correction angle, groundspeed, and headings.
+    - Great-circle distance and bearing are derived from airport coordinates.
+    - Magnetic heading currently uses variation fields that default to `0`; automatic magnetic variation lookup is not implemented yet.
 
-## 4. Navigation Log Output (3 Tables)
+## 4. Navigation Log Output
 ### Table 1: Cruise Performance
-- **Columns:** POINT/LEG, ALTITUDE, P. ALT, OAT, D. ALT, % BHP, RPM, KTAS, FUEL (GPH).
-- **Rows:** 
-    - **Airport Rows (APT):** Represent the climb phase from ground to TOC. Must populate with climb performance data: **100% BHP, 5500 RPM, 65 KTAS, 6.6 GPH**.
-    - **Cruise Rows:** Represent level flight at planned altitude. Populate with cruise performance data: **65% BHP, 4800 RPM, 93 KTAS, 4.3 GPH**.
+- **Columns:** POINT, ALTITUDE, P. ALT, OAT, D. ALT, % BHP, RPM, KTAS, FUEL (GPH).
+- **Rows:**
+    - The departure airport always produces an initial airport row.
+    - Each leg adds a cruise row for the destination.
+    - Each leg after the first also adds an airport row for the previous destination.
+    - Example: `KORD -> KARR -> KVYS` produces four rows in Table 1.
 
 ### Table 2: Course & Wind
 - **Columns:** LEG SEGMENT, TRUE COURSE, WIND (DIR/SPD), TRUE HDG, VAR, MAG HDG, GS, DIST, ETE, FUEL BURN.
-- **Logic:** Accounts for Top of Climb adjustments.
+- **Rows:**
+    - Every leg produces one cruise row: `TOC-destination`.
+    - A climb row: `start-TOC` is only added when the planned altitude is above the previous airport elevation.
+    - Climb rows use the previous point's surface winds.
+    - Cruise rows use the destination leg's weather values.
 
 ### Table 3: Checkpoints & Comms
 - **Columns:** CHECKPOINT, MAG HDG, DIST (LEG), DIST (REM), GROUNDSPEED, ETE, ETA, COMMS / FREQ.
-- **Logic:** Tracks progress and remaining distance; includes frequencies (ATIS/CTAF).
+- **Current behavior:**
+    - One row is produced per destination checkpoint.
+    - Remaining distance is tracked cumulatively.
+    - `ETA` is currently a placeholder value of `-`.
+    - `COMMS / FREQ` is currently a placeholder value of `CTAF`.
 
-## 5. Test-Driven UI Workflow
-- **Standard:** All UI changes must be verified using the automated test suite.
-- **Workflow:**
-    1. Run `npm run test:ui` **BEFORE** making any UI changes to establish a baseline.
-    2. Apply the requested changes.
-    3. Run `npm run test:ui` **AFTER** changes to verify functionality.
-    4. If any tests fail, the AI **MUST** ask the user if they want to revert the changes.
-- **Coverage:** Automated tests in `tests/ui.test.js` cover dark theme colors, flight graph visibility, automated weather fetching, leg addition/removal, and navigation log generation.
+## 5. Validation Rules
+- The aircraft profile must load successfully before the nav log can be generated.
+- Departure ICAO and all destination ICAOs must be four characters.
+- Departure weather and coordinates must be loaded before generation.
+- Every destination leg must have weather and coordinates loaded before generation.
+- Every planned leg altitude must be numeric and non-negative.
 
-## 6. Future Roadmap
-- Integrate internet-sourced performance data for more common GA airplanes (Cessna, Piper, etc.).
-- Enhanced Top of Climb / Top of Descent splitting in the nav log tables.
-- Automatic Magnetic Variation lookup based on coordinates.
+## 6. Test Workflow
+- **Standard:** Behavior changes must be covered by automated tests.
+- **Commands:**
+    - `npm run test:unit` runs Jest unit tests for calculations and service logic.
+    - `npm run test:ui` runs Playwright end-to-end tests.
+    - `npm test` runs both suites and is the required pre-push check.
+- **Coverage:**
+    - `tests/unit` covers navigation calculations and weather-service fallback behavior.
+    - `tests/e2e` covers theme rendering, flight graph visibility, automated weather population, leg addition/removal, and multi-destination navigation log generation with mocked weather responses.
+- **CI:** GitHub Actions runs the same checks on pushes and pull requests.
+
+## 7. Future Roadmap
+- Add more aircraft profiles and profile-selection UX beyond the current data files.
+- Add automatic magnetic variation lookup based on coordinates.
+- Improve checkpoint communications and ETA generation from real data sources.
+- Add explicit top-of-descent logic if descent planning becomes part of the nav log.

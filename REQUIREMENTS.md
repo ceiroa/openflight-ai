@@ -6,17 +6,19 @@ OpenFlight AI is a stylized, dark-themed flight planning and navigation log gene
 ## 2. UI/UX Standards
 - **Theme:** High-contrast Dark Mode (Slate/Blue/Zinc palette).
 - **Aesthetics:** 
-    - Interactive "Flight Path" canvas at the top with a recognizable stylized airplane icon.
+    - Interactive "Flight Path" canvas at the top with a recognizable stylized airplane icon flying along a dashed path.
     - Responsive layout that fits well on smaller screens.
     - Distinct grouping for Departure and Destination legs with background contrast for field readability.
 - **Interactivity:**
     - ICAO fields trigger automatic weather fetching on "blur" (tab out).
-    - Weather data includes Temperature (°C), Altimeter (inHg), Wind Speed (kt), and Wind Direction (°).
+    - Weather data includes Temperature (°C), Altimeter (inHg), Wind Speed (kt), Wind Direction (°), and Airport Elevation (ft).
+    - **Global Altitude Prepopulation:** Changing the 'Global Cruise Altitude' field automatically updates all existing leg altitudes. New legs default to this value.
     - Automatic conversion of hPa to inHg for altimeter settings (detect if > 50).
     - Dynamic addition/removal of destination legs.
 
 ## 3. Data Sources & Logic
-- **Weather:** Real-time data from `aviationweather.gov`.
+- **Weather & Elevation:** Real-time data from `aviationweather.gov`.
+    - **Airport Elevation:** Official field `elev` is provided in meters; converted automatically to feet using the 3.28084 multiplier.
 - **Aircraft Performance:** 
     - Sourced from POH data (e.g., `src/data/harmony_specs.json`).
     - **Climb:** 100% BHP, 5500 RPM, 65 VY KTAS.
@@ -32,7 +34,9 @@ OpenFlight AI is a stylized, dark-themed flight planning and navigation log gene
 ## 4. Navigation Log Output (3 Tables)
 ### Table 1: Cruise Performance
 - **Columns:** POINT/LEG, ALTITUDE, P. ALT, OAT, D. ALT, % BHP, RPM, KTAS, FUEL (GPH).
-- **Rows:** Must show a row for each airport (APT) at ground elevation and separate rows for the cruise segments at planned altitudes.
+- **Rows:** 
+    - **Airport Rows (APT):** Represent the climb phase from ground to TOC. Must populate with climb performance data: **100% BHP, 5500 RPM, 65 KTAS, 6.6 GPH**.
+    - **Cruise Rows:** Represent level flight at planned altitude. Populate with cruise performance data: **65% BHP, 4800 RPM, 93 KTAS, 4.3 GPH**.
 
 ### Table 2: Course & Wind
 - **Columns:** LEG SEGMENT, TRUE COURSE, WIND (DIR/SPD), TRUE HDG, VAR, MAG HDG, GS, DIST, ETE, FUEL BURN.

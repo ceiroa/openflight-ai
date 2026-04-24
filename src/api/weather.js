@@ -22,7 +22,7 @@ export async function fetchWeather(icao) {
         return {
             temperature: metar.temp, // Celsius
             altimeter: Number(altim.toFixed(2)), // inHg
-            elevation: metar.elev // feet
+            elevation: Math.round(metar.elev * 3.28084) // feet
         };
     } catch (error) {
         console.error('Error fetching weather:', error);

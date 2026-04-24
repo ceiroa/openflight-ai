@@ -326,8 +326,12 @@
                         <label>Destination (ICAO)</label>
                         <input type="text" class="destination-icao" placeholder="e.g. KSFO" required onblur="handleWeather(this, 'dest')">
                     </div>
-                    <div class="form-group" style="width: 100px;">
-                        <label>Leg Alt (ft)</label>
+                    <div class="form-group" style="width: 80px;">
+                        <label>Apt Alt</label>
+                        <input type="number" class="leg-elevation" value="0">
+                    </div>
+                    <div class="form-group" style="width: 80px;">
+                        <label>Leg Alt</label>
                         <input type="number" class="leg-planned-alt" value="${globalAlt}" required>
                     </div>
                     <button type="button" class="btn-remove" onclick="removeLeg(this)">✕</button>
@@ -338,7 +342,6 @@
                     <div class="form-group"><label>Wind Spd (kt)</label><input type="number" class="leg-wind-spd weather-field"></div>
                     <div class="form-group"><label>Wind Dir (°)</label><input type="number" class="leg-wind-dir weather-field"></div>
                 </div>
-                <input type="hidden" class="leg-elevation" value="0">
             `;
             container.appendChild(div);
         }
@@ -395,7 +398,7 @@
             // Table 1: Departure Airport
             const pAlt0 = calculatePressureAltitude(depAlt, depAltim);
             const dAlt0 = calculateDensityAltitude(pAlt0, depTemp);
-            tb1.innerHTML += `<tr><td>${depIcao} (APT)</td><td>${depAlt}</td><td>${pAlt0}</td><td>${depTemp}</td><td>${dAlt0}</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
+            tb1.innerHTML += `<tr><td>${depIcao} (APT)</td><td>${depAlt}</td><td>${pAlt0}</td><td>${depTemp}</td><td>${dAlt0}</td><td>100%</td><td>5500</td><td>65</td><td>6.0</td></tr>`;
 
             const legDivs = document.querySelectorAll('.dest-leg.destination');
             legDivs.forEach((div, i) => {
@@ -414,7 +417,7 @@
                 // Table 1: Destination Airport
                 const pAltApt = calculatePressureAltitude(aptElev, altim);
                 const dAltApt = calculateDensityAltitude(pAltApt, temp);
-                tb1.innerHTML += `<tr><td>${icao} (APT)</td><td>${aptElev}</td><td>${pAltApt}</td><td>${temp}</td><td>${dAltApt}</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
+                tb1.innerHTML += `<tr><td>${icao} (APT)</td><td>${aptElev}</td><td>${pAltApt}</td><td>${temp}</td><td>${dAltApt}</td><td>100%</td><td>5500</td><td>65</td><td>6.0</td></tr>`;
             });
 
             document.getElementById('nav-log-container').style.display = 'block';

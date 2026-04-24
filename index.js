@@ -9,6 +9,10 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const AIRCRAFT_FILES = {
+    'Evektor Harmony LSA': 'harmony_specs.json',
+    'Rotax 912': 'aircraft.json',
+};
 
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
@@ -17,9 +21,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/api/aircraft', async (req, res) => {
     const { name } = req.query;
     try {
-        let fileName = 'harmony_specs.json'; // Default
-        if (name === 'Rotax 912') fileName = 'aircraft.json';
-        
+        const fileName = AIRCRAFT_FILES[name] ?? AIRCRAFT_FILES['Evektor Harmony LSA'];
         const data = await fs.readFile(path.join(__dirname, 'src', 'data', fileName), 'utf8');
         res.json(JSON.parse(data));
     } catch (error) {
@@ -38,7 +40,7 @@ app.get('/api/weather/:icao', async (req, res) => {
         if (error.message.includes('No METAR found')) {
             res.status(404).json({ error: error.message });
         } else {
-            res.status(500).json({ error: 'Failed to fetch weather data' });
+            res.status(500).json({ error: error.message || 'Failed to fetch weather data' });
         }
     }
 });
@@ -53,7 +55,7 @@ app.get('/api/weather', async (req, res) => {
         res.json(weather);
     } catch (error) {
         console.error(`Error in /api/weather?icao=${icao}:`, error);
-        res.status(error.message.includes('No METAR') ? 404 : 500).json({ error: error.message });
+        res.status(error.message.includes('No METAR') ? 404 : 500).json({ error: error.message || 'Failed to fetch weather data' });
     }
 });
 

@@ -1,51 +1,98 @@
-/**
- * Fetches the latest METAR and TAF for a given ICAO code.
- * 
- * @param {string} icao - The ICAO airport code.
- * @returns {Promise<Object>} { temperature, altimeter, windSpeed, windDirection, forecast: { temperature, windSpeed, windDirection } }
- */
+const METAR_BASE_URL = 'https://aviationweather.gov/api/data/metar';
+const STATION_INFO_BASE_URL = 'https://aviationweather.gov/api/data/stationinfo';
+const AIRPORT_INFO_BASE_URL = 'https://aviationweather.gov/api/data/airport';
+
 export async function getWeatherData(icao) {
-    console.log(`[getWeatherData] START for ${icao}`);
-    const metarUrl = `https://aviationweather.gov/api/data/metar?ids=${icao}&format=json`;
-    
-    try {
-        console.log(`[getWeatherData] Fetching METAR from: ${metarUrl}`);
-        const response = await fetch(metarUrl);
-        
-        if (!response.ok) {
-            console.error(`[getWeatherData] METAR Fetch Failed: ${response.status}`);
-            throw new Error(`METAR API returned ${response.status}`);
-        }
-        
-        const metarData = await response.json();
-        console.log(`[getWeatherData] METAR Data Received: ${JSON.stringify(metarData).substring(0, 100)}`);
-        
-        const metar = Array.isArray(metarData) ? metarData[0] : metarData;
-        if (!metar || (Array.isArray(metarData) && metarData.length === 0)) {
-            console.warn(`[getWeatherData] No METAR found for ${icao}`);
-            throw new Error(`No METAR found for ${icao}`);
-        }
+    const metarUrl = `${METAR_BASE_URL}?ids=${icao}&format=json`;
 
-        let altimeter = metar.altim;
-        if (altimeter > 50) { 
-            altimeter = altimeter / 33.8639;
-        }
-
-        const result = {
-            temperature: metar.temp,
-            altimeter: Number(altimeter.toFixed(2)),
-            windSpeed: metar.wspd,
-            windDirection: metar.wdir,
-            elevation: Math.round(metar.elev * 3.28084), // Convert meters to feet
-            lat: metar.lat,
-            lon: metar.lon,
-            forecast: null
-        };
-        
-        console.log(`[getWeatherData] SUCCESS for ${icao}`);
-        return result;
-    } catch (error) {
-        console.error(`[getWeatherData] CRITICAL ERROR for ${icao}:`, error);
-        throw error;
+    const metar = await fetchFirstRecord(metarUrl, `METAR API`);
+    if (!metar) {
+        throw new Error(`No METAR found for ${icao}`);
     }
+
+    let altimeter = metar.altim;
+    if (altimeter > 50) {
+        altimeter = altimeter / 33.8639;
+    }
+
+    if (![metar.temp, altimeter, metar.wspd].every((value) => Number.isFinite(Number(value)))) {
+        throw new Error(`Incomplete weather data returned for ${icao}`);
+    }
+
+    const location = await resolveLocationData(icao, metar);
+
+    return {
+        temperature: metar.temp,
+        altimeter: Number(altimeter.toFixed(2)),
+        windSpeed: metar.wspd,
+        windDirection: metar.wdir ?? 0,
+        elevation: location.elevation,
+        lat: location.lat,
+        lon: location.lon,
+        forecast: null,
+    };
+}
+
+async function resolveLocationData(icao, metar) {
+    const metarLocation = normalizeLocationRecord(metar);
+    if (metarLocation) {
+        return metarLocation;
+    }
+
+    const stationInfo = await fetchFirstRecord(
+        `${STATION_INFO_BASE_URL}?ids=${icao}&format=json`,
+        `stationinfo API`
+    );
+    const stationLocation = normalizeLocationRecord(stationInfo);
+    if (stationLocation) {
+        return stationLocation;
+    }
+
+    const airportInfo = await fetchFirstRecord(
+        `${AIRPORT_INFO_BASE_URL}?ids=${icao}&format=json`,
+        `airport API`
+    );
+    const airportLocation = normalizeLocationRecord(airportInfo);
+    if (airportLocation) {
+        return airportLocation;
+    }
+
+    throw new Error(`No airport coordinates found for ${icao}`);
+}
+
+function normalizeLocationRecord(record) {
+    if (!record) {
+        return null;
+    }
+
+    const lat = Number(record.lat);
+    const lon = Number(record.lon);
+    const elev = Number(record.elev);
+    if (![lat, lon, elev].every(Number.isFinite)) {
+        return null;
+    }
+
+    return {
+        lat,
+        lon,
+        elevation: Math.round(elev * 3.28084),
+    };
+}
+
+async function fetchFirstRecord(url, label) {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`${label} returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (Array.isArray(data)) {
+        return data[0] ?? null;
+    }
+
+    if (Array.isArray(data?.value)) {
+        return data.value[0] ?? null;
+    }
+
+    return data ?? null;
 }

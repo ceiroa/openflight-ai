@@ -39,7 +39,7 @@
         
         #flightGraph { 
             width: 100%; 
-            height: 160px; 
+            height: 180px; 
             background: #020617; 
             border-radius: 8px; 
             margin-bottom: 24px; 
@@ -84,7 +84,7 @@
 </head>
 <body>
     <div class="container">
-        <canvas id="flightGraph" width="1000" height="200"></canvas>
+        <canvas id="flightGraph" width="1000" height="180"></canvas>
         
         <div class="no-print">
             <h1 style="display: flex; align-items: center; gap: 10px;">
@@ -209,10 +209,23 @@
         window.handleWeather = handleWeather;
         window.generateLog = generateLog;
 
+        const harmonySpecs = {
+            climb: { speed_kts: 65, rpm: 5500, fuel_burn_gph: 6.0, rate_of_climb_fpm: 850 },
+            cruise: { speed_kts: 93, rpm: 4800, fuel_burn_gph: 4.5 }
+        };
+
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('date').value = new Date().toISOString().split('T')[0];
             addLeg(); // Default destination
             drawGraph();
+
+            // Prepopulate leg altitudes when global cruise alt changes
+            document.getElementById('cruise-alt').addEventListener('input', (e) => {
+                const val = e.target.value;
+                document.querySelectorAll('.leg-planned-alt').forEach(input => {
+                    input.value = val;
+                });
+            });
         });
 
         function drawGraph() {
@@ -248,7 +261,7 @@
             ctx.fillText('DEP', 90, 160);
             ctx.fillText('DEST', w-115, 160);
 
-            // Stylized Airplane at the peak
+            // Stylized Airplane Icon
             const px = w/2;
             const py = 45;
             ctx.save();
@@ -306,6 +319,7 @@
             const container = document.getElementById('destinations-container');
             const div = document.createElement('div');
             div.className = 'dest-leg destination';
+            const globalAlt = document.getElementById('cruise-alt').value;
             div.innerHTML = `
                 <div class="leg-header">
                     <div class="form-group" style="flex: 1;">
@@ -314,7 +328,7 @@
                     </div>
                     <div class="form-group" style="width: 100px;">
                         <label>Leg Alt (ft)</label>
-                        <input type="number" class="leg-planned-alt" placeholder="ft" required>
+                        <input type="number" class="leg-planned-alt" value="${globalAlt}" required>
                     </div>
                     <button type="button" class="btn-remove" onclick="removeLeg(this)">✕</button>
                 </div>
@@ -324,6 +338,7 @@
                     <div class="form-group"><label>Wind Spd (kt)</label><input type="number" class="leg-wind-spd weather-field"></div>
                     <div class="form-group"><label>Wind Dir (°)</label><input type="number" class="leg-wind-dir weather-field"></div>
                 </div>
+                <input type="hidden" class="leg-elevation" value="0">
             `;
             container.appendChild(div);
         }
@@ -343,12 +358,14 @@
                     document.getElementById('dep-altim').value = alt.toFixed(2);
                     document.getElementById('dep-wind-spd').value = data.windSpeed;
                     document.getElementById('dep-wind-dir').value = data.windDirection;
+                    document.getElementById('dep-airport-alt').value = data.elevation || 0;
                 } else {
                     container.querySelector('.leg-temp').value = data.temperature;
                     const alt = data.altimeter > 50 ? (data.altimeter / 33.8639) : data.altimeter;
                     container.querySelector('.leg-altim').value = alt.toFixed(2);
                     container.querySelector('.leg-wind-spd').value = data.windSpeed;
                     container.querySelector('.leg-wind-dir').value = data.windDirection;
+                    container.querySelector('.leg-elevation').value = data.elevation || 0;
                 }
             } catch (e) { console.error('Weather error:', e); }
         }
@@ -375,32 +392,29 @@
             const tb3 = document.getElementById('table3-body');
             tb1.innerHTML = ''; tb2.innerHTML = ''; tb3.innerHTML = '';
 
-            // Table 1: Departure Airport Row
+            // Table 1: Departure Airport
             const pAlt0 = calculatePressureAltitude(depAlt, depAltim);
             const dAlt0 = calculateDensityAltitude(pAlt0, depTemp);
             tb1.innerHTML += `<tr><td>${depIcao} (APT)</td><td>${depAlt}</td><td>${pAlt0}</td><td>${depTemp}</td><td>${dAlt0}</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
 
-            // Process Legs
             const legDivs = document.querySelectorAll('.dest-leg.destination');
-            let prevIcao = depIcao;
-            
             legDivs.forEach((div, i) => {
                 const icao = div.querySelector('.destination-icao').value;
                 const plannedAlt = parseFloat(div.querySelector('.leg-planned-alt').value);
                 const temp = parseFloat(div.querySelector('.leg-temp').value) || 15;
                 const altim = parseFloat(div.querySelector('.leg-altim').value) || 29.92;
+                const aptElev = parseFloat(div.querySelector('.leg-elevation').value) || 0;
                 
                 const pAlt = calculatePressureAltitude(plannedAlt, altim);
                 const dAlt = calculateDensityAltitude(pAlt, temp);
                 
-                // Table 1: Cruise Row
+                // Table 1: Cruise segment
                 tb1.innerHTML += `<tr><td>CRUISE TO ${icao}</td><td>${plannedAlt}</td><td>${pAlt}</td><td>${temp}</td><td>${dAlt}</td><td>65%</td><td>4800</td><td>93</td><td>4.5</td></tr>`;
                 
-                // Table 2 & 3 Placeholder Rows (simplified for now)
-                tb2.innerHTML += `<tr><td>${prevIcao}-${icao}</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>93</td><td>10</td><td>6</td><td>0.5</td></tr>`;
-                tb3.innerHTML += `<tr><td>${icao}</td><td>-</td><td>10</td><td>-</td><td>93</td><td>6</td><td>-</td><td>CTAF</td></tr>`;
-                
-                prevIcao = icao;
+                // Table 1: Destination Airport
+                const pAltApt = calculatePressureAltitude(aptElev, altim);
+                const dAltApt = calculateDensityAltitude(pAltApt, temp);
+                tb1.innerHTML += `<tr><td>${icao} (APT)</td><td>${aptElev}</td><td>${pAltApt}</td><td>${temp}</td><td>${dAltApt}</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
             });
 
             document.getElementById('nav-log-container').style.display = 'block';

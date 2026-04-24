@@ -1,15 +1,16 @@
 import { test, expect } from '@playwright/test';
 
 const weatherFixtures = {
-    KORD: { temperature: 21.1, altimeter: 29.7, windSpeed: 10, windDirection: 270, elevation: 663, lat: 41.9602, lon: -87.9316 },
-    KARR: { temperature: 18.9, altimeter: 29.73, windSpeed: 13, windDirection: 300, elevation: 699, lat: 41.7713, lon: -88.4815 },
-    KVYS: { temperature: 18, altimeter: 29.76, windSpeed: 10, windDirection: 270, elevation: 650, lat: 41.3519, lon: -89.1531 },
+    KORD: { temperature: 21.1, altimeter: 29.7, windSpeed: 10, windDirection: 270, elevation: 663, lat: 41.9602, lon: -87.9316, variation: -3.96 },
+    KARR: { temperature: 18.9, altimeter: 29.73, windSpeed: 13, windDirection: 300, elevation: 699, lat: 41.7713, lon: -88.4815, variation: -3.88 },
+    KVYS: { temperature: 18, altimeter: 29.76, windSpeed: 10, windDirection: 270, elevation: 650, lat: 41.3519, lon: -89.1531, variation: -2.71 },
 };
 
 test.describe('OpenFlight AI - UI Tests', () => {
     test.beforeEach(async ({ page }) => {
         await page.route('**/api/weather/*', async (route) => {
-            const icao = route.request().url().split('/').pop().toUpperCase();
+            const url = new URL(route.request().url());
+            const icao = url.pathname.split('/').pop().toUpperCase();
             const payload = weatherFixtures[icao];
 
             if (!payload) {
@@ -40,6 +41,7 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('#dep-temp')).toHaveValue('21.1');
         await expect(page.locator('#dep-altim')).toHaveValue('29.70');
         await expect(page.locator('#dep-lat')).toHaveValue('41.9602');
+        await expect(page.locator('#dep-var')).toHaveValue('-3.96');
     });
 
     test('should add and remove destination legs', async ({ page }) => {
@@ -75,5 +77,6 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('#table1-body tr')).toHaveCount(4);
         await expect(page.locator('#table2-body tr')).toHaveCount(4);
         await expect(page.locator('#table3-body tr')).toHaveCount(2);
+        await expect(page.locator('#table2-body tr').first().locator('td').nth(4)).toHaveText('-3.96');
     });
 });

@@ -21,7 +21,9 @@ OpenFlight AI is a dark-themed flight planning and navigation log generator for 
 ## 3. Data Sources & Logic
 - **Weather and airport data:** Real-time data from `aviationweather.gov`.
     - Weather is fetched from the official METAR endpoint.
+    - If a selected airport does not publish METAR, the app resolves the airport location and uses the nearest METAR-capable station for weather values.
     - If METAR data does not contain usable coordinates or elevation, the app falls back to the official `stationinfo` endpoint and then the official `airport` endpoint.
+    - If official weather datasets do not include the airport itself, the app may use a secondary airport-reference dataset to resolve the airport position before choosing the nearest METAR station.
     - Airport elevation is converted from meters to feet using `3.28084`.
 - **Aircraft performance:**
     - Aircraft profiles are loaded from project data files such as `src/data/harmony_specs.json`.
@@ -66,6 +68,7 @@ OpenFlight AI is a dark-themed flight planning and navigation log generator for 
 - Departure weather and coordinates must be loaded before generation.
 - Every destination leg must have weather and coordinates loaded before generation.
 - Every planned leg altitude must be numeric and non-negative.
+- For non-METAR airports, nearest-station weather lookup must complete before generation.
 
 ## 6. Test Workflow
 - **Standard:** Behavior changes must be covered by automated tests.

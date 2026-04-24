@@ -120,4 +120,94 @@ describe('getWeatherData', () => {
             elevation: 673,
         });
     });
+
+    test('uses the nearest METAR station for airports without METAR', async () => {
+        global.fetch = jest.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => '',
+                status: 200,
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => '',
+                status: 200,
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => '',
+                status: 200,
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => '',
+                status: 200,
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => '',
+                status: 200,
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => [
+                    'id,ident,type,name,latitude_deg,longitude_deg,elevation_ft,continent,iso_country,iso_region,municipality,scheduled_service,gps_code,iata_code,local_code,home_link,wikipedia_link,keywords',
+                    '1,1C5,small_airport,Clow International Airport,41.6954,-88.1292,670,NA,US,US-IL,Bolingbrook,no,,,"1C5",,,',
+                ].join('\n'),
+                status: 200,
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                arrayBuffer: async () => {
+                    const { gzipSync } = await import('node:zlib');
+                    const stations = JSON.stringify([
+                        { icaoId: 'KLOT', lat: 41.6031, lon: -88.1017, siteType: ['METAR'] },
+                        { icaoId: 'KDPA', lat: 41.9078, lon: -88.2486, siteType: ['METAR'] },
+                    ]);
+                    const gzipped = gzipSync(Buffer.from(stations, 'utf8'));
+                    return gzipped.buffer.slice(gzipped.byteOffset, gzipped.byteOffset + gzipped.byteLength);
+                },
+                status: 200,
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => JSON.stringify({
+                    value: [{
+                        temp: 22,
+                        altim: 1007.0,
+                        wspd: 15,
+                        wdir: 260,
+                        lat: 41.6031,
+                        lon: -88.1017,
+                        elev: 205,
+                    }],
+                }),
+                status: 200,
+            });
+
+        const result = await getWeatherData('K1C5');
+
+        expect(result).toMatchObject({
+            temperature: 22,
+            altimeter: 29.74,
+            windSpeed: 15,
+            windDirection: 260,
+            lat: 41.6954,
+            lon: -88.1292,
+            elevation: 670,
+            weatherSourceIcao: 'KLOT',
+        });
+    });
+
+    test('treats empty AviationWeather bodies as no data instead of throwing JSON parse errors', async () => {
+        global.fetch = jest.fn()
+            .mockResolvedValueOnce({ ok: true, text: async () => '', status: 200 })
+            .mockResolvedValueOnce({ ok: true, text: async () => '', status: 200 })
+            .mockResolvedValueOnce({ ok: true, text: async () => '', status: 200 })
+            .mockResolvedValueOnce({ ok: true, text: async () => '', status: 200 })
+            .mockResolvedValueOnce({ ok: true, text: async () => '', status: 200 })
+            .mockResolvedValueOnce({ ok: false, status: 404, text: async () => '' });
+
+        await expect(getWeatherData('K1C5')).rejects.not.toThrow('Unexpected end of JSON input');
+    });
 });

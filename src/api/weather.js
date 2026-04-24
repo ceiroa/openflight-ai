@@ -21,7 +21,8 @@ export async function fetchWeather(icao) {
 
         return {
             temperature: metar.temp, // Celsius
-            altimeter: Number(altim.toFixed(2)) // inHg
+            altimeter: Number(altim.toFixed(2)), // inHg
+            elevation: metar.elev // feet
         };
     } catch (error) {
         console.error('Error fetching weather:', error);

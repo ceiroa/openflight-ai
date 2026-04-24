@@ -36,6 +36,7 @@ export async function getWeatherData(icao) {
             altimeter: Number(altimeter.toFixed(2)),
             windSpeed: metar.wspd,
             windDirection: metar.wdir,
+            elevation: metar.elev, // Add elevation in feet
             forecast: null
         };
         

@@ -3,16 +3,18 @@ const STATION_INFO_BASE_URL = 'https://aviationweather.gov/api/data/stationinfo'
 const AIRPORT_INFO_BASE_URL = 'https://aviationweather.gov/api/data/airport';
 const STATIONS_CACHE_URL = 'https://aviationweather.gov/data/cache/stations.cache.json.gz';
 const AIRPORTS_CSV_URL = 'https://ourairports.com/data/airports.csv';
+const NOAA_DECLINATION_BASE_URL = 'https://www.ngdc.noaa.gov/geomag-web/calculators/calculateDeclination';
+const DEFAULT_NOAA_GEOMAG_API_KEY = process.env.NOAA_GEOMAG_API_KEY || 'zNEw7';
 
 let stationCachePromise;
 let airportReferencePromise;
 
-export async function getWeatherData(icao) {
+export async function getWeatherData(icao, dateString, geomagApiKey) {
     const metarUrl = `${METAR_BASE_URL}?ids=${icao}&format=json`;
 
     const metar = await fetchFirstRecord(metarUrl, `METAR API`, { allowNoContent: true });
     if (!metar) {
-        return getNearestStationWeather(icao);
+        return getNearestStationWeather(icao, dateString, geomagApiKey);
     }
 
     let altimeter = metar.altim;
@@ -25,6 +27,7 @@ export async function getWeatherData(icao) {
     }
 
     const location = await resolveLocationData(icao, metar);
+    const variation = await fetchMagneticVariation(location.lat, location.lon, dateString, geomagApiKey);
 
     return {
         temperature: metar.temp,
@@ -34,11 +37,12 @@ export async function getWeatherData(icao) {
         elevation: location.elevation,
         lat: location.lat,
         lon: location.lon,
+        variation,
         forecast: null,
     };
 }
 
-async function getNearestStationWeather(icao) {
+async function getNearestStationWeather(icao, dateString, geomagApiKey) {
     const airportLocation = await resolveAirportLocationWithoutMetar(icao);
     const nearestStation = await findNearestMetarStation(airportLocation.lat, airportLocation.lon);
     if (!nearestStation?.icaoId) {
@@ -63,6 +67,8 @@ async function getNearestStationWeather(icao) {
         throw new Error(`Incomplete weather data returned for nearby station ${nearestStation.icaoId}`);
     }
 
+    const variation = await fetchMagneticVariation(airportLocation.lat, airportLocation.lon, dateString, geomagApiKey);
+
     return {
         temperature: nearestMetar.temp,
         altimeter: Number(altimeter.toFixed(2)),
@@ -71,9 +77,54 @@ async function getNearestStationWeather(icao) {
         elevation: airportLocation.elevation,
         lat: airportLocation.lat,
         lon: airportLocation.lon,
+        variation,
         forecast: null,
         weatherSourceIcao: nearestStation.icaoId,
     };
+}
+
+async function fetchMagneticVariation(lat, lon, dateString, geomagApiKey) {
+    const date = parseVariationDate(dateString);
+    const url = new URL(NOAA_DECLINATION_BASE_URL);
+    url.searchParams.set('lat1', String(lat));
+    url.searchParams.set('lon1', String(lon));
+    url.searchParams.set('model', 'WMM');
+    url.searchParams.set('startYear', String(date.getUTCFullYear()));
+    url.searchParams.set('startMonth', String(date.getUTCMonth() + 1));
+    url.searchParams.set('startDay', String(date.getUTCDate()));
+    url.searchParams.set('resultFormat', 'json');
+    url.searchParams.set('key', geomagApiKey || DEFAULT_NOAA_GEOMAG_API_KEY);
+
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`NOAA declination API returned ${response.status}`);
+    }
+
+    const bodyText = await response.text();
+    if (!bodyText || !bodyText.trim()) {
+        throw new Error('NOAA declination API returned an empty response');
+    }
+
+    const payload = JSON.parse(bodyText);
+    const declination = Number(payload?.result?.[0]?.declination);
+    if (!Number.isFinite(declination)) {
+        throw new Error('NOAA declination API returned no declination value');
+    }
+
+    return Math.round(declination * 100) / 100;
+}
+
+function parseVariationDate(dateString) {
+    if (!dateString) {
+        return new Date();
+    }
+
+    const parsed = new Date(`${dateString}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) {
+        return new Date();
+    }
+
+    return parsed;
 }
 
 async function resolveLocationData(icao, metar) {

@@ -9,6 +9,10 @@ const DEFAULT_AIRCRAFT_NAME = "Evektor Harmony LSA";
 
 const state = {
     aircraftData: null,
+    settings: {
+        noaaGeomagApiKey: "",
+        weatherApiKey: "",
+    },
 };
 
 const flightForm = document.getElementById("flight-form");
@@ -17,8 +21,18 @@ const generateButton = document.getElementById("generate-btn");
 const printButton = document.getElementById("print-btn");
 const destinationsContainer = document.getElementById("destinations-container");
 const statusBanner = document.getElementById("status-banner");
+const menuToggleButton = document.getElementById("menu-toggle");
+const sideMenu = document.getElementById("side-menu");
+const saveSettingsButton = document.getElementById("save-settings-btn");
+const clearSettingsButton = document.getElementById("clear-settings-btn");
+const noaaKeyInput = document.getElementById("setting-noaa-key");
+const weatherKeyInput = document.getElementById("setting-weather-key");
+
+const SETTINGS_STORAGE_KEY = "openflight-ai-settings";
+const DEFAULT_NOAA_GEOMAG_API_KEY = "zNEw7";
 
 document.addEventListener("DOMContentLoaded", async () => {
+    loadSettings();
     document.getElementById("date").value = new Date().toISOString().split("T")[0];
     addLeg();
     drawGraph();
@@ -30,6 +44,9 @@ function registerEventHandlers() {
     addLegButton.addEventListener("click", addLeg);
     generateButton.addEventListener("click", generateLog);
     printButton.addEventListener("click", () => window.print());
+    menuToggleButton.addEventListener("click", toggleMenu);
+    saveSettingsButton.addEventListener("click", saveSettings);
+    clearSettingsButton.addEventListener("click", clearSettings);
 
     document.getElementById("aircraft").addEventListener("change", async (event) => {
         await loadAircraft(event.target.value.trim());
@@ -40,6 +57,10 @@ function registerEventHandlers() {
         document.querySelectorAll(".leg-planned-alt").forEach((input) => {
             input.value = value;
         });
+    });
+
+    document.getElementById("date").addEventListener("change", async () => {
+        await refreshWeatherForLoadedAirports();
     });
 
     flightForm.addEventListener("focusout", async (event) => {
@@ -57,6 +78,52 @@ function registerEventHandlers() {
             await handleWeather(target, "dest");
         }
     });
+}
+
+function toggleMenu() {
+    sideMenu.classList.toggle("open");
+    menuToggleButton.classList.toggle("open");
+}
+
+function loadSettings() {
+    try {
+        const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+        if (!saved) {
+            state.settings.noaaGeomagApiKey = DEFAULT_NOAA_GEOMAG_API_KEY;
+            state.settings.weatherApiKey = "";
+            syncSettingsInputs();
+            return;
+        }
+
+        const parsed = JSON.parse(saved);
+        state.settings.noaaGeomagApiKey = parsed.noaaGeomagApiKey || DEFAULT_NOAA_GEOMAG_API_KEY;
+        state.settings.weatherApiKey = parsed.weatherApiKey || "";
+    } catch {
+        state.settings.noaaGeomagApiKey = DEFAULT_NOAA_GEOMAG_API_KEY;
+        state.settings.weatherApiKey = "";
+    }
+
+    syncSettingsInputs();
+}
+
+function syncSettingsInputs() {
+    noaaKeyInput.value = state.settings.noaaGeomagApiKey;
+    weatherKeyInput.value = state.settings.weatherApiKey;
+}
+
+function saveSettings() {
+    state.settings.noaaGeomagApiKey = noaaKeyInput.value.trim();
+    state.settings.weatherApiKey = weatherKeyInput.value.trim();
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(state.settings));
+    showStatus("Settings saved in this browser.", "info");
+}
+
+function clearSettings() {
+    state.settings.noaaGeomagApiKey = DEFAULT_NOAA_GEOMAG_API_KEY;
+    state.settings.weatherApiKey = "";
+    localStorage.removeItem(SETTINGS_STORAGE_KEY);
+    syncSettingsInputs();
+    showStatus("Settings reset to defaults in this browser.", "info");
 }
 
 function showStatus(message, type = "info") {
@@ -260,7 +327,7 @@ async function handleWeather(input, type) {
     log(`Fetching weather for ${icao}...`);
 
     try {
-        const response = await fetch(`/api/weather/${icao}`);
+        const response = await fetch(buildWeatherUrl(icao));
         if (!response.ok) {
             const failure = await response.json().catch(() => ({ error: "Weather lookup failed." }));
             throw new Error(failure.error || `Weather lookup failed for ${icao}.`);
@@ -298,6 +365,7 @@ function applyWeatherData(input, type, data) {
         document.getElementById("dep-airport-alt").value = data.elevation;
         document.getElementById("dep-lat").value = data.lat;
         document.getElementById("dep-lon").value = data.lon;
+        document.getElementById("dep-var").value = data.variation ?? 0;
         return;
     }
 
@@ -309,6 +377,7 @@ function applyWeatherData(input, type, data) {
     container.querySelector(".leg-elevation").value = data.elevation;
     container.querySelector(".leg-lat").value = data.lat;
     container.querySelector(".leg-lon").value = data.lon;
+    container.querySelector(".leg-var").value = data.variation ?? 0;
 }
 
 function clearWeatherData(input, type) {
@@ -321,6 +390,38 @@ function clearWeatherData(input, type) {
     const container = input.closest(".dest-leg");
     container.querySelector(".leg-lat").value = "";
     container.querySelector(".leg-lon").value = "";
+    container.querySelector(".leg-var").value = "0";
+}
+
+function buildWeatherUrl(icao) {
+    const url = new URL(`/api/weather/${icao}`, window.location.origin);
+    const selectedDate = document.getElementById("date").value;
+    if (selectedDate) {
+        url.searchParams.set("date", selectedDate);
+    }
+    if (state.settings.noaaGeomagApiKey) {
+        url.searchParams.set("geomagApiKey", state.settings.noaaGeomagApiKey);
+    }
+    return url.pathname + url.search;
+}
+
+async function refreshWeatherForLoadedAirports() {
+    const refreshTasks = [];
+    const departureInput = document.getElementById("departure-icao");
+
+    if (departureInput.value.trim().length === 4) {
+        refreshTasks.push(handleWeather(departureInput, "dep"));
+    }
+
+    document.querySelectorAll(".destination-icao").forEach((input) => {
+        if (input.value.trim().length === 4) {
+            refreshTasks.push(handleWeather(input, "dest"));
+        }
+    });
+
+    if (refreshTasks.length > 0) {
+        await Promise.allSettled(refreshTasks);
+    }
 }
 
 function getDistance(lat1, lon1, lat2, lon2) {

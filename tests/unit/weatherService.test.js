@@ -31,6 +31,14 @@ describe('getWeatherData', () => {
                         elev: 205,
                     }],
                 }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => JSON.stringify({
+                    result: [{
+                        declination: -3.79,
+                    }],
+                }),
             });
 
         global.fetch = fetchMock;
@@ -45,8 +53,9 @@ describe('getWeatherData', () => {
             lat: 41.60308,
             lon: -88.10167,
             elevation: 673,
+            variation: -3.79,
         });
-        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(fetchMock).toHaveBeenCalledTimes(3);
         expect(fetchMock.mock.calls[1][0]).toContain('/stationinfo?ids=KLOT');
     });
 
@@ -78,6 +87,14 @@ describe('getWeatherData', () => {
                         elev: 207,
                     }],
                 }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => JSON.stringify({
+                    result: [{
+                        declination: -3.75,
+                    }],
+                }),
             });
 
         global.fetch = fetchMock;
@@ -87,26 +104,36 @@ describe('getWeatherData', () => {
         expect(result.lat).toBe(41.6081);
         expect(result.lon).toBe(-88.0964);
         expect(result.elevation).toBe(679);
-        expect(fetchMock).toHaveBeenCalledTimes(3);
+        expect(result.variation).toBe(-3.75);
+        expect(fetchMock).toHaveBeenCalledTimes(4);
         expect(fetchMock.mock.calls[2][0]).toContain('/airport?ids=KLOT');
     });
 
     test('parses the real AviationWeather METAR wrapper shape', async () => {
-        global.fetch = jest.fn().mockResolvedValueOnce({
-            ok: true,
-            json: async () => ({
-                value: [{
-                    temp: 21,
-                    altim: 1006.9,
-                    wspd: 16,
-                    wdir: 250,
-                    lat: 41.6031,
-                    lon: -88.1017,
-                    elev: 205,
-                }],
-                Count: 1,
-            }),
-        });
+        global.fetch = jest.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    value: [{
+                        temp: 21,
+                        altim: 1006.9,
+                        wspd: 16,
+                        wdir: 250,
+                        lat: 41.6031,
+                        lon: -88.1017,
+                        elev: 205,
+                    }],
+                    Count: 1,
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => JSON.stringify({
+                    result: [{
+                        declination: -3.79,
+                    }],
+                }),
+            });
 
         const result = await getWeatherData('KLOT');
 
@@ -118,6 +145,7 @@ describe('getWeatherData', () => {
             lat: 41.6031,
             lon: -88.1017,
             elevation: 673,
+            variation: -3.79,
         });
     });
 
@@ -183,6 +211,15 @@ describe('getWeatherData', () => {
                     }],
                 }),
                 status: 200,
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => JSON.stringify({
+                    result: [{
+                        declination: -3.66,
+                    }],
+                }),
+                status: 200,
             });
 
         const result = await getWeatherData('K1C5');
@@ -195,6 +232,7 @@ describe('getWeatherData', () => {
             lat: 41.6954,
             lon: -88.1292,
             elevation: 670,
+            variation: -3.66,
             weatherSourceIcao: 'KLOT',
         });
     });
@@ -209,5 +247,70 @@ describe('getWeatherData', () => {
             .mockResolvedValueOnce({ ok: false, status: 404, text: async () => '' });
 
         await expect(getWeatherData('K1C5')).rejects.not.toThrow('Unexpected end of JSON input');
+    });
+
+    test('uses the provided flight date when requesting declination', async () => {
+        global.fetch = jest.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    value: [{
+                        temp: 21,
+                        altim: 1006.9,
+                        wspd: 16,
+                        wdir: 250,
+                        lat: 41.6031,
+                        lon: -88.1017,
+                        elev: 205,
+                    }],
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => JSON.stringify({
+                    result: [{
+                        declination: -3.79,
+                    }],
+                }),
+            });
+
+        await getWeatherData('KLOT', '2026-07-04');
+
+        const declinationUrl = global.fetch.mock.calls[1][0].toString();
+        expect(declinationUrl).toContain('startYear=2026');
+        expect(declinationUrl).toContain('startMonth=7');
+        expect(declinationUrl).toContain('startDay=4');
+        expect(declinationUrl).toContain('key=');
+    });
+
+    test('prefers a provided NOAA key over the default key', async () => {
+        global.fetch = jest.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    value: [{
+                        temp: 21,
+                        altim: 1006.9,
+                        wspd: 16,
+                        wdir: 250,
+                        lat: 41.6031,
+                        lon: -88.1017,
+                        elev: 205,
+                    }],
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => JSON.stringify({
+                    result: [{
+                        declination: -3.79,
+                    }],
+                }),
+            });
+
+        await getWeatherData('KLOT', '2026-07-04', 'custom-noaa-key');
+
+        const declinationUrl = global.fetch.mock.calls[1][0].toString();
+        expect(declinationUrl).toContain('key=custom-noaa-key');
     });
 });

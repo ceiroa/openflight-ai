@@ -32,8 +32,9 @@ app.get('/api/aircraft', async (req, res) => {
 // API endpoint to get weather data by ICAO (Path Parameter)
 app.get('/api/weather/:icao', async (req, res) => {
     const { icao } = req.params;
+    const { date, geomagApiKey } = req.query;
     try {
-        const weather = await getWeatherData(icao.toUpperCase());
+        const weather = await getWeatherData(icao.toUpperCase(), date, geomagApiKey);
         res.json(weather);
     } catch (error) {
         console.error(`Error in /api/weather/${icao}:`, error);
@@ -47,11 +48,11 @@ app.get('/api/weather/:icao', async (req, res) => {
 
 // Legacy/Compatibility endpoint (Query Parameter)
 app.get('/api/weather', async (req, res) => {
-    const { icao } = req.query;
+    const { icao, date, geomagApiKey } = req.query;
     if (!icao) return res.status(400).json({ error: 'ICAO code is required' });
     
     try {
-        const weather = await getWeatherData(icao.toUpperCase());
+        const weather = await getWeatherData(icao.toUpperCase(), date, geomagApiKey);
         res.json(weather);
     } catch (error) {
         console.error(`Error in /api/weather?icao=${icao}:`, error);

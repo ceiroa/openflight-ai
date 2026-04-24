@@ -46,7 +46,16 @@ OpenFlight AI is a stylized, dark-themed flight planning and navigation log gene
 - **Columns:** CHECKPOINT, MAG HDG, DIST (LEG), DIST (REM), GROUNDSPEED, ETE, ETA, COMMS / FREQ.
 - **Logic:** Tracks progress and remaining distance; includes frequencies (ATIS/CTAF).
 
-## 5. Future Roadmap
+## 5. Test-Driven UI Workflow
+- **Standard:** All UI changes must be verified using the automated test suite.
+- **Workflow:**
+    1. Run `npm run test:ui` **BEFORE** making any UI changes to establish a baseline.
+    2. Apply the requested changes.
+    3. Run `npm run test:ui` **AFTER** changes to verify functionality.
+    4. If any tests fail, the AI **MUST** ask the user if they want to revert the changes.
+- **Coverage:** Automated tests in `tests/ui.test.js` cover dark theme colors, flight graph visibility, automated weather fetching, leg addition/removal, and navigation log generation.
+
+## 6. Future Roadmap
 - Integrate internet-sourced performance data for more common GA airplanes (Cessna, Piper, etc.).
 - Enhanced Top of Climb / Top of Descent splitting in the nav log tables.
 - Automatic Magnetic Variation lookup based on coordinates.

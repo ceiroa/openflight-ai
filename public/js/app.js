@@ -10,7 +10,6 @@ const DEFAULT_AIRCRAFT_NAME = "Evektor Harmony LSA";
 const state = {
     aircraftData: null,
     settings: {
-        noaaGeomagApiKey: "",
         weatherApiKey: "",
     },
 };
@@ -25,11 +24,11 @@ const menuToggleButton = document.getElementById("menu-toggle");
 const sideMenu = document.getElementById("side-menu");
 const saveSettingsButton = document.getElementById("save-settings-btn");
 const clearSettingsButton = document.getElementById("clear-settings-btn");
-const noaaKeyInput = document.getElementById("setting-noaa-key");
 const weatherKeyInput = document.getElementById("setting-weather-key");
+const debugToggleButton = document.getElementById("debug-toggle");
+const debugWindow = document.getElementById("debug-window");
 
 const SETTINGS_STORAGE_KEY = "openflight-ai-settings";
-const DEFAULT_NOAA_GEOMAG_API_KEY = "zNEw7";
 
 document.addEventListener("DOMContentLoaded", async () => {
     loadSettings();
@@ -47,6 +46,7 @@ function registerEventHandlers() {
     menuToggleButton.addEventListener("click", toggleMenu);
     saveSettingsButton.addEventListener("click", saveSettings);
     clearSettingsButton.addEventListener("click", clearSettings);
+    debugToggleButton.addEventListener("click", toggleDebugWindow);
 
     document.getElementById("aircraft").addEventListener("change", async (event) => {
         await loadAircraft(event.target.value.trim());
@@ -57,10 +57,6 @@ function registerEventHandlers() {
         document.querySelectorAll(".leg-planned-alt").forEach((input) => {
             input.value = value;
         });
-    });
-
-    document.getElementById("date").addEventListener("change", async () => {
-        await refreshWeatherForLoadedAirports();
     });
 
     flightForm.addEventListener("focusout", async (event) => {
@@ -89,17 +85,14 @@ function loadSettings() {
     try {
         const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
         if (!saved) {
-            state.settings.noaaGeomagApiKey = DEFAULT_NOAA_GEOMAG_API_KEY;
             state.settings.weatherApiKey = "";
             syncSettingsInputs();
             return;
         }
 
         const parsed = JSON.parse(saved);
-        state.settings.noaaGeomagApiKey = parsed.noaaGeomagApiKey || DEFAULT_NOAA_GEOMAG_API_KEY;
         state.settings.weatherApiKey = parsed.weatherApiKey || "";
     } catch {
-        state.settings.noaaGeomagApiKey = DEFAULT_NOAA_GEOMAG_API_KEY;
         state.settings.weatherApiKey = "";
     }
 
@@ -107,19 +100,16 @@ function loadSettings() {
 }
 
 function syncSettingsInputs() {
-    noaaKeyInput.value = state.settings.noaaGeomagApiKey;
     weatherKeyInput.value = state.settings.weatherApiKey;
 }
 
 function saveSettings() {
-    state.settings.noaaGeomagApiKey = noaaKeyInput.value.trim();
     state.settings.weatherApiKey = weatherKeyInput.value.trim();
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(state.settings));
     showStatus("Settings saved in this browser.", "info");
 }
 
 function clearSettings() {
-    state.settings.noaaGeomagApiKey = DEFAULT_NOAA_GEOMAG_API_KEY;
     state.settings.weatherApiKey = "";
     localStorage.removeItem(SETTINGS_STORAGE_KEY);
     syncSettingsInputs();
@@ -138,10 +128,26 @@ function clearStatus() {
 }
 
 function log(message) {
-    const debugWindow = document.getElementById("debug-window");
     debugWindow.style.display = "block";
     debugWindow.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${message}</div>`;
     debugWindow.scrollTop = debugWindow.scrollHeight;
+    debugToggleButton.setAttribute("aria-expanded", "true");
+    debugToggleButton.textContent = "Hide Debug Log";
+}
+
+function toggleDebugWindow() {
+    const isOpen = debugWindow.style.display === "block";
+    debugWindow.style.display = isOpen ? "none" : "block";
+    debugToggleButton.setAttribute("aria-expanded", String(!isOpen));
+    debugToggleButton.textContent = isOpen ? "Show Debug Log" : "Hide Debug Log";
+}
+
+function normalizeAirportCode(value) {
+    const normalized = value.trim().toUpperCase();
+    if (normalized.length === 3 && /^[A-Z]{3}$/.test(normalized)) {
+        return `K${normalized}`;
+    }
+    return normalized;
 }
 
 async function loadAircraft(name) {
@@ -319,10 +325,12 @@ function removeLeg(leg) {
 }
 
 async function handleWeather(input, type) {
-    const icao = input.value.trim().toUpperCase();
+    const icao = normalizeAirportCode(input.value);
     if (icao.length !== 4) {
         return;
     }
+
+    input.value = icao;
 
     log(`Fetching weather for ${icao}...`);
 
@@ -384,6 +392,7 @@ function clearWeatherData(input, type) {
     if (type === "dep") {
         document.getElementById("dep-lat").value = "";
         document.getElementById("dep-lon").value = "";
+        document.getElementById("dep-var").value = "0";
         return;
     }
 
@@ -394,34 +403,7 @@ function clearWeatherData(input, type) {
 }
 
 function buildWeatherUrl(icao) {
-    const url = new URL(`/api/weather/${icao}`, window.location.origin);
-    const selectedDate = document.getElementById("date").value;
-    if (selectedDate) {
-        url.searchParams.set("date", selectedDate);
-    }
-    if (state.settings.noaaGeomagApiKey) {
-        url.searchParams.set("geomagApiKey", state.settings.noaaGeomagApiKey);
-    }
-    return url.pathname + url.search;
-}
-
-async function refreshWeatherForLoadedAirports() {
-    const refreshTasks = [];
-    const departureInput = document.getElementById("departure-icao");
-
-    if (departureInput.value.trim().length === 4) {
-        refreshTasks.push(handleWeather(departureInput, "dep"));
-    }
-
-    document.querySelectorAll(".destination-icao").forEach((input) => {
-        if (input.value.trim().length === 4) {
-            refreshTasks.push(handleWeather(input, "dest"));
-        }
-    });
-
-    if (refreshTasks.length > 0) {
-        await Promise.allSettled(refreshTasks);
-    }
+    return `/api/weather/${icao}`;
 }
 
 function getDistance(lat1, lon1, lat2, lon2) {
@@ -444,7 +426,7 @@ function getBearing(lat1, lon1, lat2, lon2) {
 
 function collectFlightInputs() {
     const departure = {
-        icao: document.getElementById("departure-icao").value.trim().toUpperCase(),
+        icao: normalizeAirportCode(document.getElementById("departure-icao").value),
         airportAlt: Number(document.getElementById("dep-airport-alt").value),
         temp: Number(document.getElementById("dep-temp").value),
         altimeter: Number(document.getElementById("dep-altim").value),
@@ -456,7 +438,7 @@ function collectFlightInputs() {
     };
 
     const legs = Array.from(document.querySelectorAll(".dest-leg.destination")).map((leg) => ({
-        icao: leg.querySelector(".destination-icao").value.trim().toUpperCase(),
+        icao: normalizeAirportCode(leg.querySelector(".destination-icao").value),
         plannedAlt: Number(leg.querySelector(".leg-planned-alt").value),
         temp: Number(leg.querySelector(".leg-temp").value),
         altimeter: Number(leg.querySelector(".leg-altim").value),

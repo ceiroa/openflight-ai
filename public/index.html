@@ -54,7 +54,7 @@
         .menu-section:last-child { border-bottom: none; }
         .menu-section h3 { margin: 0 0 10px; color: var(--accent-color); font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; }
         .menu-copy { margin: 0; color: #cbd5e1; font-size: 13px; }
-        .menu-link { display: inline-block; margin: 2px 0 10px; color: #7dd3fc; font-size: 12px; text-decoration: none; }
+        .menu-link { display: block; margin: 2px 0 10px; color: #7dd3fc; font-size: 12px; text-decoration: none; }
         .menu-link:hover { text-decoration: underline; }
         .settings-actions { display: flex; gap: 10px; margin-top: 12px; }
         .settings-actions button { flex: 1; }
@@ -127,7 +127,10 @@
             body { background: white; margin: 0; }
         }
 
-        #debug-window { margin-top: 20px; background: #1e293b; padding: 10px; border: 1px solid #475569; color: #f1f5f9; border-radius: 8px; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; display: none; }
+        .debug-toggle-wrap { display: flex; justify-content: flex-end; margin-top: 16px; }
+        #debug-toggle { background-color: transparent; border: 1px solid var(--border-color); color: #cbd5e1; padding: 8px 12px; font-size: 12px; }
+        #debug-toggle:hover { background: rgba(56, 189, 248, 0.08); }
+        #debug-window { margin-top: 12px; background: #1e293b; padding: 10px; border: 1px solid #475569; color: #f1f5f9; border-radius: 8px; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; display: none; }
     </style>
 </head>
 <body>
@@ -141,16 +144,6 @@
             <div class="menu-section">
                 <h3>Settings</h3>
                 <div class="form-group">
-                    <label for="setting-noaa-key">NOAA Geomag API Key</label>
-                    <a
-                        class="menu-link"
-                        href="https://www.ngdc.noaa.gov/geomag/CalcSurvey.shtml?mobileWebApp=true"
-                        target="_blank"
-                        rel="noreferrer"
-                    >Get a NOAA API key</a>
-                    <input type="password" id="setting-noaa-key" placeholder="Enter NOAA key">
-                </div>
-                <div class="form-group">
                     <label for="setting-weather-key">Reserved Weather API Key</label>
                     <input type="password" id="setting-weather-key" placeholder="Optional future use">
                 </div>
@@ -160,8 +153,14 @@
                 </div>
             </div>
             <div class="menu-section">
+                <h3>Resources</h3>
+                <a class="menu-link" href="https://aviationweather.gov" target="_blank" rel="noreferrer">aviationweather.gov</a>
+                <a class="menu-link" href="https://earth.google.com/web/" target="_blank" rel="noreferrer">Google Earth</a>
+                <a class="menu-link" href="https://www.fltplan.com" target="_blank" rel="noreferrer">FltPlan.com</a>
+            </div>
+            <div class="menu-section">
                 <h3>About</h3>
-                <p class="menu-copy">API keys entered here are stored in this browser only and sent with app requests when needed.</p>
+                <p class="menu-copy">Settings entered here are stored in this browser only. Magnetic variation is calculated offline using the World Magnetic Model.</p>
             </div>
         </aside>
         <div class="container">
@@ -222,6 +221,9 @@
                     <button type="button" id="print-btn" style="background-color: #64748b; color: white;">PRINT PDF</button>
                 </div>
             </form>
+            <div class="debug-toggle-wrap">
+                <button type="button" id="debug-toggle" aria-expanded="false" aria-controls="debug-window">Show Debug Log</button>
+            </div>
             <div id="debug-window"></div>
         </div>
 

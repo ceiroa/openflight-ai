@@ -44,6 +44,15 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('#dep-var')).toHaveValue('-3.96');
     });
 
+    test('should assume K prefix when a 3-letter airport code is entered', async ({ page }) => {
+        const depInput = page.locator('#departure-icao');
+        await depInput.fill('ORD');
+        await depInput.blur();
+
+        await expect(depInput).toHaveValue('KORD');
+        await expect(page.locator('#dep-lat')).toHaveValue('41.9602');
+    });
+
     test('should add and remove destination legs', async ({ page }) => {
         await expect(page.locator('.dest-leg.destination')).toHaveCount(1);
 
@@ -52,6 +61,20 @@ test.describe('OpenFlight AI - UI Tests', () => {
 
         await page.locator('.btn-remove').first().click();
         await expect(page.locator('.dest-leg.destination')).toHaveCount(1);
+    });
+
+    test('should let the user open and close the debug log', async ({ page }) => {
+        const debugToggle = page.locator('#debug-toggle');
+        const debugWindow = page.locator('#debug-window');
+
+        await expect(debugWindow).toBeVisible();
+        await expect(debugToggle).toHaveText('Hide Debug Log');
+        await debugToggle.click();
+        await expect(debugWindow).toBeHidden();
+        await expect(debugToggle).toHaveText('Show Debug Log');
+        await debugToggle.click();
+        await expect(debugWindow).toBeVisible();
+        await expect(debugToggle).toHaveText('Hide Debug Log');
     });
 
     test('should generate correct row counts for multiple destinations', async ({ page }) => {

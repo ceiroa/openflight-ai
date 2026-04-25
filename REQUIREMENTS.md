@@ -17,7 +17,6 @@ OpenFlight AI is a dark-themed flight planning and navigation log generator for 
     - A status banner displays validation and fetch failures.
     - A debug log window shows weather fetches and navigation log generation events.
     - Navigation log generation is blocked until required aircraft, weather, and coordinate inputs exist for every leg.
-    - Changing the flight date causes subsequent weather lookups to use that date when calculating magnetic variation.
 
 ## 3. Data Sources & Logic
 - **Weather and airport data:** Real-time data from `aviationweather.gov`.
@@ -26,7 +25,7 @@ OpenFlight AI is a dark-themed flight planning and navigation log generator for 
     - If METAR data does not contain usable coordinates or elevation, the app falls back to the official `stationinfo` endpoint and then the official `airport` endpoint.
     - If official weather datasets do not include the airport itself, the app may use a secondary airport-reference dataset to resolve the airport position before choosing the nearest METAR station.
     - Airport elevation is converted from meters to feet using `3.28084`.
-    - Magnetic variation is sourced from NOAA/NCEI's official geomagnetic declination calculator API using the airport coordinates and selected flight date.
+    - Magnetic variation is calculated locally with the `magvar` npm package using the World Magnetic Model 2025-2030 and does not require any external API key or network request.
 - **Aircraft performance:**
     - Aircraft profiles are loaded from project data files such as `src/data/harmony_specs.json`.
     - Climb and cruise values are taken from the selected aircraft profile rather than hardcoded in the UI.
@@ -37,7 +36,7 @@ OpenFlight AI is a dark-themed flight planning and navigation log generator for 
     - Climb performance is interpolated from the aircraft climb table.
     - Wind triangle calculations determine wind correction angle, groundspeed, and headings.
     - Great-circle distance and bearing are derived from airport coordinates.
-    - Magnetic heading uses NOAA/NCEI declination values. West variation is negative and east variation is positive.
+    - Magnetic heading uses locally calculated WMM 2025-2030 declination values. West variation is negative and east variation is positive.
 
 ## 4. Navigation Log Output
 ### Table 1: Cruise Performance
@@ -55,7 +54,7 @@ OpenFlight AI is a dark-themed flight planning and navigation log generator for 
     - A climb row: `start-TOC` is only added when the planned altitude is above the previous airport elevation.
     - Climb rows use the previous point's surface winds.
     - Cruise rows use the destination leg's weather values.
-    - `VAR` is populated from the official NOAA/NCEI declination lookup for the relevant airport coordinates and flight date.
+    - `VAR` is populated from the local WMM 2025-2030 declination calculation for the relevant airport coordinates.
 
 ### Table 3: Checkpoints & Comms
 - **Columns:** CHECKPOINT, MAG HDG, DIST (LEG), DIST (REM), GROUNDSPEED, ETE, ETA, COMMS / FREQ.

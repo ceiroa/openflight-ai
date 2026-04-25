@@ -23,7 +23,8 @@
   "homepage": "https://github.com/ceiroa/openflight-ai#readme",
   "dependencies": {
     "express": "^5.2.1",
-    "luxon": "^3.7.2"
+    "luxon": "^3.7.2",
+    "magvar": "^2.0.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",

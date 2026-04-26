@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenFlight AI - Aircraft Profiles</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --container-bg: #1e293b;
+            --field-bg: #334155;
+            --text-color: #f1f5f9;
+            --accent-color: #38bdf8;
+            --border-color: #475569;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+        }
+        body { font-family: "Inter", sans-serif; margin: 20px; background-color: var(--bg-color); color: var(--text-color); line-height: 1.5; }
+        .app-shell { position: relative; }
+        .menu-toggle {
+            position: fixed;
+            left: -8px;
+            top: 18px;
+            width: 44px;
+            height: 44px;
+            border-radius: 0 12px 12px 0;
+            background: #0ea5e9;
+            color: #082f49;
+            z-index: 20;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+            padding-left: 12px;
+            transition: transform 0.25s ease, opacity 0.25s ease;
+        }
+        .menu-toggle.open { transform: translateX(320px); }
+        .side-menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 320px;
+            height: 100vh;
+            background: rgba(2, 6, 23, 0.98);
+            border-right: 1px solid var(--border-color);
+            transform: translateX(-100%);
+            transition: transform 0.25s ease;
+            z-index: 19;
+            padding: 72px 20px 24px;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+        .side-menu.open { transform: translateX(0); }
+        .menu-section { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid rgba(71, 85, 105, 0.5); }
+        .menu-section:last-child { border-bottom: none; }
+        .menu-section h3 { margin: 0 0 10px; color: var(--accent-color); font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; }
+        .menu-link { display: block; margin: 2px 0 10px; color: #7dd3fc; font-size: 12px; text-decoration: none; }
+        .menu-link:hover { text-decoration: underline; }
+        .container { max-width: 1200px; margin: 0 auto; background: var(--container-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; }
+        .layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
+        .sidebar, .editor { border: 1px solid var(--border-color); border-radius: 10px; background: rgba(15, 23, 42, 0.55); padding: 18px; }
+        .profile-list { display: flex; flex-direction: column; gap: 10px; }
+        .profile-card { border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; background: rgba(30, 41, 59, 0.8); cursor: pointer; }
+        .profile-card.active { border-color: var(--accent-color); }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+        .badge.complete { background: rgba(16, 185, 129, 0.18); color: #86efac; }
+        .badge.incomplete { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+        .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+        label { font-weight: 600; color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+        input, textarea { padding: 10px; background: var(--field-bg); border: 1px solid var(--border-color); border-radius: 6px; color: white; width: 100%; box-sizing: border-box; font-size: 13px; }
+        textarea { min-height: 180px; resize: vertical; font-family: Consolas, monospace; }
+        button {
+            background-color: var(--accent-color);
+            color: #0f172a;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+        .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+        .secondary { background-color: #64748b; color: white; }
+        .status-banner { display: none; margin-bottom: 16px; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 13px; }
+        .status-banner.error { display: block; background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.4); color: #fecaca; }
+        .status-banner.info { display: block; background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.4); color: #bae6fd; }
+        .issues { margin-top: 8px; font-size: 12px; color: #fcd34d; }
+        @media (max-width: 960px) {
+            .layout { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-shell">
+        <button type="button" id="menu-toggle" class="menu-toggle" aria-label="Open menu">≡</button>
+        <aside id="side-menu" class="side-menu" aria-label="Application menu">
+            <div class="menu-section">
+                <h3>Navigation</h3>
+                <a class="menu-link" href="/index.html">Flight Setup</a>
+                <a class="menu-link" href="/checkpoints.html">Checkpoints Planner</a>
+            </div>
+            <div class="menu-section">
+                <h3>Resources</h3>
+                <a class="menu-link" href="https://aviationweather.gov" target="_blank" rel="noreferrer">aviationweather.gov</a>
+                <a class="menu-link" href="https://earth.google.com/web/" target="_blank" rel="noreferrer">Google Earth</a>
+                <a class="menu-link" href="https://www.fltplan.com" target="_blank" rel="noreferrer">FltPlan.com</a>
+                <a class="menu-link" href="https://skyvector.com/" target="_blank" rel="noreferrer">SkyVector</a>
+            </div>
+        </aside>
+        <div class="container">
+            <h1>Aircraft Profiles</h1>
+            <p>Profiles are stored as JSON files in `src/data/aircraft/profiles`. Contributors can browse, edit, save, or add new aircraft from this page.</p>
+            <div id="status-banner" class="status-banner" role="status" aria-live="polite"></div>
+            <div class="layout">
+                <section class="sidebar">
+                    <div class="actions">
+                        <button type="button" id="new-profile-btn">New Profile</button>
+                        <button type="button" id="refresh-profiles-btn" class="secondary">Refresh</button>
+                    </div>
+                    <div id="profile-list" class="profile-list"></div>
+                </section>
+                <section class="editor">
+                    <div class="actions">
+                        <button type="button" id="save-profile-btn">Save Profile</button>
+                    </div>
+                    <div class="grid">
+                        <div class="form-group"><label for="profile-id">Profile Id</label><input id="profile-id" type="text"></div>
+                        <div class="form-group"><label for="profile-aircraft">Aircraft Name</label><input id="profile-aircraft" type="text"></div>
+                        <div class="form-group"><label for="profile-manufacturer">Manufacturer</label><input id="profile-manufacturer" type="text"></div>
+                        <div class="form-group"><label for="profile-model">Model</label><input id="profile-model" type="text"></div>
+                        <div class="form-group"><label for="profile-engine">Engine</label><input id="profile-engine" type="text"></div>
+                        <div class="form-group"><label for="profile-source-notes">Source Notes</label><input id="profile-source-notes" type="text"></div>
+                        <div class="form-group"><label for="climb-speed">Climb Speed (kt)</label><input id="climb-speed" type="number"></div>
+                        <div class="form-group"><label for="climb-rpm">Climb RPM</label><input id="climb-rpm" type="number"></div>
+                        <div class="form-group"><label for="climb-fuel">Climb Fuel Burn (gph)</label><input id="climb-fuel" type="number" step="0.1"></div>
+                        <div class="form-group"><label for="climb-rate">Rate Of Climb (fpm)</label><input id="climb-rate" type="number"></div>
+                        <div class="form-group"><label for="cruise-speed">Cruise Speed (kt)</label><input id="cruise-speed" type="number"></div>
+                        <div class="form-group"><label for="cruise-rpm">Cruise RPM</label><input id="cruise-rpm" type="number"></div>
+                        <div class="form-group"><label for="cruise-fuel">Cruise Fuel Burn (gph)</label><input id="cruise-fuel" type="number" step="0.1"></div>
+                        <div class="form-group"><label for="limit-vne">VNE (kt)</label><input id="limit-vne" type="number"></div>
+                        <div class="form-group"><label for="limit-vs">VS (kt)</label><input id="limit-vs" type="number"></div>
+                        <div class="form-group"><label for="limit-max-rpm">Max RPM</label><input id="limit-max-rpm" type="number"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="climb-table-json">Climb Table JSON</label>
+                        <textarea id="climb-table-json"></textarea>
+                    </div>
+                    <div id="validation-issues" class="issues"></div>
+                </section>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="./js/aircraftProfiles.js"></script>
+</body>
+</html>

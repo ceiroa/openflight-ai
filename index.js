@@ -1,31 +1,72 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fs from 'fs/promises';
 import { getWeatherData } from './src/api/weatherService.js';
+import {
+    getAircraftProfileById,
+    getAircraftProfileByName,
+    listAircraftProfiles,
+    normalizeAircraftProfile,
+    saveAircraftProfile,
+    validateAircraftProfile,
+} from './src/aircraftProfiles.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const AIRCRAFT_FILES = {
-    'Evektor Harmony LSA': 'harmony_specs.json',
-    'Rotax 912': 'aircraft.json',
-};
 
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
 
-// API endpoint to get aircraft data
+// API endpoints to get or list aircraft data
 app.get('/api/aircraft', async (req, res) => {
-    const { name } = req.query;
     try {
-        const fileName = AIRCRAFT_FILES[name] ?? AIRCRAFT_FILES['Evektor Harmony LSA'];
-        const data = await fs.readFile(path.join(__dirname, 'src', 'data', fileName), 'utf8');
-        res.json(JSON.parse(data));
+        const { name } = req.query;
+        if (name) {
+            const profile = await getAircraftProfileByName(String(name));
+            res.json(profile);
+            return;
+        }
+
+        const profiles = await listAircraftProfiles();
+        res.json(profiles);
     } catch (error) {
-        res.status(500).json({ error: 'Failed to load aircraft data' });
+        const status = error.message?.includes('was not found') ? 404 : 500;
+        res.status(status).json({ error: error.message || 'Failed to load aircraft data' });
+    }
+});
+
+app.get('/api/aircraft/:id', async (req, res) => {
+    try {
+        const profile = await getAircraftProfileById(req.params.id);
+        res.json(profile);
+    } catch (error) {
+        res.status(404).json({ error: error.message || 'Aircraft profile not found' });
+    }
+});
+
+app.post('/api/aircraft', async (req, res) => {
+    try {
+        const normalized = normalizeAircraftProfile(req.body);
+        const validation = validateAircraftProfile(normalized);
+        const saved = await saveAircraftProfile(normalized);
+        res.status(201).json({ profile: saved, validation });
+    } catch (error) {
+        res.status(400).json({ error: error.message || 'Failed to save aircraft profile' });
+    }
+});
+
+app.put('/api/aircraft/:id', async (req, res) => {
+    try {
+        const normalized = normalizeAircraftProfile({ ...req.body, id: req.params.id });
+        const validation = validateAircraftProfile(normalized);
+        const saved = await saveAircraftProfile(normalized);
+        res.json({ profile: saved, validation });
+    } catch (error) {
+        res.status(400).json({ error: error.message || 'Failed to update aircraft profile' });
     }
 });
 

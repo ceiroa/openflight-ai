@@ -28,7 +28,7 @@ test.describe('OpenFlight AI - UI Tests', () => {
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) });
         });
 
-        await page.goto('http://localhost:3000');
+        await page.goto('/');
     });
 
     test('should have dark theme colors', async ({ page }) => {
@@ -162,6 +162,15 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page).toHaveURL(/checkpoints\.html$/);
         await expect(page.locator('h1')).toHaveText('Checkpoints Planner');
         await expect(page.locator('.leg-card')).toHaveCount(1);
+    });
+
+    test('should open the aircraft profiles page and list available profiles', async ({ page }) => {
+        await page.click('#menu-toggle');
+        await page.click('#open-aircraft-btn');
+
+        await expect(page).toHaveURL(/aircraft\.html$/);
+        await expect(page.locator('h1')).toHaveText('Aircraft Profiles');
+        await expect(page.locator('.profile-card')).toHaveCount(2);
     });
 
     test('should preserve nav-log draft data when returning from the checkpoints planner', async ({ page }) => {

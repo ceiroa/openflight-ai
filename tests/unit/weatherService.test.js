@@ -238,4 +238,30 @@ describe('getWeatherData', () => {
         expect(result.variation).toBeCloseTo(-3.79, 2);
         expect(global.fetch).toHaveBeenCalledTimes(1);
     });
+
+    test('retries transient 503 responses before succeeding', async () => {
+        global.fetch = jest.fn()
+            .mockResolvedValueOnce({ ok: false, status: 503, text: async () => '' })
+            .mockResolvedValueOnce({ ok: false, status: 503, text: async () => '' })
+            .mockResolvedValueOnce({
+                ok: true,
+                text: async () => JSON.stringify({
+                    value: [{
+                        temp: 21,
+                        altim: 1006.9,
+                        wspd: 16,
+                        wdir: 250,
+                        lat: 41.6031,
+                        lon: -88.1017,
+                        elev: 205,
+                    }],
+                }),
+                status: 200,
+            });
+
+        const result = await getWeatherData('KLOT');
+
+        expect(result.temperature).toBe(21);
+        expect(global.fetch).toHaveBeenCalledTimes(3);
+    });
 });

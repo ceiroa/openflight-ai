@@ -14,8 +14,10 @@ OpenFlight AI is a dark-themed flight planning and navigation log generator for 
     - Weather population fills temperature, altimeter, wind speed, wind direction, airport elevation, latitude, longitude, and magnetic variation.
     - The global cruise altitude updates all existing leg altitudes and is used as the default for newly added legs.
     - Users can dynamically add and remove destination legs, but at least one destination leg must remain.
+    - The menu includes a separate checkpoints-planner page so dead-reckoning checkpoint work does not disrupt the main nav-log screen.
     - A status banner displays validation and fetch failures.
     - A debug log window shows weather fetches and navigation log generation events.
+    - The debug log can be manually collapsed and reopened.
     - Navigation log generation is blocked until required aircraft, weather, and coordinate inputs exist for every leg.
 
 ## 3. Data Sources & Logic
@@ -37,6 +39,7 @@ OpenFlight AI is a dark-themed flight planning and navigation log generator for 
     - Wind triangle calculations determine wind correction angle, groundspeed, and headings.
     - Great-circle distance and bearing are derived from airport coordinates.
     - Magnetic heading uses locally calculated WMM 2025-2030 declination values. West variation is negative and east variation is positive.
+    - Draft dead-reckoning checkpoints are initially generated from route geometry with a target spacing near 7 NM, then saved for later use in Table 3.
 
 ## 4. Navigation Log Output
 ### Table 1: Cruise Performance
@@ -59,10 +62,11 @@ OpenFlight AI is a dark-themed flight planning and navigation log generator for 
 ### Table 3: Checkpoints & Comms
 - **Columns:** CHECKPOINT, MAG HDG, DIST (LEG), DIST (REM), GROUNDSPEED, ETE, ETA, COMMS / FREQ.
 - **Current behavior:**
-    - One row is produced per destination checkpoint.
+    - If no saved checkpoint plan exists for the current route, one row is produced per destination checkpoint.
+    - If a saved checkpoint plan exists, intermediate checkpoints are inserted before the destination row for each leg.
     - Remaining distance is tracked cumulatively.
     - `ETA` is currently a placeholder value of `-`.
-    - `COMMS / FREQ` is currently a placeholder value of `CTAF`.
+    - `COMMS / FREQ` uses saved checkpoint values when available, otherwise defaults to `VIS` for generated checkpoints and `CTAF` for destination rows.
 
 ## 5. Validation Rules
 - The aircraft profile must load successfully before the nav log can be generated.

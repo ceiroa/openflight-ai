@@ -4,6 +4,14 @@ import {
     calculatePressureAltitude,
     calculateWindTriangle,
 } from "./navigation.js";
+import {
+    SETTINGS_STORAGE_KEY,
+    normalizeAirportCode,
+    saveFlightDraft,
+    loadFlightDraft,
+    loadCheckpointPlan,
+    createRouteSignature,
+} from "./flightStore.js";
 
 const DEFAULT_AIRCRAFT_NAME = "Evektor Harmony LSA";
 
@@ -12,6 +20,7 @@ const state = {
     settings: {
         weatherApiKey: "",
     },
+    weatherCache: new Map(),
 };
 
 const flightForm = document.getElementById("flight-form");
@@ -22,21 +31,26 @@ const destinationsContainer = document.getElementById("destinations-container");
 const statusBanner = document.getElementById("status-banner");
 const menuToggleButton = document.getElementById("menu-toggle");
 const sideMenu = document.getElementById("side-menu");
+const openCheckpointsButton = document.getElementById("open-checkpoints-btn");
+const testFillButton = document.getElementById("test-fill-btn");
 const saveSettingsButton = document.getElementById("save-settings-btn");
 const clearSettingsButton = document.getElementById("clear-settings-btn");
 const weatherKeyInput = document.getElementById("setting-weather-key");
 const debugToggleButton = document.getElementById("debug-toggle");
 const debugWindow = document.getElementById("debug-window");
 
-const SETTINGS_STORAGE_KEY = "openflight-ai-settings";
-
 document.addEventListener("DOMContentLoaded", async () => {
     loadSettings();
     document.getElementById("date").value = new Date().toISOString().split("T")[0];
-    addLeg();
     drawGraph();
     registerEventHandlers();
     await loadAircraft(document.getElementById("aircraft").value || DEFAULT_AIRCRAFT_NAME);
+    if (shouldRestoreDraftFromUrl()) {
+        restoreFlightDraft();
+        clearRestoreDraftFlagFromUrl();
+    } else {
+        addLeg();
+    }
 });
 
 function registerEventHandlers() {
@@ -44,6 +58,8 @@ function registerEventHandlers() {
     generateButton.addEventListener("click", generateLog);
     printButton.addEventListener("click", () => window.print());
     menuToggleButton.addEventListener("click", toggleMenu);
+    openCheckpointsButton.addEventListener("click", openCheckpointPlanner);
+    testFillButton.addEventListener("click", populateTestRoute);
     saveSettingsButton.addEventListener("click", saveSettings);
     clearSettingsButton.addEventListener("click", clearSettings);
     debugToggleButton.addEventListener("click", toggleDebugWindow);
@@ -72,6 +88,22 @@ function registerEventHandlers() {
 
         if (target.classList.contains("destination-icao")) {
             await handleWeather(target, "dest");
+        }
+    });
+
+    flightForm.addEventListener("input", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement)) {
+            return;
+        }
+
+        if (target.id === "departure-icao") {
+            setWeatherStatus(target, "dep");
+            return;
+        }
+
+        if (target.classList.contains("destination-icao")) {
+            setWeatherStatus(target, "dest");
         }
     });
 }
@@ -128,11 +160,8 @@ function clearStatus() {
 }
 
 function log(message) {
-    debugWindow.style.display = "block";
     debugWindow.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ${message}</div>`;
     debugWindow.scrollTop = debugWindow.scrollHeight;
-    debugToggleButton.setAttribute("aria-expanded", "true");
-    debugToggleButton.textContent = "Hide Debug Log";
 }
 
 function toggleDebugWindow() {
@@ -140,14 +169,6 @@ function toggleDebugWindow() {
     debugWindow.style.display = isOpen ? "none" : "block";
     debugToggleButton.setAttribute("aria-expanded", String(!isOpen));
     debugToggleButton.textContent = isOpen ? "Show Debug Log" : "Hide Debug Log";
-}
-
-function normalizeAirportCode(value) {
-    const normalized = value.trim().toUpperCase();
-    if (normalized.length === 3 && /^[A-Z]{3}$/.test(normalized)) {
-        return `K${normalized}`;
-    }
-    return normalized;
 }
 
 async function loadAircraft(name) {
@@ -305,6 +326,7 @@ function addLeg() {
             <div class="form-group"><label>Wind Spd (kt)</label><input type="number" class="leg-wind-speed weather-field"></div>
             <div class="form-group"><label>Wind Dir (deg)</label><input type="number" class="leg-wind-dir weather-field"></div>
         </div>
+        <div class="leg-weather-status weather-status" aria-live="polite"></div>
         <input type="hidden" class="leg-lat">
         <input type="hidden" class="leg-lon">
         <input type="hidden" class="leg-var" value="0">
@@ -332,6 +354,15 @@ async function handleWeather(input, type) {
 
     input.value = icao;
 
+    const cachedWeather = state.weatherCache.get(icao);
+    if (cachedWeather) {
+        applyWeatherData(input, type, cachedWeather);
+        setWeatherStatus(input, type, `Weather loaded for ${icao}.`, "success");
+        return;
+    }
+
+    setWeatherStatus(input, type, `Loading weather for ${icao}...`, "loading");
+
     log(`Fetching weather for ${icao}...`);
 
     try {
@@ -343,12 +374,14 @@ async function handleWeather(input, type) {
 
         const data = await response.json();
         validateWeatherData(data, icao);
+        state.weatherCache.set(icao, data);
         applyWeatherData(input, type, data);
         clearStatus();
+        setWeatherStatus(input, type, `Weather loaded for ${icao}.`, "success");
         log(`Success: Data loaded for ${icao}.`);
     } catch (error) {
         clearWeatherData(input, type);
-        showStatus(error.message, "error");
+        setWeatherStatus(input, type, error.message, "error");
         log(`Error fetching weather for ${icao}: ${error.message}`);
     }
 }
@@ -393,17 +426,109 @@ function clearWeatherData(input, type) {
         document.getElementById("dep-lat").value = "";
         document.getElementById("dep-lon").value = "";
         document.getElementById("dep-var").value = "0";
+        document.getElementById("dep-temp").value = "";
+        document.getElementById("dep-altim").value = "";
+        document.getElementById("dep-wind-speed").value = "";
+        document.getElementById("dep-wind-dir").value = "";
+        document.getElementById("dep-airport-alt").value = "0";
         return;
     }
 
     const container = input.closest(".dest-leg");
+    container.querySelector(".leg-temp").value = "";
+    container.querySelector(".leg-altim").value = "";
+    container.querySelector(".leg-wind-speed").value = "";
+    container.querySelector(".leg-wind-dir").value = "";
+    container.querySelector(".leg-elevation").value = "0";
     container.querySelector(".leg-lat").value = "";
     container.querySelector(".leg-lon").value = "";
     container.querySelector(".leg-var").value = "0";
 }
 
+function setWeatherStatus(input, type, message = "", status = "") {
+    const statusElement = type === "dep"
+        ? document.getElementById("dep-weather-status")
+        : input.closest(".dest-leg")?.querySelector(".leg-weather-status");
+
+    if (!statusElement) {
+        return;
+    }
+
+    statusElement.textContent = message;
+    statusElement.className = type === "dep" ? "weather-status" : "leg-weather-status weather-status";
+    if (status) {
+        statusElement.classList.add(status);
+    }
+    if (!message) {
+        statusElement.style.display = "none";
+    } else {
+        statusElement.style.display = "block";
+    }
+}
+
 function buildWeatherUrl(icao) {
     return `/api/weather/${icao}`;
+}
+
+function openCheckpointPlanner() {
+    saveCurrentFlightDraft();
+    window.location.assign("/checkpoints.html");
+}
+
+function restoreFlightDraft() {
+    const draft = loadFlightDraft();
+    if (!draft) {
+        addLeg();
+        return;
+    }
+
+    document.getElementById("aircraft").value = draft.aircraftName || DEFAULT_AIRCRAFT_NAME;
+    document.getElementById("date").value = draft.date || document.getElementById("date").value;
+    document.getElementById("cruise-alt").value = draft.legs?.[0]?.plannedAlt || "3000";
+    document.getElementById("departure-icao").value = draft.departure?.icao || "";
+    document.getElementById("dep-airport-alt").value = draft.departure?.airportAlt ?? 0;
+    document.getElementById("dep-temp").value = isFiniteValue(draft.departure?.temp);
+    document.getElementById("dep-altim").value = isFiniteValue(draft.departure?.altimeter);
+    document.getElementById("dep-wind-speed").value = isFiniteValue(draft.departure?.windSpeed);
+    document.getElementById("dep-wind-dir").value = isFiniteValue(draft.departure?.windDirection);
+    document.getElementById("dep-lat").value = isFiniteValue(draft.departure?.lat);
+    document.getElementById("dep-lon").value = isFiniteValue(draft.departure?.lon);
+    document.getElementById("dep-var").value = isFiniteValue(draft.departure?.variation, "0");
+
+    destinationsContainer.innerHTML = "";
+    const legs = Array.isArray(draft.legs) && draft.legs.length > 0 ? draft.legs : [{}];
+    for (const leg of legs) {
+        addLeg();
+        const container = destinationsContainer.lastElementChild;
+        container.querySelector(".destination-icao").value = leg.icao || "";
+        container.querySelector(".leg-planned-alt").value = isFiniteValue(leg.plannedAlt, document.getElementById("cruise-alt").value);
+        container.querySelector(".leg-temp").value = isFiniteValue(leg.temp);
+        container.querySelector(".leg-altim").value = isFiniteValue(leg.altimeter);
+        container.querySelector(".leg-wind-speed").value = isFiniteValue(leg.windSpeed);
+        container.querySelector(".leg-wind-dir").value = isFiniteValue(leg.windDirection);
+        container.querySelector(".leg-elevation").value = isFiniteValue(leg.airportElevation, "0");
+        container.querySelector(".leg-lat").value = isFiniteValue(leg.lat);
+        container.querySelector(".leg-lon").value = isFiniteValue(leg.lon);
+        container.querySelector(".leg-var").value = isFiniteValue(leg.variation, "0");
+    }
+}
+
+async function populateTestRoute() {
+    destinationsContainer.innerHTML = "";
+    state.weatherCache.clear();
+
+    document.getElementById("departure-icao").value = "KLOT";
+    document.getElementById("cruise-alt").value = "3000";
+
+    for (const icao of ["KARR", "KSQI", "KLOT"]) {
+        addLeg();
+        destinationsContainer.lastElementChild.querySelector(".destination-icao").value = icao;
+    }
+
+    await handleWeather(document.getElementById("departure-icao"), "dep");
+    for (const input of document.querySelectorAll(".destination-icao")) {
+        await handleWeather(input, "dest");
+    }
 }
 
 function getDistance(lat1, lon1, lat2, lon2) {
@@ -493,6 +618,23 @@ function appendRow(tableBody, cells) {
     tableBody.innerHTML += `<tr>${cells.map((cell) => `<td>${cell}</td>`).join("")}</tr>`;
 }
 
+function saveCurrentFlightDraft() {
+    saveFlightDraft(collectFlightInputs());
+}
+
+function getApprovedCheckpoints(inputs) {
+    const checkpointPlan = loadCheckpointPlan();
+    if (!checkpointPlan) {
+        return null;
+    }
+
+    if (checkpointPlan.routeSignature !== createRouteSignature(inputs)) {
+        return null;
+    }
+
+    return Array.isArray(checkpointPlan.legs) ? checkpointPlan.legs : null;
+}
+
 function generateLog() {
     log("Generating Log...");
 
@@ -524,6 +666,7 @@ function generateLog() {
     table1Body.innerHTML = "";
     table2Body.innerHTML = "";
     table3Body.innerHTML = "";
+    saveFlightDraft(inputs);
 
     const departurePressureAlt = calculatePressureAltitude(inputs.departure.airportAlt, inputs.departure.altimeter);
     const departureDensityAlt = calculateDensityAltitude(departurePressureAlt, inputs.departure.temp);
@@ -555,6 +698,7 @@ function generateLog() {
     let previousSurfaceWindDirection = inputs.departure.windDirection;
     let previousSurfaceWindSpeed = inputs.departure.windSpeed;
     let previousVariation = inputs.departure.variation;
+    const approvedCheckpoints = getApprovedCheckpoints(inputs);
 
     inputs.legs.forEach((leg, index) => {
         const legDistance = getDistance(prevLat, prevLon, leg.lat, leg.lon);
@@ -642,16 +786,55 @@ function generateLog() {
             ((cruiseTimeMinutes / 60) * profiles.cruise.fuel_burn_gph).toFixed(1),
         ]);
 
-        appendRow(table3Body, [
-            leg.icao,
-            cruiseMagHeading.toFixed(0),
-            legDistance.toFixed(1),
-            totalDistanceRemaining.toFixed(1),
-            cruiseWind.groundspeed.toFixed(0),
-            (climbTimeMinutes + cruiseTimeMinutes).toFixed(0),
-            "-",
-            "CTAF",
-        ]);
+        const legCheckpoints = Array.isArray(approvedCheckpoints?.[index]?.checkpoints)
+            ? approvedCheckpoints[index].checkpoints
+            : [];
+
+        if (legCheckpoints.length === 0) {
+            appendRow(table3Body, [
+                leg.icao,
+                cruiseMagHeading.toFixed(0),
+                legDistance.toFixed(1),
+                Math.max(0, totalDistanceRemaining - legDistance).toFixed(1),
+                cruiseWind.groundspeed.toFixed(0),
+                (climbTimeMinutes + cruiseTimeMinutes).toFixed(0),
+                "-",
+                "CTAF",
+            ]);
+        } else {
+            let previousCheckpointDistance = 0;
+            for (const checkpoint of legCheckpoints) {
+                const cumulativeDistance = Math.min(legDistance, Math.max(previousCheckpointDistance, Number(checkpoint.distanceFromLegStartNm) || 0));
+                const segmentDistance = cumulativeDistance - previousCheckpointDistance;
+                const segmentMinutes = cruiseWind.groundspeed === 0 ? 0 : (segmentDistance / cruiseWind.groundspeed) * 60;
+
+                appendRow(table3Body, [
+                    checkpoint.name || "CHECKPOINT",
+                    cruiseMagHeading.toFixed(0),
+                    segmentDistance.toFixed(1),
+                    Math.max(0, totalDistanceRemaining - cumulativeDistance).toFixed(1),
+                    cruiseWind.groundspeed.toFixed(0),
+                    segmentMinutes.toFixed(0),
+                    "-",
+                    checkpoint.comms || "VIS",
+                ]);
+
+                previousCheckpointDistance = cumulativeDistance;
+            }
+
+            const finalSegmentDistance = Math.max(0, legDistance - previousCheckpointDistance);
+            const finalMinutes = cruiseWind.groundspeed === 0 ? 0 : (finalSegmentDistance / cruiseWind.groundspeed) * 60;
+            appendRow(table3Body, [
+                leg.icao,
+                cruiseMagHeading.toFixed(0),
+                finalSegmentDistance.toFixed(1),
+                Math.max(0, totalDistanceRemaining - legDistance).toFixed(1),
+                cruiseWind.groundspeed.toFixed(0),
+                finalMinutes.toFixed(0),
+                "-",
+                "CTAF",
+            ]);
+        }
 
         totalDistanceRemaining -= legDistance;
         prevLat = leg.lat;
@@ -665,4 +848,19 @@ function generateLog() {
 
     document.getElementById("nav-log-container").style.display = "block";
     window.scrollTo(0, document.body.scrollHeight);
+}
+
+function isFiniteValue(value, fallback = "") {
+    return Number.isFinite(Number(value)) ? String(value) : fallback;
+}
+
+function shouldRestoreDraftFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("restoreDraft") === "1";
+}
+
+function clearRestoreDraftFlagFromUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("restoreDraft");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
 }

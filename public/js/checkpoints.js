@@ -102,7 +102,7 @@ function renderPlanner() {
                 <div><strong>Route:</strong> ${legPlan.fromIcao} -> ${legPlan.toIcao}</div>
             </div>
             ${checkpointsHtml}
-            <div style="margin-top: 12px;">
+            <div class="checkpoint-card-actions">
                 <button type="button" class="ghost add-checkpoint-btn" data-leg-index="${index}">Add Checkpoint</button>
             </div>
         `;

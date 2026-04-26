@@ -301,15 +301,15 @@ function addLeg() {
     leg.className = "dest-leg destination";
     leg.innerHTML = `
         <div class="leg-header">
-            <div class="form-group" style="flex: 1;">
+            <div class="form-group flex-fill">
                 <label>Destination (ICAO)</label>
                 <input type="text" class="destination-icao" placeholder="e.g. KSFO" required maxlength="4">
             </div>
-            <div class="form-group" style="width: 80px;">
+            <div class="form-group width-leg-field">
                 <label>Apt Alt</label>
                 <input type="number" class="leg-elevation" value="0">
             </div>
-            <div class="form-group" style="width: 80px;">
+            <div class="form-group width-leg-field">
                 <label>Leg Alt</label>
                 <input type="number" class="leg-planned-alt" value="${document.getElementById("cruise-alt").value}" required min="0">
             </div>

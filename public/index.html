@@ -4,68 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OpenFlight AI - Navigation Log</title>
+    <link rel="stylesheet" href="./styles/app-shell.css">
     <style>
         :root {
-            --bg-color: #0f172a;
-            --container-bg: #1e293b;
-            --field-bg: #334155;
-            --text-color: #f1f5f9;
-            --accent-color: #38bdf8;
             --border-color: #475569;
             --danger-color: #ef4444;
             --success-color: #10b981;
         }
 
-        body { font-family: "Inter", sans-serif; margin: 20px; background-color: var(--bg-color); color: var(--text-color); line-height: 1.5; }
         .container { max-width: 1000px; margin: 0 auto; }
-        .app-shell { position: relative; }
         .title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-        .menu-toggle {
-            position: fixed;
-            left: -8px;
-            top: 18px;
-            width: 44px;
-            height: 44px;
-            border-radius: 0 12px 12px 0;
-            background: #0ea5e9;
-            color: #082f49;
-            z-index: 20;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
-            padding-left: 12px;
-            transition: transform 0.25s ease, opacity 0.25s ease;
-        }
-        .menu-toggle.open { transform: translateX(320px); }
-        .side-menu {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 320px;
-            height: 100vh;
-            background: rgba(2, 6, 23, 0.98);
-            border-right: 1px solid var(--border-color);
-            transform: translateX(-100%);
-            transition: transform 0.25s ease;
-            z-index: 19;
-            padding: 72px 20px 24px;
-            overflow-y: auto;
-            box-sizing: border-box;
-        }
-        .side-menu.open { transform: translateX(0); }
-        .menu-section { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid rgba(71, 85, 105, 0.5); }
-        .menu-section:last-child { border-bottom: none; }
-        .menu-section h3 { margin: 0 0 10px; color: var(--accent-color); font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; }
-        .menu-copy { margin: 0; color: #cbd5e1; font-size: 13px; }
-        .menu-link { display: block; margin: 2px 0 10px; color: #7dd3fc; font-size: 12px; text-decoration: none; }
-        .menu-link:hover { text-decoration: underline; }
-        .settings-actions { display: flex; gap: 10px; margin-top: 12px; }
-        .settings-actions button { flex: 1; }
 
         .no-print { background: var(--container-bg); padding: 24px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); margin-bottom: 32px; }
 
         h1 { margin-top: 0; color: var(--accent-color); font-size: 1.5rem; }
+        .title-heading { display: flex; align-items: center; gap: 10px; }
+        .title-version { font-size: 0.8rem; font-weight: normal; opacity: 0.7; }
 
         .form-group { margin-bottom: 12px; display: flex; flex-direction: column; }
+        .form-group.flex-fill { flex: 1; }
+        .form-group.width-airport-alt { width: 100px; }
+        .form-group.width-leg-field { width: 80px; }
         label { font-weight: 600; margin-bottom: 4px; color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .section-label { color: var(--accent-color); font-size: 13px; }
 
         input, select {
             padding: 10px;
@@ -112,6 +73,8 @@
         }
         button:hover { opacity: 0.9; }
         button:disabled { cursor: not-allowed; opacity: 0.6; }
+        .button-success { background-color: #10b981; color: white; }
+        .button-secondary { background-color: #64748b; color: white; }
 
         .btn-remove { background-color: var(--danger-color); color: white; padding: 10px; width: 40px; }
         .btn-add { background-color: transparent; border: 2px dashed var(--border-color); color: #94a3b8; width: 100%; margin-bottom: 24px; }
@@ -136,11 +99,16 @@
         #debug-toggle { background-color: transparent; border: 1px solid var(--border-color); color: #cbd5e1; padding: 8px 12px; font-size: 12px; }
         #debug-toggle:hover { background: rgba(56, 189, 248, 0.08); }
         #debug-window { margin-top: 12px; background: #1e293b; padding: 10px; border: 1px solid #475569; color: #f1f5f9; border-radius: 8px; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; display: none; }
+        .flight-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .departure-header { margin-top: 10px; }
         .generate-row { display: flex; gap: 12px; justify-content: flex-end; align-items: center; }
         .checkpoint-status { min-height: 18px; font-size: 12px; color: #93c5fd; display: none; margin-right: auto; }
         .checkpoint-status.loading { display: block; }
         .checkpoint-status.error { display: block; color: #fca5a5; }
         .checkpoint-status.success { display: block; color: #86efac; }
+        .nav-log-title { text-align: center; margin: 0; text-transform: uppercase; }
+        .nav-log-header { display: flex; justify-content: space-between; margin-top: 10px; margin-bottom: 20px; font-size: 12px; border-bottom: 1px solid #000; padding-bottom: 5px; }
+        .nav-log-section-title { margin: 0; }
     </style>
 </head>
 <body>
@@ -150,8 +118,8 @@
             <div class="menu-section">
                 <h3>Navigation</h3>
                 <p class="menu-copy">Use this menu for app settings and planning tools.</p>
-                <button type="button" id="open-checkpoints-btn" style="margin-top: 12px; width: 100%;">Open Checkpoints Planner</button>
-                <button type="button" id="open-aircraft-btn" style="margin-top: 12px; width: 100%;">Open Aircraft Profiles</button>
+                <button type="button" id="open-checkpoints-btn" class="menu-nav-button">Open Checkpoints Planner</button>
+                <button type="button" id="open-aircraft-btn" class="menu-nav-button">Open Aircraft Profiles</button>
             </div>
             <div class="menu-section">
                 <h3>Resources</h3>
@@ -170,16 +138,16 @@
 
         <div class="no-print">
             <div class="title-row">
-                <h1 style="display: flex; align-items: center; gap: 10px;">
-                    OpenFlight AI <span style="font-size: 0.8rem; font-weight: normal; opacity: 0.7;">v2.1</span>
+                <h1 class="title-heading">
+                    OpenFlight AI <span class="title-version">v2.1</span>
                 </h1>
-                <button type="button" id="test-fill-btn" style="background-color: #10b981; color: white;">Test</button>
+                <button type="button" id="test-fill-btn" class="button-success">Test</button>
             </div>
 
             <div id="status-banner" role="status" aria-live="polite"></div>
 
             <form id="flight-form">
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+                <div class="flight-form-grid">
                     <div class="form-group">
                         <label for="aircraft">Airplane Type</label>
                         <input type="text" id="aircraft" list="aircraft-options" value="Evektor Harmony LSA" required>
@@ -196,13 +164,13 @@
                 </div>
 
                 <div id="departure-section" class="dest-leg departure">
-                    <label style="color: var(--accent-color); font-size: 13px;">Departure Airport</label>
-                    <div class="leg-header" style="margin-top: 10px;">
-                        <div class="form-group" style="flex: 1;">
+                    <label class="section-label">Departure Airport</label>
+                    <div class="leg-header departure-header">
+                        <div class="form-group flex-fill">
                             <label for="departure-icao">Departure (ICAO)</label>
                             <input type="text" id="departure-icao" placeholder="e.g. KORD" required maxlength="4">
                         </div>
-                        <div class="form-group" style="width: 100px;">
+                        <div class="form-group width-airport-alt">
                             <label for="dep-airport-alt">Airport Alt (ft)</label>
                             <input type="number" id="dep-airport-alt" placeholder="0" value="0">
                         </div>
@@ -225,8 +193,8 @@
 
                 <div class="generate-row">
                     <div id="checkpoint-status" class="checkpoint-status" aria-live="polite"></div>
-                    <button type="button" id="generate-btn" style="background-color: #10b981; color: white;">GENERATE NAV LOG</button>
-                    <button type="button" id="print-btn" style="background-color: #64748b; color: white;">PRINT PDF</button>
+                    <button type="button" id="generate-btn" class="button-success">GENERATE NAV LOG</button>
+                    <button type="button" id="print-btn" class="button-secondary">PRINT PDF</button>
                 </div>
             </form>
             <div class="debug-toggle-wrap">
@@ -236,13 +204,13 @@
         </div>
 
         <div id="nav-log-container">
-            <h2 style="text-align: center; margin: 0; text-transform: uppercase;">Aeronautical Navigation Log</h2>
-            <div style="display: flex; justify-content: space-between; margin-top: 10px; margin-bottom: 20px; font-size: 12px; border-bottom: 1px solid #000; padding-bottom: 5px;">
+            <h2 class="nav-log-title">Aeronautical Navigation Log</h2>
+            <div class="nav-log-header">
                 <span id="out-aircraft"></span>
                 <span id="out-date"></span>
             </div>
 
-            <h4 style="margin: 0;">Table 1: Cruise Performance</h4>
+            <h4 class="nav-log-section-title">Table 1: Cruise Performance</h4>
             <table class="nav-log-table">
                 <thead>
                     <tr>
@@ -260,7 +228,7 @@
                 <tbody id="table1-body"></tbody>
             </table>
 
-            <h4 style="margin: 0;">Table 2: Course & Wind</h4>
+            <h4 class="nav-log-section-title">Table 2: Course & Wind</h4>
             <table class="nav-log-table">
                 <thead>
                     <tr>
@@ -279,7 +247,7 @@
                 <tbody id="table2-body"></tbody>
             </table>
 
-            <h4 style="margin: 0;">Table 3: Checkpoints & Comms</h4>
+            <h4 class="nav-log-section-title">Table 3: Checkpoints & Comms</h4>
             <table class="nav-log-table">
                 <thead>
                     <tr>

@@ -62,11 +62,11 @@ async function loadProfile(id) {
 function renderProfileList() {
     profileList.innerHTML = profiles.map((profile) => `
         <button type="button" class="profile-card${profile.id === activeProfileId ? ' active' : ''}" data-profile-id="${profile.id}">
-            <div style="display:flex; justify-content:space-between; gap: 10px; align-items: center;">
-                <strong style="color:white; text-align:left;">${escapeHtml(profile.aircraft)}</strong>
+            <div class="profile-card-header">
+                <strong class="profile-card-title">${escapeHtml(profile.aircraft)}</strong>
                 <span class="badge ${profile.complete ? 'complete' : 'incomplete'}">${profile.complete ? 'Complete' : 'Needs Work'}</span>
             </div>
-            <div style="margin-top:6px; text-align:left; color:#cbd5e1; font-size:12px;">${escapeHtml(profile.manufacturer || profile.model || profile.id)}</div>
+            <div class="profile-card-meta">${escapeHtml(profile.manufacturer || profile.model || profile.id)}</div>
         </button>
     `).join("");
 

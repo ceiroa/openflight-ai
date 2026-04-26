@@ -4,61 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OpenFlight AI - Aircraft Profiles</title>
+    <link rel="stylesheet" href="./styles/app-shell.css">
     <style>
         :root {
-            --bg-color: #0f172a;
             --container-bg: #1e293b;
             --field-bg: #334155;
-            --text-color: #f1f5f9;
-            --accent-color: #38bdf8;
             --border-color: #475569;
             --success-color: #10b981;
             --warning-color: #f59e0b;
         }
-        body { font-family: "Inter", sans-serif; margin: 20px; background-color: var(--bg-color); color: var(--text-color); line-height: 1.5; }
-        .app-shell { position: relative; }
-        .menu-toggle {
-            position: fixed;
-            left: -8px;
-            top: 18px;
-            width: 44px;
-            height: 44px;
-            border-radius: 0 12px 12px 0;
-            background: #0ea5e9;
-            color: #082f49;
-            z-index: 20;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
-            padding-left: 12px;
-            transition: transform 0.25s ease, opacity 0.25s ease;
-        }
-        .menu-toggle.open { transform: translateX(320px); }
-        .side-menu {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 320px;
-            height: 100vh;
-            background: rgba(2, 6, 23, 0.98);
-            border-right: 1px solid var(--border-color);
-            transform: translateX(-100%);
-            transition: transform 0.25s ease;
-            z-index: 19;
-            padding: 72px 20px 24px;
-            overflow-y: auto;
-            box-sizing: border-box;
-        }
-        .side-menu.open { transform: translateX(0); }
-        .menu-section { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid rgba(71, 85, 105, 0.5); }
-        .menu-section:last-child { border-bottom: none; }
-        .menu-section h3 { margin: 0 0 10px; color: var(--accent-color); font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; }
-        .menu-link { display: block; margin: 2px 0 10px; color: #7dd3fc; font-size: 12px; text-decoration: none; }
-        .menu-link:hover { text-decoration: underline; }
         .container { max-width: 1200px; margin: 0 auto; background: var(--container-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; }
         .layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
         .sidebar, .editor { border: 1px solid var(--border-color); border-radius: 10px; background: rgba(15, 23, 42, 0.55); padding: 18px; }
         .profile-list { display: flex; flex-direction: column; gap: 10px; }
         .profile-card { border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; background: rgba(30, 41, 59, 0.8); cursor: pointer; }
         .profile-card.active { border-color: var(--accent-color); }
+        .profile-card-header { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+        .profile-card-title { color:white; text-align:left; }
+        .profile-card-meta { margin-top:6px; text-align:left; color:#cbd5e1; font-size:12px; }
         .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
         .badge.complete { background: rgba(16, 185, 129, 0.18); color: #86efac; }
         .badge.incomplete { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
@@ -93,8 +56,9 @@
         <aside id="side-menu" class="side-menu" aria-label="Application menu">
             <div class="menu-section">
                 <h3>Navigation</h3>
-                <a class="menu-link" href="/index.html">Flight Setup</a>
-                <a class="menu-link" href="/checkpoints.html">Checkpoints Planner</a>
+                <p class="menu-copy">Use this menu for app settings and planning tools.</p>
+                <a class="link-button menu-nav-link" href="/index.html">Flight Setup</a>
+                <a class="link-button menu-nav-link" href="/checkpoints.html">Checkpoints Planner</a>
             </div>
             <div class="menu-section">
                 <h3>Resources</h3>

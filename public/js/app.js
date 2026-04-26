@@ -21,6 +21,7 @@ const state = {
         weatherApiKey: "",
     },
     weatherCache: new Map(),
+    airportCommsCache: new Map(),
 };
 
 const flightForm = document.getElementById("flight-form");
@@ -57,7 +58,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function registerEventHandlers() {
     addLegButton.addEventListener("click", addLeg);
-    generateButton.addEventListener("click", generateLog);
+    generateButton.addEventListener("click", () => {
+        void generateLog();
+    });
     printButton.addEventListener("click", () => window.print());
     menuToggleButton.addEventListener("click", toggleMenu);
     openCheckpointsButton.addEventListener("click", openCheckpointPlanner);
@@ -490,6 +493,28 @@ function buildWeatherUrl(icao) {
     return `/api/weather/${icao}`;
 }
 
+async function getAirportComms(icao) {
+    const normalized = normalizeAirportCode(icao);
+    if (state.airportCommsCache.has(normalized)) {
+        return state.airportCommsCache.get(normalized);
+    }
+
+    try {
+        const response = await fetch(`/api/airport/${encodeURIComponent(normalized)}/comms`);
+        if (!response.ok) {
+            throw new Error(`Airport comms lookup failed for ${normalized}.`);
+        }
+
+        const comms = await response.json();
+        state.airportCommsCache.set(normalized, comms);
+        return comms;
+    } catch {
+        const fallback = { summary: "N/A" };
+        state.airportCommsCache.set(normalized, fallback);
+        return fallback;
+    }
+}
+
 function openCheckpointPlanner() {
     saveCurrentFlightDraft();
     window.location.assign("/checkpoints.html");
@@ -655,7 +680,7 @@ function getApprovedCheckpoints(inputs) {
     return Array.isArray(checkpointPlan.legs) ? checkpointPlan.legs : null;
 }
 
-function generateLog() {
+async function generateLog() {
     log("Generating Log...");
 
     let profiles;
@@ -719,6 +744,14 @@ function generateLog() {
     let previousSurfaceWindSpeed = inputs.departure.windSpeed;
     let previousVariation = inputs.departure.variation;
     const approvedCheckpoints = getApprovedCheckpoints(inputs);
+    const airportCommsEntries = await Promise.all([
+        getAirportComms(inputs.departure.icao),
+        ...inputs.legs.map((leg) => getAirportComms(leg.icao)),
+    ]);
+    const airportCommsByCode = new Map([
+        [inputs.departure.icao, airportCommsEntries[0]],
+        ...inputs.legs.map((leg, index) => [leg.icao, airportCommsEntries[index + 1]]),
+    ]);
 
     inputs.legs.forEach((leg, index) => {
         const legDistance = getDistance(prevLat, prevLon, leg.lat, leg.lon);
@@ -819,7 +852,7 @@ function generateLog() {
                 cruiseWind.groundspeed.toFixed(0),
                 (climbTimeMinutes + cruiseTimeMinutes).toFixed(0),
                 "-",
-                "CTAF",
+                airportCommsByCode.get(leg.icao)?.summary || "N/A",
             ]);
         } else {
             let previousCheckpointDistance = 0;
@@ -852,7 +885,7 @@ function generateLog() {
                 cruiseWind.groundspeed.toFixed(0),
                 finalMinutes.toFixed(0),
                 "-",
-                "CTAF",
+                airportCommsByCode.get(leg.icao)?.summary || "N/A",
             ]);
         }
 

@@ -1,15 +1,14 @@
 import { magvar } from 'magvar';
+import { findAirportInReferenceData } from './airportReferenceService.js';
 
 const METAR_BASE_URL = 'https://aviationweather.gov/api/data/metar';
 const STATION_INFO_BASE_URL = 'https://aviationweather.gov/api/data/stationinfo';
 const AIRPORT_INFO_BASE_URL = 'https://aviationweather.gov/api/data/airport';
 const STATIONS_CACHE_URL = 'https://aviationweather.gov/data/cache/stations.cache.json.gz';
-const AIRPORTS_CSV_URL = 'https://ourairports.com/data/airports.csv';
 const RETRYABLE_STATUS_CODES = new Set([502, 503, 504]);
 const MAX_FETCH_ATTEMPTS = 3;
 
 let stationCachePromise;
-let airportReferencePromise;
 
 export async function getWeatherData(icao) {
     const metarUrl = `${METAR_BASE_URL}?ids=${icao}&format=json`;
@@ -277,99 +276,6 @@ async function loadMetarStations() {
     }
 
     return stationCachePromise;
-}
-
-async function findAirportInReferenceData(candidateIds) {
-    const airports = await loadAirportReferenceData();
-    const normalizedIds = new Set(candidateIds.map((id) => id.trim().toUpperCase()));
-
-    for (const airport of airports) {
-        if (normalizedIds.has(airport.ident) || normalizedIds.has(airport.gpsCode) || normalizedIds.has(airport.localCode)) {
-            return airport;
-        }
-    }
-
-    return null;
-}
-
-async function loadAirportReferenceData() {
-    if (!airportReferencePromise) {
-        airportReferencePromise = fetchWithRetry(AIRPORTS_CSV_URL, 'airport reference data')
-            .then(async (response) => {
-                if (!response.ok) {
-                    throw new Error(`airport reference data returned ${response.status}`);
-                }
-
-                const csv = await response.text();
-                return parseAirportReferenceCsv(csv);
-            });
-    }
-
-    return airportReferencePromise;
-}
-
-function parseAirportReferenceCsv(csv) {
-    const lines = csv.split(/\r?\n/).filter(Boolean);
-    if (lines.length < 2) {
-        return [];
-    }
-
-    const headers = parseCsvLine(lines[0]);
-    const indexByName = Object.fromEntries(headers.map((header, index) => [header, index]));
-    const airports = [];
-
-    for (const line of lines.slice(1)) {
-        const values = parseCsvLine(line);
-        const latitude = Number(values[indexByName.latitude_deg]);
-        const longitude = Number(values[indexByName.longitude_deg]);
-        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-            continue;
-        }
-
-        const elevationFeet = Number(values[indexByName.elevation_ft]);
-        airports.push({
-            ident: (values[indexByName.ident] || '').toUpperCase(),
-            gpsCode: (values[indexByName.gps_code] || '').toUpperCase(),
-            localCode: (values[indexByName.local_code] || '').toUpperCase(),
-            lat: latitude,
-            lon: longitude,
-            elevation: Number.isFinite(elevationFeet) ? Math.round(elevationFeet) : 0,
-        });
-    }
-
-    return airports;
-}
-
-function parseCsvLine(line) {
-    const values = [];
-    let current = '';
-    let inQuotes = false;
-
-    for (let index = 0; index < line.length; index += 1) {
-        const char = line[index];
-        const nextChar = line[index + 1];
-
-        if (char === '"') {
-            if (inQuotes && nextChar === '"') {
-                current += '"';
-                index += 1;
-            } else {
-                inQuotes = !inQuotes;
-            }
-            continue;
-        }
-
-        if (char === ',' && !inQuotes) {
-            values.push(current);
-            current = '';
-            continue;
-        }
-
-        current += char;
-    }
-
-    values.push(current);
-    return values;
 }
 
 function calculateDistanceNm(lat1, lon1, lat2, lon2) {

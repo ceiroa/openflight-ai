@@ -10,6 +10,10 @@ import {
     saveAircraftProfile,
     validateAircraftProfile,
 } from './src/aircraftProfiles.js';
+import {
+    generateNamedCheckpointsForRoute,
+    getAirportCommsByCode,
+} from './src/api/airportReferenceService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,6 +71,39 @@ app.put('/api/aircraft/:id', async (req, res) => {
         res.json({ profile: saved, validation });
     } catch (error) {
         res.status(400).json({ error: error.message || 'Failed to update aircraft profile' });
+    }
+});
+
+app.get('/api/airport/:icao/comms', async (req, res) => {
+    try {
+        const comms = await getAirportCommsByCode(req.params.icao.toUpperCase());
+        res.json(comms);
+    } catch (error) {
+        res.status(500).json({ error: error.message || 'Failed to load airport communications' });
+    }
+});
+
+app.post('/api/checkpoints/generate', async (req, res) => {
+    try {
+        const draft = req.body;
+        const legs = await generateNamedCheckpointsForRoute(draft);
+        res.json({
+            routeSignature: draft ? JSON.stringify({
+                departure: {
+                    icao: draft.departure?.icao || '',
+                    lat: Number(draft.departure?.lat),
+                    lon: Number(draft.departure?.lon),
+                },
+                legs: Array.isArray(draft.legs) ? draft.legs.map((leg) => ({
+                    icao: leg.icao || '',
+                    lat: Number(leg.lat),
+                    lon: Number(leg.lon),
+                })) : [],
+            }) : '',
+            legs,
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message || 'Failed to generate checkpoints' });
     }
 });
 

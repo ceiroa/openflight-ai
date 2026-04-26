@@ -13,6 +13,14 @@ const routeSignature = JSON.stringify({
     legs: [{ icao: 'KARR', lat: 41.7713, lon: -88.4815 }],
 });
 
+const airportCommsFixtures = {
+    KORD: { summary: 'ATIS 135.4 | TWR 120.75' },
+    KLOT: { summary: 'AWOS 118.125 | CTAF 123.0' },
+    KARR: { summary: 'AWOS 118.525 | CTAF 120.1' },
+    KSQI: { summary: 'AWOS 119.275 | CTAF 122.8' },
+    KVYS: { summary: 'AWOS 118.525 | CTAF 122.8' },
+};
+
 test.describe('OpenFlight AI - UI Tests', () => {
     test.beforeEach(async ({ page }) => {
         await page.route('**/api/weather/*', async (route) => {
@@ -26,6 +34,41 @@ test.describe('OpenFlight AI - UI Tests', () => {
             }
 
             await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) });
+        });
+
+        await page.route('**/api/airport/*/comms', async (route) => {
+            const url = new URL(route.request().url());
+            const parts = url.pathname.split('/');
+            const icao = parts[parts.length - 2].toUpperCase();
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify(airportCommsFixtures[icao] || { summary: 'N/A' }),
+            });
+        });
+
+        await page.route('**/api/checkpoints/generate', async (route) => {
+            const draft = route.request().postDataJSON();
+            const legs = draft.legs.map((leg, index) => ({
+                legIndex: index,
+                fromIcao: index === 0 ? draft.departure.icao : draft.legs[index - 1].icao,
+                toIcao: leg.icao,
+                legDistanceNm: 20,
+                spacingNm: 6.7,
+                checkpoints: [
+                    {
+                        name: `${leg.icao} CHECKPOINT`,
+                        distanceFromLegStartNm: 7,
+                        comms: airportCommsFixtures[leg.icao]?.summary || 'VIS',
+                    },
+                ],
+            }));
+
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ routeSignature, legs }),
+            });
         });
 
         await page.goto('/');

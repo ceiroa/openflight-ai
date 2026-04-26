@@ -4,7 +4,6 @@ import {
     loadCheckpointPlan,
     clearCheckpointPlan,
     createRouteSignature,
-    normalizeAirportCode,
 } from "./flightStore.js";
 
 const plannerRoot = document.getElementById("planner-root");
@@ -30,20 +29,26 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
     }
 
-    hydratePlan();
-    renderPlanner();
+    initializePlanner();
 
     regenerateButton.addEventListener("click", () => {
-        currentPlan = generateCheckpointPlan(currentDraft);
-        renderPlanner();
-        showStatus("Draft checkpoints regenerated for the current route.", "info");
+        regeneratePlan();
     });
 
     saveButton.addEventListener("click", savePlan);
     clearButton.addEventListener("click", clearPlan);
 });
 
-function hydratePlan() {
+async function initializePlanner() {
+    try {
+        await hydratePlan();
+        renderPlanner();
+    } catch (error) {
+        showStatus(error.message, "error");
+    }
+}
+
+async function hydratePlan() {
     const savedPlan = loadCheckpointPlan();
     const routeSignature = createRouteSignature(currentDraft);
 
@@ -52,7 +57,7 @@ function hydratePlan() {
         return;
     }
 
-    currentPlan = generateCheckpointPlan(currentDraft);
+    currentPlan = await fetchGeneratedCheckpointPlan();
 }
 
 function renderPlanner() {
@@ -125,9 +130,7 @@ function savePlan() {
 
 function clearPlan() {
     clearCheckpointPlan();
-    currentPlan = generateCheckpointPlan(currentDraft);
-    renderPlanner();
-    showStatus("Saved checkpoints cleared for this route.", "info");
+    regeneratePlan("Saved checkpoints cleared for this route.");
 }
 
 function updateCheckpointFromRow(legIndex, checkpointIndex, row) {
@@ -142,53 +145,14 @@ function updateCheckpointFromRow(legIndex, checkpointIndex, row) {
     checkpoint.comms = row.querySelector('[data-field="comms"]').value.trim() || "VIS";
 }
 
-function generateCheckpointPlan(draft) {
-    let prevPoint = {
-        icao: normalizeAirportCode(draft.departure.icao),
-        lat: Number(draft.departure.lat),
-        lon: Number(draft.departure.lon),
-    };
-
-    const legs = draft.legs.map((leg, index) => {
-        const nextPoint = {
-            icao: normalizeAirportCode(leg.icao),
-            lat: Number(leg.lat),
-            lon: Number(leg.lon),
-        };
-
-        const legDistanceNm = getDistance(prevPoint.lat, prevPoint.lon, nextPoint.lat, nextPoint.lon);
-        const segmentCount = Math.max(1, Math.round(legDistanceNm / 7));
-        const spacingNm = legDistanceNm / segmentCount;
-        const checkpoints = [];
-
-        for (let checkpointNumber = 1; checkpointNumber < segmentCount; checkpointNumber += 1) {
-            const fraction = checkpointNumber / segmentCount;
-            const distanceFromLegStartNm = legDistanceNm * fraction;
-            checkpoints.push({
-                name: `${prevPoint.icao}-${nextPoint.icao} CP${checkpointNumber}`,
-                distanceFromLegStartNm: Math.round(distanceFromLegStartNm * 10) / 10,
-                fraction,
-                comms: "VIS",
-            });
-        }
-
-        const legPlan = {
-            legIndex: index,
-            fromIcao: prevPoint.icao,
-            toIcao: nextPoint.icao,
-            legDistanceNm,
-            spacingNm,
-            checkpoints,
-        };
-
-        prevPoint = nextPoint;
-        return legPlan;
-    });
-
-    return {
-        routeSignature: createRouteSignature(draft),
-        legs,
-    };
+async function regeneratePlan(message = "Draft checkpoints regenerated for the current route.") {
+    try {
+        currentPlan = await fetchGeneratedCheckpointPlan();
+        renderPlanner();
+        showStatus(message, "info");
+    } catch (error) {
+        showStatus(error.message, "error");
+    }
 }
 
 function isUsableDraft(draft) {
@@ -214,15 +178,25 @@ function showStatus(message, type) {
     statusBanner.classList.add(type);
 }
 
-function getDistance(lat1, lon1, lat2, lon2) {
-    const radiusNm = 3440.065;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return radiusNm * c;
+async function fetchGeneratedCheckpointPlan() {
+    const response = await fetch("/api/checkpoints/generate", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(currentDraft),
+    });
+
+    if (!response.ok) {
+        const failure = await response.json().catch(() => ({ error: "Checkpoint generation failed." }));
+        throw new Error(failure.error || "Checkpoint generation failed.");
+    }
+
+    const plan = await response.json();
+    return {
+        routeSignature: createRouteSignature(currentDraft),
+        legs: plan.legs || [],
+    };
 }
 
 function clampNumber(value, min, max, fallback) {

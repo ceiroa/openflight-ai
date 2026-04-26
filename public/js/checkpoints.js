@@ -1,7 +1,9 @@
 import {
+    CHECKPOINT_PLAN_VERSION,
+    checkpointPlanLooksLegacy,
     loadFlightDraft,
     saveCheckpointPlan,
-    loadCheckpointPlan,
+    getCheckpointPlanForRoute,
     clearCheckpointPlan,
     createRouteSignature,
 } from "./flightStore.js";
@@ -45,14 +47,14 @@ async function initializePlanner() {
         renderPlanner();
     } catch (error) {
         showStatus(error.message, "error");
+    } finally {
+        setPlannerBusy(false);
     }
 }
 
 async function hydratePlan() {
-    const savedPlan = loadCheckpointPlan();
-    const routeSignature = createRouteSignature(currentDraft);
-
-    if (savedPlan?.routeSignature === routeSignature && Array.isArray(savedPlan.legs)) {
+    const savedPlan = getCheckpointPlanForRoute(currentDraft);
+    if (savedPlan) {
         currentPlan = savedPlan;
         return;
     }
@@ -100,9 +102,19 @@ function renderPlanner() {
                 <div><strong>Route:</strong> ${legPlan.fromIcao} -> ${legPlan.toIcao}</div>
             </div>
             ${checkpointsHtml}
+            <div style="margin-top: 12px;">
+                <button type="button" class="ghost add-checkpoint-btn" data-leg-index="${index}">Add Checkpoint</button>
+            </div>
         `;
 
         plannerRoot.appendChild(legCard);
+    });
+
+    plannerRoot.querySelectorAll(".add-checkpoint-btn").forEach((button) => {
+        button.addEventListener("click", () => {
+            const legIndex = Number(button.getAttribute("data-leg-index"));
+            addCheckpointToLeg(legIndex);
+        });
     });
 
     plannerRoot.querySelectorAll("[data-checkpoint-row]").forEach((row) => {
@@ -123,6 +135,7 @@ function savePlan() {
     }
 
     currentPlan.routeSignature = createRouteSignature(currentDraft);
+    currentPlan.version = CHECKPOINT_PLAN_VERSION;
     currentPlan.savedAt = new Date().toISOString();
     saveCheckpointPlan(currentPlan);
     showStatus("Checkpoint plan saved. Return to Flight Setup and generate the nav log to populate Table 3.", "info");
@@ -147,11 +160,14 @@ function updateCheckpointFromRow(legIndex, checkpointIndex, row) {
 
 async function regeneratePlan(message = "Draft checkpoints regenerated for the current route.") {
     try {
+        setPlannerBusy(true, "Loading checkpoints...");
         currentPlan = await fetchGeneratedCheckpointPlan();
         renderPlanner();
         showStatus(message, "info");
     } catch (error) {
         showStatus(error.message, "error");
+    } finally {
+        setPlannerBusy(false);
     }
 }
 
@@ -179,6 +195,7 @@ function showStatus(message, type) {
 }
 
 async function fetchGeneratedCheckpointPlan() {
+    setPlannerBusy(true, "Loading checkpoints...");
     const response = await fetch("/api/checkpoints/generate", {
         method: "POST",
         headers: {
@@ -193,10 +210,44 @@ async function fetchGeneratedCheckpointPlan() {
     }
 
     const plan = await response.json();
-    return {
+    const normalizedPlan = {
+        version: CHECKPOINT_PLAN_VERSION,
         routeSignature: createRouteSignature(currentDraft),
         legs: plan.legs || [],
     };
+    saveCheckpointPlan(normalizedPlan);
+    return normalizedPlan;
+}
+
+function addCheckpointToLeg(legIndex) {
+    const legPlan = currentPlan.legs[legIndex];
+    if (!legPlan) {
+        return;
+    }
+
+    const lastDistance = legPlan.checkpoints.length > 0
+        ? Number(legPlan.checkpoints[legPlan.checkpoints.length - 1].distanceFromLegStartNm) || 0
+        : 0;
+    const suggestedDistance = Math.min(
+        legPlan.legDistanceNm,
+        Math.max(0, lastDistance + Math.max(1, Math.min(legPlan.spacingNm || 5, 10))),
+    );
+
+    legPlan.checkpoints.push({
+        name: `Custom Checkpoint ${legPlan.checkpoints.length + 1}`,
+        distanceFromLegStartNm: Math.round(suggestedDistance * 10) / 10,
+        comms: "",
+    });
+    renderPlanner();
+}
+
+function setPlannerBusy(isBusy, message = "") {
+    regenerateButton.disabled = isBusy;
+    saveButton.disabled = isBusy;
+    clearButton.disabled = isBusy;
+    if (isBusy) {
+        showStatus(message || "Loading checkpoints...", "info");
+    }
 }
 
 function clampNumber(value, min, max, fallback) {

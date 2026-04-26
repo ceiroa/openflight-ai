@@ -136,6 +136,11 @@
         #debug-toggle { background-color: transparent; border: 1px solid var(--border-color); color: #cbd5e1; padding: 8px 12px; font-size: 12px; }
         #debug-toggle:hover { background: rgba(56, 189, 248, 0.08); }
         #debug-window { margin-top: 12px; background: #1e293b; padding: 10px; border: 1px solid #475569; color: #f1f5f9; border-radius: 8px; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; display: none; }
+        .generate-row { display: flex; gap: 12px; justify-content: flex-end; align-items: center; }
+        .checkpoint-status { min-height: 18px; font-size: 12px; color: #93c5fd; display: none; margin-right: auto; }
+        .checkpoint-status.loading { display: block; }
+        .checkpoint-status.error { display: block; color: #fca5a5; }
+        .checkpoint-status.success { display: block; color: #86efac; }
     </style>
 </head>
 <body>
@@ -147,17 +152,6 @@
                 <p class="menu-copy">Use this menu for app settings and planning tools.</p>
                 <button type="button" id="open-checkpoints-btn" style="margin-top: 12px; width: 100%;">Open Checkpoints Planner</button>
                 <button type="button" id="open-aircraft-btn" style="margin-top: 12px; width: 100%;">Open Aircraft Profiles</button>
-            </div>
-            <div class="menu-section">
-                <h3>Settings</h3>
-                <div class="form-group">
-                    <label for="setting-weather-key">Reserved Weather API Key</label>
-                    <input type="password" id="setting-weather-key" placeholder="Optional future use">
-                </div>
-                <div class="settings-actions">
-                    <button type="button" id="save-settings-btn">Save</button>
-                    <button type="button" id="clear-settings-btn" style="background-color: #64748b; color: white;">Clear</button>
-                </div>
             </div>
             <div class="menu-section">
                 <h3>Resources</h3>
@@ -229,7 +223,8 @@
 
                 <button type="button" class="btn-add" id="add-leg-btn">+ ADD DESTINATION LEG</button>
 
-                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <div class="generate-row">
+                    <div id="checkpoint-status" class="checkpoint-status" aria-live="polite"></div>
                     <button type="button" id="generate-btn" style="background-color: #10b981; color: white;">GENERATE NAV LOG</button>
                     <button type="button" id="print-btn" style="background-color: #64748b; color: white;">PRINT PDF</button>
                 </div>

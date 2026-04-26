@@ -5,21 +5,20 @@ import {
     calculateWindTriangle,
 } from "./navigation.js";
 import {
-    SETTINGS_STORAGE_KEY,
+    checkpointPlanLooksLegacy,
+    getCheckpointPlanForRoute,
     normalizeAirportCode,
     saveFlightDraft,
+    saveCheckpointPlan,
     loadFlightDraft,
-    loadCheckpointPlan,
     createRouteSignature,
+    CHECKPOINT_PLAN_VERSION,
 } from "./flightStore.js";
 
 const DEFAULT_AIRCRAFT_NAME = "Evektor Harmony LSA";
 
 const state = {
     aircraftData: null,
-    settings: {
-        weatherApiKey: "",
-    },
     weatherCache: new Map(),
     airportCommsCache: new Map(),
 };
@@ -35,14 +34,11 @@ const sideMenu = document.getElementById("side-menu");
 const openCheckpointsButton = document.getElementById("open-checkpoints-btn");
 const openAircraftButton = document.getElementById("open-aircraft-btn");
 const testFillButton = document.getElementById("test-fill-btn");
-const saveSettingsButton = document.getElementById("save-settings-btn");
-const clearSettingsButton = document.getElementById("clear-settings-btn");
-const weatherKeyInput = document.getElementById("setting-weather-key");
 const debugToggleButton = document.getElementById("debug-toggle");
 const debugWindow = document.getElementById("debug-window");
+const checkpointStatus = document.getElementById("checkpoint-status");
 
 document.addEventListener("DOMContentLoaded", async () => {
-    loadSettings();
     document.getElementById("date").value = new Date().toISOString().split("T")[0];
     drawGraph();
     registerEventHandlers();
@@ -66,8 +62,6 @@ function registerEventHandlers() {
     openCheckpointsButton.addEventListener("click", openCheckpointPlanner);
     openAircraftButton.addEventListener("click", () => window.location.assign("/aircraft.html"));
     testFillButton.addEventListener("click", populateTestRoute);
-    saveSettingsButton.addEventListener("click", saveSettings);
-    clearSettingsButton.addEventListener("click", clearSettings);
     debugToggleButton.addEventListener("click", toggleDebugWindow);
 
     document.getElementById("aircraft").addEventListener("change", async (event) => {
@@ -119,41 +113,6 @@ function toggleMenu() {
     menuToggleButton.classList.toggle("open");
 }
 
-function loadSettings() {
-    try {
-        const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
-        if (!saved) {
-            state.settings.weatherApiKey = "";
-            syncSettingsInputs();
-            return;
-        }
-
-        const parsed = JSON.parse(saved);
-        state.settings.weatherApiKey = parsed.weatherApiKey || "";
-    } catch {
-        state.settings.weatherApiKey = "";
-    }
-
-    syncSettingsInputs();
-}
-
-function syncSettingsInputs() {
-    weatherKeyInput.value = state.settings.weatherApiKey;
-}
-
-function saveSettings() {
-    state.settings.weatherApiKey = weatherKeyInput.value.trim();
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(state.settings));
-    showStatus("Settings saved in this browser.", "info");
-}
-
-function clearSettings() {
-    state.settings.weatherApiKey = "";
-    localStorage.removeItem(SETTINGS_STORAGE_KEY);
-    syncSettingsInputs();
-    showStatus("Settings reset to defaults in this browser.", "info");
-}
-
 function showStatus(message, type = "info") {
     statusBanner.textContent = message;
     statusBanner.className = "";
@@ -163,6 +122,19 @@ function showStatus(message, type = "info") {
 function clearStatus() {
     statusBanner.textContent = "";
     statusBanner.className = "";
+}
+
+function setCheckpointStatus(message = "", type = "") {
+    if (!checkpointStatus) {
+        return;
+    }
+
+    checkpointStatus.textContent = message;
+    checkpointStatus.className = "checkpoint-status";
+    if (type) {
+        checkpointStatus.classList.add(type);
+    }
+    checkpointStatus.style.display = message ? "block" : "none";
 }
 
 function log(message) {
@@ -667,17 +639,57 @@ function saveCurrentFlightDraft() {
     saveFlightDraft(collectFlightInputs());
 }
 
-function getApprovedCheckpoints(inputs) {
-    const checkpointPlan = loadCheckpointPlan();
-    if (!checkpointPlan) {
-        return null;
+async function getApprovedCheckpoints(inputs) {
+    const savedPlan = getCheckpointPlanForRoute(inputs);
+    if (savedPlan) {
+        return {
+            legs: savedPlan.legs,
+            source: "cache",
+        };
     }
 
-    if (checkpointPlan.routeSignature !== createRouteSignature(inputs)) {
-        return null;
-    }
+    log("Loading checkpoints...");
+    showStatus("Loading checkpoints...", "info");
+    setCheckpointStatus("Checkpoints are being calculated...", "loading");
 
-    return Array.isArray(checkpointPlan.legs) ? checkpointPlan.legs : null;
+    try {
+        const response = await fetch("/api/checkpoints/generate", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(inputs),
+        });
+
+        if (!response.ok) {
+            const failure = await response.json().catch(() => ({ error: "Checkpoint generation failed." }));
+            throw new Error(failure.error || "Checkpoint generation failed.");
+        }
+
+        const plan = await response.json();
+        const normalizedPlan = {
+            version: CHECKPOINT_PLAN_VERSION,
+            routeSignature: createRouteSignature(inputs),
+            legs: Array.isArray(plan.legs) ? plan.legs : [],
+        };
+
+        if (!checkpointPlanLooksLegacy(normalizedPlan)) {
+            saveCheckpointPlan(normalizedPlan);
+        }
+
+        return {
+            legs: normalizedPlan.legs,
+            source: "generated",
+        };
+    } catch (error) {
+        log(`Checkpoint generation error: ${error.message}`);
+        showStatus(error.message, "error");
+        setCheckpointStatus(error.message, "error");
+        return {
+            legs: null,
+            source: "error",
+        };
+    }
 }
 
 async function generateLog() {
@@ -687,6 +699,7 @@ async function generateLog() {
     try {
         profiles = getAircraftProfiles();
     } catch (error) {
+        setCheckpointStatus("");
         showStatus(error.message, "error");
         log(`Validation failed: ${error.message}`);
         return;
@@ -695,12 +708,14 @@ async function generateLog() {
     const inputs = collectFlightInputs();
     const errors = validateFlightInputs(inputs);
     if (errors.length > 0) {
+        setCheckpointStatus("");
         showStatus(errors[0], "error");
         log(`Validation failed: ${errors.join(" | ")}`);
         return;
     }
 
-    clearStatus();
+    showStatus("Loading airport comms...", "info");
+    setCheckpointStatus("");
 
     document.getElementById("out-aircraft").innerText = `Aircraft: ${inputs.aircraftName}`;
     document.getElementById("out-date").innerText = `Date: ${inputs.date}`;
@@ -743,11 +758,14 @@ async function generateLog() {
     let previousSurfaceWindDirection = inputs.departure.windDirection;
     let previousSurfaceWindSpeed = inputs.departure.windSpeed;
     let previousVariation = inputs.departure.variation;
-    const approvedCheckpoints = getApprovedCheckpoints(inputs);
-    const airportCommsEntries = await Promise.all([
-        getAirportComms(inputs.departure.icao),
-        ...inputs.legs.map((leg) => getAirportComms(leg.icao)),
+    const [checkpointResult, airportCommsEntries] = await Promise.all([
+        getApprovedCheckpoints(inputs),
+        Promise.all([
+            getAirportComms(inputs.departure.icao),
+            ...inputs.legs.map((leg) => getAirportComms(leg.icao)),
+        ]),
     ]);
+    const approvedCheckpoints = checkpointResult.legs;
     const airportCommsByCode = new Map([
         [inputs.departure.icao, airportCommsEntries[0]],
         ...inputs.legs.map((leg, index) => [leg.icao, airportCommsEntries[index + 1]]),
@@ -900,6 +918,12 @@ async function generateLog() {
     });
 
     document.getElementById("nav-log-container").style.display = "block";
+    if (checkpointResult.source === "error") {
+        showStatus("Checkpoint generation failed. Destination rows were used instead.", "error");
+    } else {
+        clearStatus();
+        setCheckpointStatus("");
+    }
     window.scrollTo(0, document.body.scrollHeight);
 }
 

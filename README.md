@@ -2,6 +2,10 @@
 
 OpenFlight-AI is a sophisticated tool designed to assist pilots in VFR (Visual Flight Rules) cross-country planning. By leveraging modern computational logic, it simplifies complex navigational calculations, ensuring safer and more efficient flight preparation.
 
+## Disclaimer
+
+This project is provided for educational purposes only. Do not rely exclusively on it for real-world navigation planning, weather evaluation, or flight decision-making. Always use official aeronautical charts, current weather briefings, approved flight-planning tools, and your own pilot judgment.
+
 ## Features
 
 - **Wind Correction Angle (WCA) Calculation:** Determine the necessary heading correction to maintain a desired course under varying wind conditions.

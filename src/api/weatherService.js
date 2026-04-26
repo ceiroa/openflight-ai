@@ -5,6 +5,8 @@ const STATION_INFO_BASE_URL = 'https://aviationweather.gov/api/data/stationinfo'
 const AIRPORT_INFO_BASE_URL = 'https://aviationweather.gov/api/data/airport';
 const STATIONS_CACHE_URL = 'https://aviationweather.gov/data/cache/stations.cache.json.gz';
 const AIRPORTS_CSV_URL = 'https://ourairports.com/data/airports.csv';
+const RETRYABLE_STATUS_CODES = new Set([502, 503, 504]);
+const MAX_FETCH_ATTEMPTS = 3;
 
 let stationCachePromise;
 let airportReferencePromise;
@@ -176,7 +178,7 @@ function normalizeLocationRecord(record) {
 }
 
 async function fetchFirstRecord(url, label, options = {}) {
-    const response = await fetch(url);
+    const response = await fetchWithRetry(url, label);
     if (response.status === 204 && options.allowNoContent) {
         return null;
     }
@@ -208,6 +210,28 @@ async function fetchFirstRecord(url, label, options = {}) {
     return data ?? null;
 }
 
+async function fetchWithRetry(url, label) {
+    let lastError;
+
+    for (let attempt = 1; attempt <= MAX_FETCH_ATTEMPTS; attempt += 1) {
+        try {
+            const response = await fetch(url);
+            if (response.ok || response.status === 204 || !RETRYABLE_STATUS_CODES.has(response.status) || attempt === MAX_FETCH_ATTEMPTS) {
+                return response;
+            }
+
+            lastError = new Error(`${label} returned ${response.status}`);
+        } catch (error) {
+            lastError = error;
+            if (attempt === MAX_FETCH_ATTEMPTS) {
+                throw error;
+            }
+        }
+    }
+
+    throw lastError ?? new Error(`${label} request failed`);
+}
+
 function getAlternateAirportIds(icao) {
     const normalized = icao.trim().toUpperCase();
     const alternatives = [];
@@ -237,7 +261,7 @@ async function findNearestMetarStation(lat, lon) {
 
 async function loadMetarStations() {
     if (!stationCachePromise) {
-        stationCachePromise = fetch(STATIONS_CACHE_URL)
+        stationCachePromise = fetchWithRetry(STATIONS_CACHE_URL, 'stations cache')
             .then(async (response) => {
                 if (!response.ok) {
                     throw new Error(`stations cache returned ${response.status}`);
@@ -270,7 +294,7 @@ async function findAirportInReferenceData(candidateIds) {
 
 async function loadAirportReferenceData() {
     if (!airportReferencePromise) {
-        airportReferencePromise = fetch(AIRPORTS_CSV_URL)
+        airportReferencePromise = fetchWithRetry(AIRPORTS_CSV_URL, 'airport reference data')
             .then(async (response) => {
                 if (!response.ok) {
                     throw new Error(`airport reference data returned ${response.status}`);

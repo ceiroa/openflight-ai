@@ -1,5 +1,11 @@
 {
+  "schema_version": 1,
+  "id": "evektor-harmony-lsa",
   "aircraft": "Evektor Harmony LSA",
+  "manufacturer": "Evektor",
+  "model": "Harmony LSA",
+  "engine": "Rotax 912 ULS",
+  "source_notes": "Seed profile migrated from the original project data.",
   "profiles": {
     "climb": {
       "speed_kts": 65,

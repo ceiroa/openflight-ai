@@ -146,6 +146,7 @@
                 <h3>Navigation</h3>
                 <p class="menu-copy">Use this menu for app settings and planning tools.</p>
                 <button type="button" id="open-checkpoints-btn" style="margin-top: 12px; width: 100%;">Open Checkpoints Planner</button>
+                <button type="button" id="open-aircraft-btn" style="margin-top: 12px; width: 100%;">Open Aircraft Profiles</button>
             </div>
             <div class="menu-section">
                 <h3>Settings</h3>
@@ -187,7 +188,8 @@
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
                     <div class="form-group">
                         <label for="aircraft">Airplane Type</label>
-                        <input type="text" id="aircraft" value="Evektor Harmony LSA" required>
+                        <input type="text" id="aircraft" list="aircraft-options" value="Evektor Harmony LSA" required>
+                        <datalist id="aircraft-options"></datalist>
                     </div>
                     <div class="form-group">
                         <label for="cruise-alt">Global Cruise Altitude (ft)</label>

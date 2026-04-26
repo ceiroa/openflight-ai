@@ -32,6 +32,7 @@ const statusBanner = document.getElementById("status-banner");
 const menuToggleButton = document.getElementById("menu-toggle");
 const sideMenu = document.getElementById("side-menu");
 const openCheckpointsButton = document.getElementById("open-checkpoints-btn");
+const openAircraftButton = document.getElementById("open-aircraft-btn");
 const testFillButton = document.getElementById("test-fill-btn");
 const saveSettingsButton = document.getElementById("save-settings-btn");
 const clearSettingsButton = document.getElementById("clear-settings-btn");
@@ -44,6 +45,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("date").value = new Date().toISOString().split("T")[0];
     drawGraph();
     registerEventHandlers();
+    await loadAircraftOptions();
     await loadAircraft(document.getElementById("aircraft").value || DEFAULT_AIRCRAFT_NAME);
     if (shouldRestoreDraftFromUrl()) {
         restoreFlightDraft();
@@ -59,6 +61,7 @@ function registerEventHandlers() {
     printButton.addEventListener("click", () => window.print());
     menuToggleButton.addEventListener("click", toggleMenu);
     openCheckpointsButton.addEventListener("click", openCheckpointPlanner);
+    openAircraftButton.addEventListener("click", () => window.location.assign("/aircraft.html"));
     testFillButton.addEventListener("click", populateTestRoute);
     saveSettingsButton.addEventListener("click", saveSettings);
     clearSettingsButton.addEventListener("click", clearSettings);
@@ -191,6 +194,23 @@ async function loadAircraft(name) {
         state.aircraftData = null;
         showStatus(error.message, "error");
         log(`Aircraft profile error: ${error.message}`);
+    }
+}
+
+async function loadAircraftOptions() {
+    try {
+        const response = await fetch("/api/aircraft");
+        if (!response.ok) {
+            return;
+        }
+
+        const profiles = await response.json();
+        const datalist = document.getElementById("aircraft-options");
+        datalist.innerHTML = profiles
+            .map((profile) => `<option value="${profile.aircraft}"></option>`)
+            .join("");
+    } catch {
+        // Leave the datalist empty if profile discovery fails.
     }
 }
 

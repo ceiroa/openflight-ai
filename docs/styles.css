@@ -66,6 +66,10 @@ pre {
     margin: 0 auto;
 }
 
+.hero-copy-shell {
+    width: min(1600px, calc(100% - 32px));
+}
+
 .hero-copy,
 .notice,
 .card,
@@ -311,6 +315,10 @@ h3 {
     .hero-copy-shell,
     .page {
         width: min(100% - 24px, 1180px);
+    }
+
+    .hero-copy-shell {
+        width: min(100% - 24px, 1600px);
     }
 
     .hero-copy,

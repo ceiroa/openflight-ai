@@ -23,7 +23,12 @@ const PORT = process.env.PORT || 3000;
 
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/docs', express.static(path.join(__dirname, 'docs')));
 app.use(express.json());
+
+app.get('/docs', (req, res) => {
+    res.sendFile(path.join(__dirname, 'docs', 'index.html'));
+});
 
 // API endpoints to get or list aircraft data
 app.get('/api/aircraft', async (req, res) => {

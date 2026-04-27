@@ -6,13 +6,16 @@ import {
 } from "./navigation.js";
 import {
     checkpointPlanLooksLegacy,
+    clearNavLogSnapshot,
     getCheckpointPlanForRoute,
+    loadNavLogSnapshot,
     normalizeAirportCode,
-    saveFlightDraft,
-    saveCheckpointPlan,
-    loadFlightDraft,
     createRouteSignature,
     CHECKPOINT_PLAN_VERSION,
+    loadFlightDraft,
+    saveCheckpointPlan,
+    saveFlightDraft,
+    saveNavLogSnapshot,
 } from "./flightStore.js";
 
 const DEFAULT_AIRCRAFT_NAME = "Evektor Harmony LSA";
@@ -32,6 +35,7 @@ const statusBanner = document.getElementById("status-banner");
 const menuToggleButton = document.getElementById("menu-toggle");
 const sideMenu = document.getElementById("side-menu");
 const openCheckpointsButton = document.getElementById("open-checkpoints-btn");
+const openMapButton = document.getElementById("open-map-btn");
 const openAircraftButton = document.getElementById("open-aircraft-btn");
 const testFillButton = document.getElementById("test-fill-btn");
 const debugToggleButton = document.getElementById("debug-toggle");
@@ -50,21 +54,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else {
         addLeg();
     }
+    restoreMatchingNavLog();
+    updateGenerateButtonState();
 });
 
 function registerEventHandlers() {
     addLegButton.addEventListener("click", addLeg);
     generateButton.addEventListener("click", () => {
+        if (generateButton.dataset.mode === "open") {
+            openNavLog();
+            return;
+        }
         void generateLog();
     });
     printButton.addEventListener("click", () => window.print());
     menuToggleButton.addEventListener("click", toggleMenu);
     openCheckpointsButton.addEventListener("click", openCheckpointPlanner);
-    openAircraftButton.addEventListener("click", () => window.location.assign("/aircraft.html"));
+    openMapButton.addEventListener("click", openRouteMap);
+    openAircraftButton.addEventListener("click", openAircraftProfiles);
     testFillButton.addEventListener("click", populateTestRoute);
     debugToggleButton.addEventListener("click", toggleDebugWindow);
 
     document.getElementById("aircraft").addEventListener("change", async (event) => {
+        invalidateNavLogState();
         await loadAircraft(event.target.value.trim());
     });
 
@@ -97,6 +109,8 @@ function registerEventHandlers() {
             return;
         }
 
+        invalidateNavLogState();
+
         if (target.id === "departure-icao") {
             setWeatherStatus(target, "dep");
             return;
@@ -122,6 +136,19 @@ function showStatus(message, type = "info") {
 function clearStatus() {
     statusBanner.textContent = "";
     statusBanner.className = "";
+}
+
+function updateGenerateButtonState() {
+    const hasNavLog = hasMatchingNavLogSnapshot();
+    generateButton.dataset.mode = hasNavLog ? "open" : "generate";
+    generateButton.textContent = hasNavLog ? "OPEN NAV LOG" : "GENERATE NAV LOG";
+}
+
+function invalidateNavLogState() {
+    if (generateButton.dataset.mode === "open" || loadNavLogSnapshot()) {
+        clearNavLogSnapshot();
+        updateGenerateButtonState();
+    }
 }
 
 function setCheckpointStatus(message = "", type = "") {
@@ -329,6 +356,7 @@ function addLeg() {
 
     leg.querySelector(".btn-remove").addEventListener("click", () => removeLeg(leg));
     destinationsContainer.appendChild(leg);
+    updateGenerateButtonState();
 }
 
 function removeLeg(leg) {
@@ -339,6 +367,7 @@ function removeLeg(leg) {
 
     leg.remove();
     clearStatus();
+    invalidateNavLogState();
 }
 
 async function handleWeather(input, type) {
@@ -492,6 +521,16 @@ function openCheckpointPlanner() {
     window.location.assign("/checkpoints.html");
 }
 
+function openAircraftProfiles() {
+    saveCurrentFlightDraft();
+    window.location.assign("/aircraft.html");
+}
+
+function openRouteMap() {
+    saveCurrentFlightDraft();
+    window.location.assign("/map.html");
+}
+
 function restoreFlightDraft() {
     const draft = loadFlightDraft();
     if (!draft) {
@@ -637,6 +676,67 @@ function appendRow(tableBody, cells) {
 
 function saveCurrentFlightDraft() {
     saveFlightDraft(collectFlightInputs());
+}
+
+function hasMatchingNavLogSnapshot() {
+    const snapshot = loadNavLogSnapshot();
+    if (!snapshot) {
+        return false;
+    }
+
+    try {
+        return snapshot.routeSignature === createRouteSignature(collectFlightInputs());
+    } catch {
+        return false;
+    }
+}
+
+function saveCurrentNavLogSnapshot(inputs) {
+    saveNavLogSnapshot({
+        routeSignature: createRouteSignature(inputs),
+        aircraftText: document.getElementById("out-aircraft").innerText,
+        dateText: document.getElementById("out-date").innerText,
+        table1Html: document.getElementById("table1-body").innerHTML,
+        table2Html: document.getElementById("table2-body").innerHTML,
+        table3Html: document.getElementById("table3-body").innerHTML,
+    });
+}
+
+function restoreMatchingNavLog() {
+    const snapshot = loadNavLogSnapshot();
+    if (!snapshot) {
+        return false;
+    }
+
+    let currentRouteSignature;
+    try {
+        currentRouteSignature = createRouteSignature(collectFlightInputs());
+    } catch {
+        return false;
+    }
+
+    if (snapshot.routeSignature !== currentRouteSignature) {
+        return false;
+    }
+
+    document.getElementById("out-aircraft").innerText = snapshot.aircraftText || "";
+    document.getElementById("out-date").innerText = snapshot.dateText || "";
+    document.getElementById("table1-body").innerHTML = snapshot.table1Html || "";
+    document.getElementById("table2-body").innerHTML = snapshot.table2Html || "";
+    document.getElementById("table3-body").innerHTML = snapshot.table3Html || "";
+    document.getElementById("nav-log-container").style.display = "block";
+    return true;
+}
+
+function openNavLog() {
+    if (!restoreMatchingNavLog()) {
+        updateGenerateButtonState();
+        void generateLog();
+        return;
+    }
+
+    document.getElementById("nav-log-container").style.display = "block";
+    window.scrollTo(0, document.body.scrollHeight);
 }
 
 async function getApprovedCheckpoints(inputs) {
@@ -918,6 +1018,8 @@ async function generateLog() {
     });
 
     document.getElementById("nav-log-container").style.display = "block";
+    saveCurrentNavLogSnapshot(inputs);
+    updateGenerateButtonState();
     if (checkpointResult.source === "error") {
         showStatus("Checkpoint generation failed. Destination rows were used instead.", "error");
     } else {

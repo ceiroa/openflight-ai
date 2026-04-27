@@ -207,6 +207,68 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('.leg-card')).toHaveCount(1);
     });
 
+    test('should open the route map from the main page', async ({ page }) => {
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+
+        await page.click('#menu-toggle');
+        await page.click('#open-map-btn');
+
+        await expect(page).toHaveURL(/map\.html$/);
+        await expect(page.locator('h1')).toHaveText('Route Map');
+        await expect(page.locator('#map-status')).toHaveText('Street map mode. Route, airports, and checkpoints are plotted on OpenStreetMap.');
+        await expect(page.locator('.route-list li')).toHaveCount(1);
+        await expect(page.locator('[data-leg-toggle="0"]')).toBeChecked();
+        await expect(page.locator('#export-kml-btn')).toBeVisible();
+        await expect(page.locator('[data-map-mode="sectional"]')).toBeVisible();
+    });
+
+    test('should open the route map from the checkpoints planner without regenerating checkpoints', async ({ page }) => {
+        let generateCalls = 0;
+        await page.unroute('**/api/checkpoints/generate');
+        await page.route('**/api/checkpoints/generate', async (route) => {
+            generateCalls += 1;
+            const draft = route.request().postDataJSON();
+            const legs = draft.legs.map((leg, index) => ({
+                legIndex: index,
+                fromIcao: index === 0 ? draft.departure.icao : draft.legs[index - 1].icao,
+                toIcao: leg.icao,
+                legDistanceNm: 20,
+                spacingNm: 6.7,
+                checkpoints: [
+                    {
+                        name: `${leg.icao} CHECKPOINT`,
+                        distanceFromLegStartNm: 7,
+                        comms: airportCommsFixtures[leg.icao]?.summary || 'VIS',
+                    },
+                ],
+            }));
+
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ routeSignature, legs }),
+            });
+        });
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+
+        await page.click('#menu-toggle');
+        await page.click('#open-checkpoints-btn');
+        await expect(page.locator('[data-field="name"]').first()).toHaveValue('KARR CHECKPOINT');
+        expect(generateCalls).toBe(1);
+
+        await page.click('#open-map-btn');
+        await expect(page).toHaveURL(/map\.html$/);
+        await expect(page.locator('.checkpoint-button')).toContainText(['KARR CHECKPOINT']);
+        expect(generateCalls).toBe(1);
+    });
+
     test('should ignore legacy saved CP placeholder plans and regenerate checkpoints', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
@@ -249,6 +311,17 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('#table3-body tr').first().locator('td').first()).toHaveText('KARR CHECKPOINT');
     });
 
+    test('should change generate nav log button to open nav log after successful generation', async ({ page }) => {
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+
+        await expect(page.locator('#generate-btn')).toHaveText('GENERATE NAV LOG');
+        await page.click('#generate-btn');
+        await expect(page.locator('#generate-btn')).toHaveText('OPEN NAV LOG');
+    });
+
     test('should open the aircraft profiles page and list available profiles', async ({ page }) => {
         await page.click('#menu-toggle');
         await page.click('#open-aircraft-btn');
@@ -271,6 +344,42 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.click('#menu-toggle');
         await page.click('text=Back To Flight Setup');
         await expect(page).toHaveURL(/index\.html$/);
+        await expect(page.locator('#departure-icao')).toHaveValue('KLOT');
+        await expect(page.locator('.destination-icao').first()).toHaveValue('KARR');
+        await expect(page.locator('#dep-lat')).toHaveValue('41.6031');
+    });
+
+    test('should keep open nav log button state when returning from the checkpoints planner', async ({ page }) => {
+        await page.fill('#departure-icao', 'KLOT');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#generate-btn');
+        await expect(page.locator('#generate-btn')).toHaveText('OPEN NAV LOG');
+
+        await page.click('#menu-toggle');
+        await page.click('#open-checkpoints-btn');
+        await expect(page).toHaveURL(/checkpoints\.html$/);
+
+        await page.click('#menu-toggle');
+        await page.click('text=Back To Flight Setup');
+        await expect(page).toHaveURL(/index\.html$/);
+        await expect(page.locator('#generate-btn')).toHaveText('OPEN NAV LOG');
+    });
+
+    test('should preserve nav-log draft data when returning from aircraft profiles', async ({ page }) => {
+        await page.fill('#departure-icao', 'KLOT');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+
+        await page.click('#menu-toggle');
+        await page.click('#open-aircraft-btn');
+        await expect(page).toHaveURL(/aircraft\.html$/);
+
+        await page.click('#menu-toggle');
+        await page.click('text=Flight Setup');
+        await expect(page).toHaveURL(/index\.html/);
         await expect(page.locator('#departure-icao')).toHaveValue('KLOT');
         await expect(page.locator('.destination-icao').first()).toHaveValue('KARR');
         await expect(page.locator('#dep-lat')).toHaveValue('41.6031');

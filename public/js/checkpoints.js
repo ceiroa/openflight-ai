@@ -12,6 +12,7 @@ const plannerRoot = document.getElementById("planner-root");
 const statusBanner = document.getElementById("status-banner");
 const regenerateButton = document.getElementById("regenerate-btn");
 const saveButton = document.getElementById("save-btn");
+const openMapButton = document.getElementById("open-map-btn");
 const clearButton = document.getElementById("clear-btn");
 const menuToggleButton = document.getElementById("menu-toggle");
 const sideMenu = document.getElementById("side-menu");
@@ -38,6 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     saveButton.addEventListener("click", savePlan);
+    openMapButton.addEventListener("click", openCurrentRouteOnMap);
     clearButton.addEventListener("click", clearPlan);
 });
 
@@ -139,6 +141,18 @@ function savePlan() {
     currentPlan.savedAt = new Date().toISOString();
     saveCheckpointPlan(currentPlan);
     showStatus("Checkpoint plan saved. Return to Flight Setup and generate the nav log to populate Table 3.", "info");
+}
+
+function openCurrentRouteOnMap() {
+    if (!currentDraft || !currentPlan) {
+        return;
+    }
+
+    currentPlan.routeSignature = createRouteSignature(currentDraft);
+    currentPlan.version = CHECKPOINT_PLAN_VERSION;
+    currentPlan.savedAt = new Date().toISOString();
+    saveCheckpointPlan(currentPlan);
+    window.location.assign("/map.html");
 }
 
 function clearPlan() {
@@ -244,6 +258,7 @@ function addCheckpointToLeg(legIndex) {
 function setPlannerBusy(isBusy, message = "") {
     regenerateButton.disabled = isBusy;
     saveButton.disabled = isBusy;
+    openMapButton.disabled = isBusy;
     clearButton.disabled = isBusy;
     if (isBusy) {
         showStatus(message || "Loading checkpoints...", "info");

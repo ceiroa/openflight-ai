@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenFlight AI - Route Map</title>
+    <link rel="stylesheet" href="./styles/app-shell.css">
+    <link rel="stylesheet" href="./styles/map.css">
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""
+    >
+</head>
+<body>
+    <div class="app-shell">
+        <button type="button" id="menu-toggle" class="menu-toggle" aria-label="Open menu">≡</button>
+        <aside id="side-menu" class="side-menu" aria-label="Application menu">
+            <div class="menu-section">
+                <h3>Navigation</h3>
+                <p class="menu-copy">Use this menu for app settings and planning tools.</p>
+                <a class="link-button menu-nav-link" href="/index.html?restoreDraft=1">Flight Setup</a>
+                <a class="link-button menu-nav-link" href="/checkpoints.html">Checkpoints Planner</a>
+                <a class="link-button menu-nav-link" href="/aircraft.html">Aircraft Profiles</a>
+            </div>
+            <div class="menu-section">
+                <h3>Resources</h3>
+                <a class="menu-link" href="https://aviationweather.gov" target="_blank" rel="noreferrer">aviationweather.gov</a>
+                <a class="menu-link" href="https://earth.google.com/web/" target="_blank" rel="noreferrer">Google Earth</a>
+                <a class="menu-link" href="https://www.fltplan.com" target="_blank" rel="noreferrer">FltPlan.com</a>
+                <a class="menu-link" href="https://skyvector.com/" target="_blank" rel="noreferrer">SkyVector</a>
+            </div>
+        </aside>
+        <div class="container">
+            <h1>Route Map</h1>
+            <p>Plot the current route on a free OpenStreetMap base map. This first version focuses on route review, airport markers, and saved checkpoints.</p>
+            <div id="status-banner" class="status-banner" role="status" aria-live="polite"></div>
+            <div id="map-root"></div>
+        </div>
+    </div>
+
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""
+    ></script>
+    <script type="module" src="./js/map.js"></script>
+</body>
+</html>

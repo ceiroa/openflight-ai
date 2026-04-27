@@ -1,6 +1,7 @@
 export const SETTINGS_STORAGE_KEY = "openflight-ai-settings";
 export const FLIGHT_DRAFT_STORAGE_KEY = "openflight-ai-flight-draft";
 export const CHECKPOINTS_STORAGE_KEY = "openflight-ai-checkpoints";
+export const NAV_LOG_STORAGE_KEY = "openflight-ai-nav-log";
 export const CHECKPOINT_PLAN_VERSION = 2;
 
 export function normalizeAirportCode(value) {
@@ -46,6 +47,18 @@ export function loadCheckpointPlan() {
 
 export function clearCheckpointPlan() {
     localStorage.removeItem(CHECKPOINTS_STORAGE_KEY);
+}
+
+export function saveNavLogSnapshot(snapshot) {
+    localStorage.setItem(NAV_LOG_STORAGE_KEY, JSON.stringify(snapshot));
+}
+
+export function loadNavLogSnapshot() {
+    return readJsonStorage(NAV_LOG_STORAGE_KEY);
+}
+
+export function clearNavLogSnapshot() {
+    localStorage.removeItem(NAV_LOG_STORAGE_KEY);
 }
 
 export function checkpointPlanLooksLegacy(plan) {

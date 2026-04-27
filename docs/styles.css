@@ -42,24 +42,31 @@ pre {
 }
 
 .hero {
-    padding: 72px 24px 36px;
+    padding: 40px 0 36px;
 }
 
-.hero-inner,
+.hero-copy-shell,
 .page {
     width: min(1180px, calc(100% - 32px));
     margin: 0 auto;
 }
 
-.hero-inner {
-    display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(360px, 1fr);
-    gap: 28px;
-    align-items: stretch;
+.page {
+    margin: 0 auto;
+}
+
+.hero-band {
+    width: 100%;
+    padding: 0 16px;
+    margin-bottom: 24px;
+}
+
+.hero-visual-shell {
+    width: min(1600px, calc(100% - 0px));
+    margin: 0 auto;
 }
 
 .hero-copy,
-.hero-panel,
 .notice,
 .card,
 .diagram-card,
@@ -68,8 +75,7 @@ pre {
     box-shadow: 0 22px 40px -24px var(--shadow-color);
 }
 
-.hero-copy,
-.hero-panel {
+.hero-copy {
     border-radius: 24px;
     background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.76));
     backdrop-filter: blur(10px);
@@ -77,10 +83,6 @@ pre {
 
 .hero-copy {
     padding: 40px;
-}
-
-.hero-panel {
-    padding: 24px;
 }
 
 .eyebrow {
@@ -122,7 +124,7 @@ h3 {
 }
 
 .hero-text {
-    max-width: 58ch;
+    max-width: none;
     font-size: 1.05rem;
 }
 
@@ -161,21 +163,21 @@ h3 {
 }
 
 .hero-illustration {
-    height: 100%;
-    padding: 12px;
-    border-radius: 18px;
+    padding: 18px;
+    border-radius: 24px;
     background:
         radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 34%),
         linear-gradient(180deg, rgba(8, 17, 31, 0.95), rgba(15, 23, 42, 0.86));
-    border: 1px solid rgba(56, 189, 248, 0.12);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 22px 40px -24px var(--shadow-color);
 }
 
 .hero-illustration canvas {
     display: block;
     width: 100%;
     height: auto;
-    aspect-ratio: 1000 / 180;
-    border-radius: 12px;
+    aspect-ratio: 1400 / 220;
+    border-radius: 16px;
     background: linear-gradient(180deg, #020617, #0f172a);
 }
 
@@ -286,7 +288,6 @@ h3 {
 }
 
 @media (max-width: 980px) {
-    .hero-inner,
     .grid.two,
     .grid.three,
     .flow-grid {
@@ -300,19 +301,26 @@ h3 {
 
 @media (max-width: 640px) {
     .hero {
-        padding: 40px 16px 24px;
+        padding: 24px 0 24px;
     }
 
-    .hero-inner,
+    .hero-band {
+        padding: 0 12px;
+    }
+
+    .hero-copy-shell,
     .page {
         width: min(100% - 24px, 1180px);
     }
 
     .hero-copy,
-    .hero-panel,
     .card,
     .diagram-card,
     .code-block {
         padding: 18px;
+    }
+
+    .hero-illustration {
+        padding: 12px;
     }
 }

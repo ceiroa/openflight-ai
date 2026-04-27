@@ -9,7 +9,14 @@
 </head>
 <body>
     <header class="hero">
-        <div class="hero-inner">
+        <div class="hero-band">
+            <div class="hero-visual-shell">
+                <div class="hero-illustration" aria-hidden="true">
+                    <canvas id="hero-flight-graph" width="1400" height="220"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="hero-copy-shell">
             <div class="hero-copy">
                 <p class="eyebrow">OpenFlight AI</p>
                 <h1>VFR Flight Planning, Weather Ingestion, and Nav-Log Generation</h1>
@@ -21,11 +28,6 @@
                 <div class="hero-actions">
                     <a class="button primary" href="https://github.com/ceiroa/openflight-ai" target="_blank" rel="noreferrer">View Repository</a>
                     <a class="button secondary" href="#architecture">Explore Architecture</a>
-                </div>
-            </div>
-            <div class="hero-panel">
-                <div class="hero-illustration" aria-hidden="true">
-                    <canvas id="hero-flight-graph" width="1000" height="180"></canvas>
                 </div>
             </div>
         </div>

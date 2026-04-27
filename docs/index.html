@@ -25,35 +25,7 @@
             </div>
             <div class="hero-panel">
                 <div class="hero-illustration" aria-hidden="true">
-                    <svg viewBox="0 0 420 240" role="presentation">
-                        <defs>
-                            <linearGradient id="routeGlow" x1="0%" y1="0%" x2="100%" y2="0%">
-                                <stop offset="0%" stop-color="#0ea5e9"/>
-                                <stop offset="100%" stop-color="#38bdf8"/>
-                            </linearGradient>
-                        </defs>
-                        <circle cx="84" cy="164" r="20" class="airport-dot airport-start"></circle>
-                        <circle cx="340" cy="78" r="20" class="airport-dot airport-end"></circle>
-                        <path class="route-trace" d="M84 164 C138 150 170 124 214 112 C256 100 292 94 340 78"></path>
-                        <circle cx="160" cy="132" r="6" class="checkpoint-dot"></circle>
-                        <circle cx="232" cy="108" r="6" class="checkpoint-dot"></circle>
-                        <circle cx="286" cy="94" r="6" class="checkpoint-dot"></circle>
-                        <g class="plane-mark" transform="translate(214 112) rotate(-18)">
-                            <path d="M0 -26 L12 -4 L56 0 L56 9 L14 12 L4 32 L-4 32 L-2 11 L-34 16 L-38 9 L-6 2 L-14 -18 L-8 -24 L4 -8 L12 -26 Z"></path>
-                        </g>
-                        <text x="54" y="202" class="airport-label">Departure</text>
-                        <text x="308" y="116" class="airport-label">Destination</text>
-                    </svg>
-                </div>
-                <div class="panel-card">
-                    <h2>At a Glance</h2>
-                    <ul class="stat-list">
-                        <li><strong>Frontend:</strong> Static HTML/CSS/JS</li>
-                        <li><strong>Backend:</strong> Node.js + Express</li>
-                        <li><strong>Weather:</strong> aviationweather.gov</li>
-                        <li><strong>Variation:</strong> offline WMM via <code>magvar</code></li>
-                        <li><strong>Testing:</strong> Jest + Playwright</li>
-                    </ul>
+                    <canvas id="hero-flight-graph" width="1000" height="180"></canvas>
                 </div>
             </div>
         </div>
@@ -64,6 +36,31 @@
             <p>
                 <strong>Disclaimer:</strong> This project is for educational purposes only. It should not be relied on as the sole source for real-world navigation planning, weather interpretation, or operational decision-making.
             </p>
+        </section>
+
+        <section class="section" id="quick-summary">
+            <div class="section-heading">
+                <p class="eyebrow">Summary</p>
+                <h2>At a glance</h2>
+            </div>
+            <div class="grid two">
+                <article class="card">
+                    <h3>Platform</h3>
+                    <ul class="stat-list">
+                        <li><strong>Frontend:</strong> Static HTML/CSS/JS</li>
+                        <li><strong>Backend:</strong> Node.js + Express</li>
+                        <li><strong>Testing:</strong> Jest + Playwright</li>
+                    </ul>
+                </article>
+                <article class="card">
+                    <h3>Data</h3>
+                    <ul class="stat-list">
+                        <li><strong>Weather:</strong> aviationweather.gov</li>
+                        <li><strong>Variation:</strong> offline WMM via <code>magvar</code></li>
+                        <li><strong>Profiles:</strong> file-based aircraft JSON</li>
+                    </ul>
+                </article>
+            </div>
         </section>
 
         <section class="section" id="overview">
@@ -318,5 +315,6 @@ docs/
             </div>
         </section>
     </main>
+    <script src="./hero-graphic.js"></script>
 </body>
 </html>

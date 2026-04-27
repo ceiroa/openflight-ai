@@ -100,8 +100,8 @@ h3 {
 }
 
 h1 {
-    font-size: clamp(2.2rem, 4.5vw, 4.4rem);
-    max-width: 10ch;
+    font-size: clamp(1.9rem, 3.4vw, 3.25rem);
+    max-width: 13ch;
 }
 
 h2 {
@@ -165,6 +165,63 @@ h3 {
     padding: 22px;
     border-radius: 18px;
     background: linear-gradient(180deg, rgba(30, 41, 59, 0.82), rgba(15, 23, 42, 0.88));
+}
+
+.hero-illustration {
+    margin-bottom: 18px;
+    padding: 12px;
+    border-radius: 18px;
+    background:
+        radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 34%),
+        linear-gradient(180deg, rgba(8, 17, 31, 0.95), rgba(15, 23, 42, 0.86));
+    border: 1px solid rgba(56, 189, 248, 0.12);
+}
+
+.hero-illustration svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.route-trace {
+    fill: none;
+    stroke: url(#routeGlow);
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-dasharray: 10 10;
+    filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.35));
+}
+
+.airport-dot {
+    stroke: rgba(8, 17, 31, 0.9);
+    stroke-width: 6;
+}
+
+.airport-start {
+    fill: #10b981;
+}
+
+.airport-end {
+    fill: #f59e0b;
+}
+
+.checkpoint-dot {
+    fill: #e2e8f0;
+    stroke: #38bdf8;
+    stroke-width: 3;
+}
+
+.plane-mark path {
+    fill: #e2e8f0;
+    stroke: #0f172a;
+    stroke-width: 3;
+}
+
+.airport-label {
+    fill: #cbd5e1;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
 }
 
 .stat-list,

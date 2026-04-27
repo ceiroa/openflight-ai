@@ -24,6 +24,27 @@
                 </div>
             </div>
             <div class="hero-panel">
+                <div class="hero-illustration" aria-hidden="true">
+                    <svg viewBox="0 0 420 240" role="presentation">
+                        <defs>
+                            <linearGradient id="routeGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#0ea5e9"/>
+                                <stop offset="100%" stop-color="#38bdf8"/>
+                            </linearGradient>
+                        </defs>
+                        <circle cx="84" cy="164" r="20" class="airport-dot airport-start"></circle>
+                        <circle cx="340" cy="78" r="20" class="airport-dot airport-end"></circle>
+                        <path class="route-trace" d="M84 164 C138 150 170 124 214 112 C256 100 292 94 340 78"></path>
+                        <circle cx="160" cy="132" r="6" class="checkpoint-dot"></circle>
+                        <circle cx="232" cy="108" r="6" class="checkpoint-dot"></circle>
+                        <circle cx="286" cy="94" r="6" class="checkpoint-dot"></circle>
+                        <g class="plane-mark" transform="translate(214 112) rotate(-18)">
+                            <path d="M0 -26 L12 -4 L56 0 L56 9 L14 12 L4 32 L-4 32 L-2 11 L-34 16 L-38 9 L-6 2 L-14 -18 L-8 -24 L4 -8 L12 -26 Z"></path>
+                        </g>
+                        <text x="54" y="202" class="airport-label">Departure</text>
+                        <text x="308" y="116" class="airport-label">Destination</text>
+                    </svg>
+                </div>
                 <div class="panel-card">
                     <h2>At a Glance</h2>
                     <ul class="stat-list">
@@ -96,11 +117,11 @@
                     <h3>High-Level Flow</h3>
                     <div class="flow-grid">
                         <div class="flow-node">Static Pages<br><span>index, checkpoints, map, aircraft</span></div>
-                        <div class="flow-arrow">→</div>
+                        <div class="flow-arrow">&rarr;</div>
                         <div class="flow-node">Browser State<br><span>drafts, checkpoints, nav-log snapshot</span></div>
-                        <div class="flow-arrow">→</div>
+                        <div class="flow-arrow">&rarr;</div>
                         <div class="flow-node">Local API<br><span>weather, aircraft, checkpoint generation</span></div>
-                        <div class="flow-arrow">→</div>
+                        <div class="flow-arrow">&rarr;</div>
                         <div class="flow-node">External Data<br><span>AviationWeather + local datasets</span></div>
                     </div>
                 </article>
@@ -210,6 +231,40 @@
 <pre><code>npm test
 npm run test:unit
 npm run test:ui</code></pre>
+            </div>
+        </section>
+
+        <section class="section" id="ai-workflow">
+            <div class="section-heading">
+                <p class="eyebrow">AI Workflow</p>
+                <h2>How AI tools were used</h2>
+            </div>
+            <div class="grid two">
+                <article class="card">
+                    <h3>Where AI helped</h3>
+                    <p>
+                        AI tools were used as implementation accelerators for UI changes, refactors,
+                        integration glue, test scaffolding, and exploratory feature work. That was
+                        especially useful while the app was expanding from a single nav-log screen into
+                        weather, checkpoints, mapping, and aircraft-profile workflows.
+                    </p>
+                </article>
+                <article class="card">
+                    <h3>What made it reliable</h3>
+                    <p>
+                        The project became more stable only after the code was reorganized around clearer
+                        boundaries, shared browser state, standardized data files, and repeatable tests.
+                        In other words, the useful pattern was not just "ask an AI to change code," but
+                        "constrain the change, verify it locally, and keep one source of truth per area."
+                    </p>
+                </article>
+            </div>
+            <div class="code-block">
+<pre><code>Typical AI-assisted workflow:
+1. make one bounded change
+2. update or add tests in the same change
+3. run npm test locally
+4. push only after the workflow passes</code></pre>
             </div>
         </section>
 

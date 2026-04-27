@@ -64,6 +64,20 @@ To keep future AI-generated edits from breaking the app:
 
 The repository CI workflow runs the same checks on GitHub for every push and pull request.
 
+## GitHub Pages
+
+The repository now includes a static technical overview site under `docs/`.
+
+To publish it with GitHub Pages:
+
+1. Open the repository on GitHub.
+2. Go to `Settings` -> `Pages`.
+3. Under `Build and deployment`, choose `Deploy from a branch`.
+4. Select branch `main` and folder `/docs`.
+5. Save the setting.
+
+After that, GitHub will publish the site automatically from the contents of `docs/`.
+
 ## License
 
 This project is licensed under the MIT License.

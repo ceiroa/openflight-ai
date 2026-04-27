@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenFlight AI | Technical Overview</title>
+    <meta name="description" content="Technical overview of OpenFlight AI architecture, data flow, testing strategy, and roadmap.">
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <header class="hero">
+        <div class="hero-inner">
+            <div class="hero-copy">
+                <p class="eyebrow">OpenFlight AI</p>
+                <h1>VFR Flight Planning, Weather Ingestion, and Nav-Log Generation</h1>
+                <p class="hero-text">
+                    OpenFlight AI is a browser-first cross-country planning tool for educational use.
+                    It combines weather retrieval, aircraft performance profiles, checkpoint planning,
+                    and route review into a single local workflow.
+                </p>
+                <div class="hero-actions">
+                    <a class="button primary" href="https://github.com/ceiroa/openflight-ai" target="_blank" rel="noreferrer">View Repository</a>
+                    <a class="button secondary" href="#architecture">Explore Architecture</a>
+                </div>
+            </div>
+            <div class="hero-panel">
+                <div class="panel-card">
+                    <h2>At a Glance</h2>
+                    <ul class="stat-list">
+                        <li><strong>Frontend:</strong> Static HTML/CSS/JS</li>
+                        <li><strong>Backend:</strong> Node.js + Express</li>
+                        <li><strong>Weather:</strong> aviationweather.gov</li>
+                        <li><strong>Variation:</strong> offline WMM via <code>magvar</code></li>
+                        <li><strong>Testing:</strong> Jest + Playwright</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="page">
+        <section class="notice">
+            <p>
+                <strong>Disclaimer:</strong> This project is for educational purposes only. It should not be relied on as the sole source for real-world navigation planning, weather interpretation, or operational decision-making.
+            </p>
+        </section>
+
+        <section class="section" id="overview">
+            <div class="section-heading">
+                <p class="eyebrow">Overview</p>
+                <h2>What the app does</h2>
+            </div>
+            <div class="grid two">
+                <article class="card">
+                    <h3>Flight Setup</h3>
+                    <p>
+                        The home page collects departure, destination legs, cruise altitude, and
+                        aircraft selection. Weather loads per airport and populates the data needed
+                        for the navigation tables and printable nav log.
+                    </p>
+                </article>
+                <article class="card">
+                    <h3>Checkpoint Planning</h3>
+                    <p>
+                        A separate planner generates and stores intermediate dead-reckoning checkpoints.
+                        Users can edit, add, remove, and save checkpoints before they are reflected
+                        back into Table 3 and the PDF workflow.
+                    </p>
+                </article>
+                <article class="card">
+                    <h3>Route Map</h3>
+                    <p>
+                        The map page renders the active route on a free OpenStreetMap base layer,
+                        supports per-leg focus and visibility toggles, highlights saved checkpoints,
+                        and exports the route to KML for Google Earth review.
+                    </p>
+                </article>
+                <article class="card">
+                    <h3>Aircraft Profiles</h3>
+                    <p>
+                        Aircraft performance data lives in separate profile files so contributors can
+                        add new aircraft without changing calculation code. The browser UI can list,
+                        edit, and save profiles through the local backend.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+        <section class="section" id="architecture">
+            <div class="section-heading">
+                <p class="eyebrow">Architecture</p>
+                <h2>How the system is organized</h2>
+            </div>
+            <div class="stack">
+                <article class="diagram-card">
+                    <h3>High-Level Flow</h3>
+                    <div class="flow-grid">
+                        <div class="flow-node">Static Pages<br><span>index, checkpoints, map, aircraft</span></div>
+                        <div class="flow-arrow">→</div>
+                        <div class="flow-node">Browser State<br><span>drafts, checkpoints, nav-log snapshot</span></div>
+                        <div class="flow-arrow">→</div>
+                        <div class="flow-node">Local API<br><span>weather, aircraft, checkpoint generation</span></div>
+                        <div class="flow-arrow">→</div>
+                        <div class="flow-node">External Data<br><span>AviationWeather + local datasets</span></div>
+                    </div>
+                </article>
+                <div class="grid three">
+                    <article class="card">
+                        <h3>Frontend</h3>
+                        <p><code>public/js/app.js</code> orchestrates the main nav-log workflow.</p>
+                        <p><code>public/js/checkpoints.js</code> manages checkpoint review and editing.</p>
+                        <p><code>public/js/map.js</code> handles route plotting, leg controls, and KML export.</p>
+                    </article>
+                    <article class="card">
+                        <h3>Shared State</h3>
+                        <p>
+                            <code>public/js/flightStore.js</code> is the browser-side cache and contract
+                            between pages. It keeps flight drafts, checkpoint plans, and nav-log state
+                            synchronized across page transitions.
+                        </p>
+                    </article>
+                    <article class="card">
+                        <h3>Backend</h3>
+                        <p>
+                            <code>index.js</code> exposes local endpoints for weather lookup, airport comms,
+                            checkpoint generation, and aircraft profile CRUD. Server-side normalization keeps
+                            third-party API quirks away from the UI.
+                        </p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="data-sources">
+            <div class="section-heading">
+                <p class="eyebrow">Data Sources</p>
+                <h2>What is local and what is external</h2>
+            </div>
+            <div class="grid two">
+                <article class="card">
+                    <h3>External Services</h3>
+                    <ul class="bullet-list">
+                        <li><strong>AviationWeather:</strong> METAR, station data, airport lookup, and fallback weather resolution.</li>
+                        <li><strong>OpenStreetMap / OpenTopoMap:</strong> route and terrain map tiles on the route map page.</li>
+                    </ul>
+                </article>
+                <article class="card">
+                    <h3>Local / Offline Components</h3>
+                    <ul class="bullet-list">
+                        <li><strong><code>magvar</code>:</strong> computes magnetic variation locally from the World Magnetic Model.</li>
+                        <li><strong>Aircraft profile JSON files:</strong> contributor-managed data files under the aircraft profile directory.</li>
+                        <li><strong>Checkpoint plan cache:</strong> browser storage reused between home, planner, and map.</li>
+                    </ul>
+                </article>
+            </div>
+        </section>
+
+        <section class="section" id="reliability">
+            <div class="section-heading">
+                <p class="eyebrow">Reliability</p>
+                <h2>How the app avoids brittle behavior</h2>
+            </div>
+            <div class="grid three">
+                <article class="card">
+                    <h3>Weather Robustness</h3>
+                    <p>
+                        Weather lookups show per-airport loading states, retry transient upstream failures,
+                        and surface incomplete-data errors inline next to the field that triggered them.
+                    </p>
+                </article>
+                <article class="card">
+                    <h3>Single Sources of Truth</h3>
+                    <p>
+                        Navigation logic, weather normalization, and aircraft profiles are separated so
+                        changes happen in one place instead of drifting across duplicated code paths.
+                    </p>
+                </article>
+                <article class="card">
+                    <h3>Cross-Page Reuse</h3>
+                    <p>
+                        Once checkpoints or a nav log are generated, the stored plan is reused across
+                        pages instead of being recalculated every time the user navigates.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+        <section class="section" id="testing">
+            <div class="section-heading">
+                <p class="eyebrow">Testing</p>
+                <h2>Local-first change safety</h2>
+            </div>
+            <div class="grid two">
+                <article class="card">
+                    <h3>Unit Tests</h3>
+                    <p>
+                        Jest covers weather normalization, fallback behavior, magnetic variation, and
+                        supporting services. These tests verify pure logic and API adaptation behavior.
+                    </p>
+                </article>
+                <article class="card">
+                    <h3>End-to-End Tests</h3>
+                    <p>
+                        Playwright validates the real user workflows: weather entry, checkpoint planning,
+                        nav-log generation, cross-page state reuse, and route map behavior.
+                    </p>
+                </article>
+            </div>
+            <div class="code-block">
+<pre><code>npm test
+npm run test:unit
+npm run test:ui</code></pre>
+            </div>
+        </section>
+
+        <section class="section" id="repo-layout">
+            <div class="section-heading">
+                <p class="eyebrow">Repository Layout</p>
+                <h2>Key directories</h2>
+            </div>
+            <div class="code-block">
+<pre><code>public/
+  index.html
+  checkpoints.html
+  map.html
+  aircraft.html
+  js/
+  styles/
+
+src/
+  api/
+  data/
+  logic/
+
+tests/
+  unit/
+  e2e/
+
+docs/
+  index.html
+  styles.css</code></pre>
+            </div>
+        </section>
+
+        <section class="section" id="roadmap">
+            <div class="section-heading">
+                <p class="eyebrow">Roadmap</p>
+                <h2>Logical next steps</h2>
+            </div>
+            <div class="grid three">
+                <article class="card">
+                    <h3>Richer Checkpoints</h3>
+                    <p>Add more real-world landmark sources and improve checkpoint ranking beyond airport-based fallbacks.</p>
+                </article>
+                <article class="card">
+                    <h3>Chart Overlays</h3>
+                    <p>Add a true FAA raster chart overlay pipeline instead of the current chart-reference mode.</p>
+                </article>
+                <article class="card">
+                    <h3>Profile Expansion</h3>
+                    <p>Grow the aircraft profile library and formalize validation for incomplete or inconsistent data.</p>
+                </article>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

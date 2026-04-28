@@ -5,6 +5,8 @@ import {
     calculateWindTriangle,
 } from "./navigation.js";
 import {
+    clearFlightDraft,
+    clearCheckpointPlan,
     checkpointPlanLooksLegacy,
     clearNavLogSnapshot,
     getCheckpointPlanForRoute,
@@ -12,6 +14,7 @@ import {
     normalizeAirportCode,
     createRouteSignature,
     CHECKPOINT_PLAN_VERSION,
+    FLIGHT_PLAN_FILE_VERSION,
     loadFlightDraft,
     saveCheckpointPlan,
     saveFlightDraft,
@@ -38,6 +41,9 @@ const openCheckpointsButton = document.getElementById("open-checkpoints-btn");
 const openMapButton = document.getElementById("open-map-btn");
 const openAircraftButton = document.getElementById("open-aircraft-btn");
 const testFillButton = document.getElementById("test-fill-btn");
+const savePlanButton = document.getElementById("save-plan-btn");
+const loadPlanButton = document.getElementById("load-plan-btn");
+const loadPlanInput = document.getElementById("load-plan-input");
 const debugToggleButton = document.getElementById("debug-toggle");
 const debugWindow = document.getElementById("debug-window");
 const checkpointStatus = document.getElementById("checkpoint-status");
@@ -73,6 +79,11 @@ function registerEventHandlers() {
     openMapButton.addEventListener("click", openRouteMap);
     openAircraftButton.addEventListener("click", openAircraftProfiles);
     testFillButton.addEventListener("click", populateTestRoute);
+    savePlanButton.addEventListener("click", savePlanToFile);
+    loadPlanButton.addEventListener("click", () => loadPlanInput.click());
+    loadPlanInput.addEventListener("change", () => {
+        void loadPlanFromFile(loadPlanInput.files?.[0] || null);
+    });
     debugToggleButton.addEventListener("click", toggleDebugWindow);
 
     document.getElementById("aircraft").addEventListener("change", async (event) => {
@@ -538,18 +549,26 @@ function restoreFlightDraft() {
         return;
     }
 
+    applyFlightDraftToForm(draft, { preserveWeather: true, invalidateNavLog: false });
+}
+
+function applyFlightDraftToForm(draft, options = {}) {
+    const preserveWeather = options.preserveWeather !== false;
+    const shouldInvalidateNavLog = options.invalidateNavLog !== false;
+
     document.getElementById("aircraft").value = draft.aircraftName || DEFAULT_AIRCRAFT_NAME;
     document.getElementById("date").value = draft.date || document.getElementById("date").value;
     document.getElementById("cruise-alt").value = draft.legs?.[0]?.plannedAlt || "3000";
     document.getElementById("departure-icao").value = draft.departure?.icao || "";
     document.getElementById("dep-airport-alt").value = draft.departure?.airportAlt ?? 0;
-    document.getElementById("dep-temp").value = isFiniteValue(draft.departure?.temp);
-    document.getElementById("dep-altim").value = isFiniteValue(draft.departure?.altimeter);
-    document.getElementById("dep-wind-speed").value = isFiniteValue(draft.departure?.windSpeed);
-    document.getElementById("dep-wind-dir").value = isFiniteValue(draft.departure?.windDirection);
+    document.getElementById("dep-temp").value = preserveWeather ? isFiniteValue(draft.departure?.temp) : "";
+    document.getElementById("dep-altim").value = preserveWeather ? isFiniteValue(draft.departure?.altimeter) : "";
+    document.getElementById("dep-wind-speed").value = preserveWeather ? isFiniteValue(draft.departure?.windSpeed) : "";
+    document.getElementById("dep-wind-dir").value = preserveWeather ? isFiniteValue(draft.departure?.windDirection) : "";
     document.getElementById("dep-lat").value = isFiniteValue(draft.departure?.lat);
     document.getElementById("dep-lon").value = isFiniteValue(draft.departure?.lon);
-    document.getElementById("dep-var").value = isFiniteValue(draft.departure?.variation, "0");
+    document.getElementById("dep-var").value = preserveWeather ? isFiniteValue(draft.departure?.variation, "0") : "0";
+    setWeatherStatus(document.getElementById("departure-icao"), "dep");
 
     destinationsContainer.innerHTML = "";
     const legs = Array.isArray(draft.legs) && draft.legs.length > 0 ? draft.legs : [{}];
@@ -558,14 +577,19 @@ function restoreFlightDraft() {
         const container = destinationsContainer.lastElementChild;
         container.querySelector(".destination-icao").value = leg.icao || "";
         container.querySelector(".leg-planned-alt").value = isFiniteValue(leg.plannedAlt, document.getElementById("cruise-alt").value);
-        container.querySelector(".leg-temp").value = isFiniteValue(leg.temp);
-        container.querySelector(".leg-altim").value = isFiniteValue(leg.altimeter);
-        container.querySelector(".leg-wind-speed").value = isFiniteValue(leg.windSpeed);
-        container.querySelector(".leg-wind-dir").value = isFiniteValue(leg.windDirection);
+        container.querySelector(".leg-temp").value = preserveWeather ? isFiniteValue(leg.temp) : "";
+        container.querySelector(".leg-altim").value = preserveWeather ? isFiniteValue(leg.altimeter) : "";
+        container.querySelector(".leg-wind-speed").value = preserveWeather ? isFiniteValue(leg.windSpeed) : "";
+        container.querySelector(".leg-wind-dir").value = preserveWeather ? isFiniteValue(leg.windDirection) : "";
         container.querySelector(".leg-elevation").value = isFiniteValue(leg.airportElevation, "0");
         container.querySelector(".leg-lat").value = isFiniteValue(leg.lat);
         container.querySelector(".leg-lon").value = isFiniteValue(leg.lon);
-        container.querySelector(".leg-var").value = isFiniteValue(leg.variation, "0");
+        container.querySelector(".leg-var").value = preserveWeather ? isFiniteValue(leg.variation, "0") : "0";
+        setWeatherStatus(container.querySelector(".destination-icao"), "dest");
+    }
+
+    if (shouldInvalidateNavLog) {
+        invalidateNavLogState();
     }
 }
 
@@ -676,6 +700,185 @@ function appendRow(tableBody, cells) {
 
 function saveCurrentFlightDraft() {
     saveFlightDraft(collectFlightInputs());
+}
+
+function buildFlightPlanExport(inputs) {
+    const checkpointPlan = getCheckpointPlanForRoute(inputs);
+
+    return {
+        app: "openflight-ai",
+        version: FLIGHT_PLAN_FILE_VERSION,
+        savedAt: new Date().toISOString(),
+        flightDraft: {
+            aircraftName: inputs.aircraftName,
+            date: inputs.date,
+            departure: {
+                icao: inputs.departure.icao,
+                airportAlt: inputs.departure.airportAlt,
+                lat: inputs.departure.lat,
+                lon: inputs.departure.lon,
+            },
+            legs: inputs.legs.map((leg) => ({
+                icao: leg.icao,
+                plannedAlt: leg.plannedAlt,
+                airportElevation: leg.airportElevation,
+                lat: leg.lat,
+                lon: leg.lon,
+            })),
+        },
+        checkpointPlan: checkpointPlan ? {
+            version: checkpointPlan.version,
+            routeSignature: checkpointPlan.routeSignature,
+            savedAt: checkpointPlan.savedAt,
+            legs: checkpointPlan.legs,
+        } : null,
+    };
+}
+
+function savePlanToFile() {
+    try {
+        const inputs = collectFlightInputs();
+        const payload = JSON.stringify(buildFlightPlanExport(inputs), null, 2);
+        const blob = new Blob([payload], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        const depCode = normalizeAirportCode(inputs.departure.icao || "flight");
+        const timestamp = new Date().toISOString().slice(0, 10);
+        link.href = url;
+        link.download = `openflight-plan-${depCode}-${timestamp}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        showStatus("Flight plan saved to file.", "info");
+        log("Flight plan saved to file.");
+    } catch (error) {
+        showStatus(`Plan export failed: ${error.message}`, "error");
+        log(`Plan export failed: ${error.message}`);
+    }
+}
+
+async function loadPlanFromFile(file) {
+    if (!file) {
+        return;
+    }
+
+    try {
+        const payload = JSON.parse(await file.text());
+        const normalizedPlan = normalizeFlightPlanFile(payload);
+        state.weatherCache.clear();
+        clearNavLogSnapshot();
+        clearFlightDraft();
+        if (normalizedPlan.checkpointPlan) {
+            saveCheckpointPlan(normalizedPlan.checkpointPlan);
+        } else {
+            clearCheckpointPlan();
+        }
+        saveFlightDraft(normalizedPlan.flightDraft);
+        applyFlightDraftToForm(normalizedPlan.flightDraft, { preserveWeather: false });
+        updateGenerateButtonState();
+        showStatus("Loading live weather for imported plan...", "info");
+        setCheckpointStatus("");
+        await refreshImportedPlanWeather();
+        showStatus("Flight plan loaded. Weather was refreshed live.", "info");
+        log("Flight plan imported successfully.");
+    } catch (error) {
+        showStatus(`Plan import failed: ${error.message}`, "error");
+        log(`Plan import failed: ${error.message}`);
+    } finally {
+        loadPlanInput.value = "";
+    }
+}
+
+function normalizeFlightPlanFile(payload) {
+    if (payload?.app !== "openflight-ai") {
+        throw new Error("This file is not an OpenFlight AI plan.");
+    }
+
+    if (payload.version !== FLIGHT_PLAN_FILE_VERSION) {
+        throw new Error(`Unsupported plan version: ${payload.version}.`);
+    }
+
+    const draft = payload.flightDraft;
+    if (!draft?.departure || !Array.isArray(draft.legs) || draft.legs.length === 0) {
+        throw new Error("Flight plan is missing route data.");
+    }
+
+    const normalizedDraft = {
+        aircraftName: draft.aircraftName || DEFAULT_AIRCRAFT_NAME,
+        date: draft.date || new Date().toISOString().split("T")[0],
+        departure: {
+            icao: normalizeAirportCode(draft.departure.icao || ""),
+            airportAlt: Number(draft.departure.airportAlt) || 0,
+            lat: Number(draft.departure.lat),
+            lon: Number(draft.departure.lon),
+            temp: null,
+            altimeter: null,
+            windSpeed: null,
+            windDirection: null,
+            variation: null,
+        },
+        legs: draft.legs.map((leg) => ({
+            icao: normalizeAirportCode(leg.icao || ""),
+            plannedAlt: Number(leg.plannedAlt) || 0,
+            airportElevation: Number(leg.airportElevation) || 0,
+            lat: Number(leg.lat),
+            lon: Number(leg.lon),
+            temp: null,
+            altimeter: null,
+            windSpeed: null,
+            windDirection: null,
+            variation: null,
+        })),
+    };
+
+    if (normalizedDraft.departure.icao.length !== 4 || normalizedDraft.legs.some((leg) => leg.icao.length !== 4)) {
+        throw new Error("Flight plan contains invalid airport codes.");
+    }
+
+    const routeSignature = createRouteSignature(normalizedDraft);
+    const checkpointPlan = payload.checkpointPlan && !checkpointPlanLooksLegacy(payload.checkpointPlan)
+        ? normalizeImportedCheckpointPlan({
+            ...payload.checkpointPlan,
+            routeSignature,
+            savedAt: payload.checkpointPlan.savedAt || new Date().toISOString(),
+        }, normalizedDraft)
+        : null;
+
+    return {
+        flightDraft: normalizedDraft,
+        checkpointPlan,
+    };
+}
+
+function normalizeImportedCheckpointPlan(plan, draft) {
+    return {
+        ...plan,
+        legs: (Array.isArray(plan.legs) ? plan.legs : []).map((leg, index) => {
+            const fromPoint = index === 0 ? draft.departure : draft.legs[index - 1];
+            const toPoint = draft.legs[index];
+            const legDistanceNm = Number(leg.legDistanceNm) || getDistance(fromPoint.lat, fromPoint.lon, toPoint.lat, toPoint.lon);
+            const checkpointCount = Array.isArray(leg.checkpoints) ? leg.checkpoints.length : 0;
+            const suggestedSpacing = checkpointCount > 0 ? legDistanceNm / (checkpointCount + 1) : Math.min(10, Math.max(5, legDistanceNm));
+
+            return {
+                legIndex: index,
+                fromIcao: leg.fromIcao || fromPoint.icao,
+                toIcao: leg.toIcao || toPoint.icao,
+                legDistanceNm,
+                spacingNm: Number(leg.spacingNm) || suggestedSpacing,
+                checkpoints: Array.isArray(leg.checkpoints) ? leg.checkpoints : [],
+            };
+        }),
+    };
+}
+
+async function refreshImportedPlanWeather() {
+    await handleWeather(document.getElementById("departure-icao"), "dep");
+    for (const input of document.querySelectorAll(".destination-icao")) {
+        await handleWeather(input, "dest");
+    }
+    saveCurrentFlightDraft();
 }
 
 function hasMatchingNavLogSnapshot() {

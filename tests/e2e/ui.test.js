@@ -385,6 +385,69 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('#dep-lat')).toHaveValue('41.6031');
     });
 
+    test('should load a saved plan file, refresh weather live, and restore planner and map state', async ({ page }) => {
+        const plan = {
+            app: 'openflight-ai',
+            version: 1,
+            savedAt: '2026-04-27T12:00:00.000Z',
+            flightDraft: {
+                aircraftName: 'Evektor Harmony LSA',
+                date: '2026-04-27',
+                departure: { icao: 'KLOT', airportAlt: 673, lat: 41.6031, lon: -88.1017 },
+                legs: [
+                    { icao: 'KARR', plannedAlt: 3000, airportElevation: 699, lat: 41.7713, lon: -88.4815 },
+                    { icao: 'KSQI', plannedAlt: 3000, airportElevation: 654, lat: 41.7428, lon: -89.6762 },
+                ],
+            },
+            checkpointPlan: {
+                version: 2,
+                routeSignature: JSON.stringify({
+                    departure: { icao: 'KLOT', lat: 41.6031, lon: -88.1017 },
+                    legs: [
+                        { icao: 'KARR', lat: 41.7713, lon: -88.4815 },
+                        { icao: 'KSQI', lat: 41.7428, lon: -89.6762 },
+                    ],
+                }),
+                legs: [
+                    {
+                        checkpoints: [
+                            { name: 'AURORA CHECKPOINT', distanceFromLegStartNm: 7, comms: 'AWOS 118.525 | CTAF 120.1' },
+                        ],
+                    },
+                    {
+                        checkpoints: [
+                            { name: 'DIXON CHECKPOINT', distanceFromLegStartNm: 8, comms: 'AWOS 119.275 | CTAF 122.8' },
+                        ],
+                    },
+                ],
+            },
+        };
+
+        await page.locator('#load-plan-input').setInputFiles({
+            name: 'openflight-plan.json',
+            mimeType: 'application/json',
+            buffer: Buffer.from(JSON.stringify(plan)),
+        });
+
+        await expect(page.locator('#departure-icao')).toHaveValue('KLOT');
+        await expect(page.locator('.destination-icao').nth(0)).toHaveValue('KARR');
+        await expect(page.locator('.destination-icao').nth(1)).toHaveValue('KSQI');
+        await expect(page.locator('#dep-temp')).toHaveValue('20');
+        await expect(page.locator('.leg-weather-status').nth(1)).toHaveText('Weather loaded for KSQI.');
+        await expect(page.locator('#generate-btn')).toHaveText('GENERATE NAV LOG');
+
+        await page.click('#menu-toggle');
+        await page.click('#open-checkpoints-btn');
+        await expect(page).toHaveURL(/checkpoints\.html$/);
+        await expect(page.locator('[data-field="name"]').nth(0)).toHaveValue('AURORA CHECKPOINT');
+        await expect(page.locator('[data-field="name"]').nth(1)).toHaveValue('DIXON CHECKPOINT');
+
+        await page.click('#open-map-btn');
+        await expect(page).toHaveURL(/map\.html$/);
+        await expect(page.locator('.route-list li')).toHaveCount(2);
+        await expect(page.locator('.checkpoint-button')).toContainText(['AURORA CHECKPOINT', 'DIXON CHECKPOINT']);
+    });
+
     test('should save edited and added planner checkpoints back into table 3', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();

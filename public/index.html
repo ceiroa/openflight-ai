@@ -99,13 +99,15 @@
         #debug-toggle { background-color: transparent; border: 1px solid var(--border-color); color: #cbd5e1; padding: 8px 12px; font-size: 12px; }
         #debug-toggle:hover { background: rgba(56, 189, 248, 0.08); }
         #debug-window { margin-top: 12px; background: #1e293b; padding: 10px; border: 1px solid #475569; color: #f1f5f9; border-radius: 8px; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; display: none; }
-        .flight-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .flight-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 10px; }
         .departure-header { margin-top: 10px; }
         .generate-row { display: flex; gap: 12px; justify-content: flex-end; align-items: center; }
         .checkpoint-status { min-height: 18px; font-size: 12px; color: #93c5fd; display: none; margin-right: auto; }
         .checkpoint-status.loading { display: block; }
         .checkpoint-status.error { display: block; color: #fca5a5; }
         .checkpoint-status.success { display: block; color: #86efac; }
+        .plan-action-spacer { display: block; visibility: hidden; }
+        .plan-actions-row { margin-bottom: 12px; }
         .nav-log-title { text-align: center; margin: 0; text-transform: uppercase; }
         .nav-log-header { display: flex; justify-content: space-between; margin-top: 10px; margin-bottom: 20px; font-size: 12px; border-bottom: 1px solid #000; padding-bottom: 5px; }
         .nav-log-section-title { margin: 0; }
@@ -128,6 +130,7 @@
                 <a class="menu-link" href="https://earth.google.com/web/" target="_blank" rel="noreferrer">Google Earth</a>
                 <a class="menu-link" href="https://www.fltplan.com" target="_blank" rel="noreferrer">FltPlan.com</a>
                 <a class="menu-link" href="https://skyvector.com/" target="_blank" rel="noreferrer">SkyVector</a>
+                <a class="menu-link" href="https://www.liveatc.net/" target="_blank" rel="noreferrer">LiveATC.net</a>
             </div>
             <div class="menu-section">
                 <h3>About</h3>
@@ -162,6 +165,13 @@
                         <label for="date">Flight Date</label>
                         <input type="date" id="date" required>
                     </div>
+                </div>
+
+                <div class="generate-row plan-actions-row">
+                    <div class="checkpoint-status plan-action-spacer">placeholder</div>
+                    <button type="button" id="save-plan-btn" class="button-secondary">Save Plan</button>
+                    <button type="button" id="load-plan-btn" class="button-secondary">Load Plan</button>
+                    <input type="file" id="load-plan-input" accept=".json,application/json" hidden>
                 </div>
 
                 <div id="departure-section" class="dest-leg departure">

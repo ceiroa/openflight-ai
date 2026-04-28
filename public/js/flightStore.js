@@ -3,6 +3,7 @@ export const FLIGHT_DRAFT_STORAGE_KEY = "openflight-ai-flight-draft";
 export const CHECKPOINTS_STORAGE_KEY = "openflight-ai-checkpoints";
 export const NAV_LOG_STORAGE_KEY = "openflight-ai-nav-log";
 export const CHECKPOINT_PLAN_VERSION = 2;
+export const FLIGHT_PLAN_FILE_VERSION = 1;
 
 export function normalizeAirportCode(value) {
     const normalized = value.trim().toUpperCase();
@@ -35,6 +36,10 @@ export function saveFlightDraft(inputs) {
 
 export function loadFlightDraft() {
     return readJsonStorage(FLIGHT_DRAFT_STORAGE_KEY);
+}
+
+export function clearFlightDraft() {
+    localStorage.removeItem(FLIGHT_DRAFT_STORAGE_KEY);
 }
 
 export function saveCheckpointPlan(plan) {

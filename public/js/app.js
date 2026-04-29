@@ -47,6 +47,14 @@ const loadPlanInput = document.getElementById("load-plan-input");
 const debugToggleButton = document.getElementById("debug-toggle");
 const debugWindow = document.getElementById("debug-window");
 const checkpointStatus = document.getElementById("checkpoint-status");
+const loadingProgress = document.getElementById("loading-progress");
+const loadingProgressLabel = document.getElementById("loading-progress-label");
+const loadingProgressBar = document.getElementById("loading-progress-bar");
+const loadingProgressNote = document.getElementById("loading-progress-note");
+const MIN_PROGRESS_VISIBLE_MS = 700;
+let progressTimer = null;
+let progressValue = 0;
+let progressStartedAt = 0;
 
 document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("date").value = new Date().toISOString().split("T")[0];
@@ -69,6 +77,11 @@ function registerEventHandlers() {
     generateButton.addEventListener("click", () => {
         if (generateButton.dataset.mode === "open") {
             openNavLog();
+            return;
+        }
+        if (generateButton.dataset.mode === "close") {
+            hideNavLog();
+            updateGenerateButtonState();
             return;
         }
         void generateLog();
@@ -175,15 +188,32 @@ function clearStatus() {
 
 function updateGenerateButtonState() {
     const hasNavLog = hasMatchingNavLogSnapshot();
-    generateButton.dataset.mode = hasNavLog ? "open" : "generate";
-    generateButton.textContent = hasNavLog ? "OPEN NAV LOG" : "GENERATE NAV LOG";
+    const navLogVisible = isNavLogVisible();
+
+    if (!hasNavLog) {
+        generateButton.dataset.mode = "generate";
+        generateButton.textContent = "GENERATE NAV LOG";
+        return;
+    }
+
+    generateButton.dataset.mode = navLogVisible ? "close" : "open";
+    generateButton.textContent = navLogVisible ? "CLOSE NAV LOG" : "OPEN NAV LOG";
 }
 
 function invalidateNavLogState() {
     if (generateButton.dataset.mode === "open" || loadNavLogSnapshot()) {
         clearNavLogSnapshot();
+        hideNavLog();
         updateGenerateButtonState();
     }
+}
+
+function isNavLogVisible() {
+    return document.getElementById("nav-log-container").style.display === "block";
+}
+
+function hideNavLog() {
+    document.getElementById("nav-log-container").style.display = "none";
 }
 
 function setCheckpointStatus(message = "", type = "") {
@@ -197,6 +227,65 @@ function setCheckpointStatus(message = "", type = "") {
         checkpointStatus.classList.add(type);
     }
     checkpointStatus.style.display = message ? "block" : "none";
+}
+
+function startLoadingProgress(initialMessage, note = "Checkpoint generation may take a few seconds while the route is being reviewed.") {
+    stopLoadingProgress(true);
+
+    progressValue = 8;
+    progressStartedAt = Date.now();
+    loadingProgress.classList.add("active");
+    loadingProgressBar.style.width = `${progressValue}%`;
+    loadingProgressLabel.textContent = initialMessage;
+    loadingProgressNote.textContent = note;
+
+    const phases = [
+        { until: 28, label: "Loading route data..." },
+        { until: 56, label: "Calculating checkpoints..." },
+        { until: 82, label: "Preparing nav log tables..." },
+        { until: 92, label: "Finishing up..." },
+    ];
+
+    progressTimer = window.setInterval(() => {
+        progressValue = Math.min(progressValue + 7, 92);
+        loadingProgressBar.style.width = `${progressValue}%`;
+        const currentPhase = phases.find((phase) => progressValue <= phase.until) ?? phases[phases.length - 1];
+        loadingProgressLabel.textContent = currentPhase.label;
+    }, 320);
+}
+
+function stopLoadingProgress(immediate = false) {
+    if (progressTimer) {
+        window.clearInterval(progressTimer);
+        progressTimer = null;
+    }
+
+    if (!loadingProgress.classList.contains("active")) {
+        return Promise.resolve();
+    }
+
+    const finish = () => {
+        loadingProgressBar.style.width = "100%";
+        return new Promise((resolve) => {
+            window.setTimeout(() => {
+                loadingProgress.classList.remove("active");
+                loadingProgressBar.style.width = "0%";
+                resolve();
+            }, 180);
+        });
+    };
+
+    if (immediate) {
+        return finish();
+    }
+
+    const elapsed = Date.now() - progressStartedAt;
+    const waitMs = Math.max(0, MIN_PROGRESS_VISIBLE_MS - elapsed);
+    return new Promise((resolve) => {
+        window.setTimeout(() => {
+            finish().then(resolve);
+        }, waitMs);
+    });
 }
 
 function log(message) {
@@ -242,12 +331,19 @@ async function loadAircraftOptions() {
         }
 
         const profiles = await response.json();
-        const datalist = document.getElementById("aircraft-options");
-        datalist.innerHTML = profiles
-            .map((profile) => `<option value="${profile.aircraft}"></option>`)
+        const aircraftSelect = document.getElementById("aircraft");
+        const currentValue = aircraftSelect.value || DEFAULT_AIRCRAFT_NAME;
+        aircraftSelect.innerHTML = profiles
+            .map((profile) => `<option value="${profile.aircraft}">${profile.aircraft}</option>`)
             .join("");
+
+        if (profiles.some((profile) => profile.aircraft === currentValue)) {
+            aircraftSelect.value = currentValue;
+        } else if (profiles.length > 0) {
+            aircraftSelect.value = profiles[0].aircraft;
+        }
     } catch {
-        // Leave the datalist empty if profile discovery fails.
+        // Leave the default option in place if profile discovery fails.
     }
 }
 
@@ -963,6 +1059,7 @@ function openNavLog() {
     }
 
     document.getElementById("nav-log-container").style.display = "block";
+    updateGenerateButtonState();
     window.scrollTo(0, document.body.scrollHeight);
 }
 
@@ -977,7 +1074,8 @@ async function getApprovedCheckpoints(inputs) {
 
     log("Loading checkpoints...");
     showStatus("Loading checkpoints...", "info");
-    setCheckpointStatus("Checkpoints are being calculated...", "loading");
+    setCheckpointStatus("");
+    startLoadingProgress("Loading checkpoints...");
 
     try {
         const response = await fetch("/api/checkpoints/generate", {
@@ -1016,6 +1114,8 @@ async function getApprovedCheckpoints(inputs) {
             legs: null,
             source: "error",
         };
+    } finally {
+        await stopLoadingProgress();
     }
 }
 

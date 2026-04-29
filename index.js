@@ -14,6 +14,7 @@ import {
     generateClassicCheckpointsForRoute,
     generateEnhancedCheckpointsForRoute,
     generateNamedCheckpointsForRoute,
+    getCuratedVisualCheckpointsInBounds,
     getAirportCommsByCode,
 } from './src/api/airportReferenceService.js';
 import { getCurrentSectionalChartMetadata } from './src/api/faaChartsService.js';
@@ -88,6 +89,20 @@ app.get('/api/airport/:icao/comms', async (req, res) => {
         res.json(comms);
     } catch (error) {
         res.status(500).json({ error: error.message || 'Failed to load airport communications' });
+    }
+});
+
+app.get('/api/checkpoints/reference', async (req, res) => {
+    try {
+        const checkpoints = getCuratedVisualCheckpointsInBounds({
+            minLat: req.query.minLat,
+            minLon: req.query.minLon,
+            maxLat: req.query.maxLat,
+            maxLon: req.query.maxLon,
+        });
+        res.json({ checkpoints });
+    } catch (error) {
+        res.status(500).json({ error: error.message || 'Failed to load reference checkpoints' });
     }
 });
 

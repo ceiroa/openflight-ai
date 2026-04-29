@@ -102,6 +102,24 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('#cruise-alt')).toHaveValue('3000');
     });
 
+    test('should allow selecting other available aircraft profiles on the home page', async ({ page }) => {
+        const aircraftOptions = await page.locator('#aircraft option').allTextContents();
+        expect(aircraftOptions).toEqual(expect.arrayContaining([
+            'Evektor Harmony LSA',
+            'Cessna 152',
+            'Cessna 172S Skyhawk',
+        ]));
+
+        await page.selectOption('#aircraft', 'Cessna 152');
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#generate-btn');
+
+        await expect(page.locator('#out-aircraft')).toHaveText('Aircraft: Cessna 152');
+    });
+
     test('should reload weather when an airport field is edited and blurred again', async ({ page }) => {
         const depInput = page.locator('#departure-icao');
         await depInput.fill('KORD');
@@ -242,6 +260,36 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('[data-leg-toggle="0"]')).toBeChecked();
         await expect(page.locator('#export-kml-btn')).toBeVisible();
         await expect(page.locator('[data-map-mode="sectional"]')).toBeVisible();
+        await expect(page.locator('#maximize-map-btn')).toBeVisible();
+        await expect(page.locator('#toggle-reference-checkpoints-btn')).toBeVisible();
+    });
+
+    test('should maximize the map and toggle nearby reference checkpoints', async ({ page }) => {
+        await page.route('**/api/checkpoints/reference*', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    checkpoints: [
+                        { name: 'Nearby Visual', lat: 41.7, lon: -88.3, notes: 'Curated nearby visual checkpoint.' },
+                    ],
+                }),
+            });
+        });
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#menu-toggle');
+        await page.click('#open-map-btn');
+
+        await page.click('#maximize-map-btn');
+        await expect(page.locator('.container')).toHaveClass(/map-maximized/);
+        await expect(page.locator('#maximize-map-btn')).toHaveText('Exit Fullscreen');
+
+        await page.click('#toggle-reference-checkpoints-btn');
+        await expect(page.locator('#toggle-reference-checkpoints-btn')).toHaveText('Hide Nearby Reference Checkpoints');
     });
 
     test('should fall back cleanly when the FAA sectional overlay cannot be loaded', async ({ page }) => {
@@ -358,6 +406,54 @@ test.describe('OpenFlight AI - UI Tests', () => {
         expect(requestedModes).toContain('enhanced');
     });
 
+    test('should show enhanced checkpoints on the map after regenerating from the planner menu path', async ({ page }) => {
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+
+        await page.click('#menu-toggle');
+        await page.click('#open-checkpoints-btn');
+        await expect(page.locator('[data-field="name"]').first()).toHaveValue('KARR CHECKPOINT');
+
+        await page.selectOption('#planner-mode', 'enhanced');
+        await page.click('#regenerate-btn');
+        await expect(page.locator('[data-field="name"]').first()).toHaveValue('KARR VISUAL CHECKPOINT');
+
+        await page.click('#menu-toggle');
+        await page.evaluate(() => {
+            window.location.assign('/map.html');
+        });
+        await expect(page).toHaveURL(/map\.html$/);
+        await expect(page.locator('.checkpoint-button')).toContainText(['KARR VISUAL CHECKPOINT']);
+    });
+
+    test('should keep enhanced regeneration working after visiting map and aircraft profiles first', async ({ page }) => {
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('text=GENERATE NAV LOG');
+
+        await page.click('#menu-toggle');
+        await page.click('#open-map-btn');
+        await expect(page).toHaveURL(/map\.html$/);
+
+        await page.evaluate(() => {
+            window.location.assign('/aircraft.html');
+        });
+        await expect(page).toHaveURL(/aircraft\.html$/);
+
+        await page.evaluate(() => {
+            window.location.assign('/checkpoints.html');
+        });
+        await expect(page).toHaveURL(/checkpoints\.html$/);
+
+        await page.selectOption('#planner-mode', 'enhanced');
+        await page.click('#regenerate-btn');
+        await expect(page.locator('[data-field="name"]').first()).toHaveValue('KARR VISUAL CHECKPOINT');
+    });
+
     test('should show a loading progress bar while regenerating checkpoints', async ({ page }) => {
         await page.unroute('**/api/checkpoints/generate*');
         await page.route('**/api/checkpoints/generate*', async (route) => {
@@ -400,6 +496,44 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.click('#open-checkpoints-btn');
         await page.selectOption('#planner-mode', 'enhanced');
         await page.click('#regenerate-btn');
+
+        await expect(page.locator('#loading-progress')).toBeVisible();
+        await expect(page.locator('#loading-progress-label')).toContainText('Loading');
+        await expect(page.locator('#loading-progress')).toBeHidden();
+    });
+
+    test('should show a loading progress bar while generating the nav log checkpoints', async ({ page }) => {
+        await page.unroute('**/api/checkpoints/generate*');
+        await page.route('**/api/checkpoints/generate*', async (route) => {
+            const draft = route.request().postDataJSON();
+            await new Promise((resolve) => setTimeout(resolve, 700));
+            const legs = draft.legs.map((leg, index) => ({
+                legIndex: index,
+                fromIcao: index === 0 ? draft.departure.icao : draft.legs[index - 1].icao,
+                toIcao: leg.icao,
+                legDistanceNm: 20,
+                spacingNm: 6.7,
+                checkpoints: [
+                    {
+                        name: `${leg.icao} CHECKPOINT`,
+                        distanceFromLegStartNm: 7,
+                        comms: airportCommsFixtures[leg.icao]?.summary || 'VIS',
+                    },
+                ],
+            }));
+
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ routeSignature, legs }),
+            });
+        });
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#generate-btn');
 
         await expect(page.locator('#loading-progress')).toBeVisible();
         await expect(page.locator('#loading-progress-label')).toContainText('Loading');
@@ -491,7 +625,7 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('#table3-body tr').first().locator('td').first()).toHaveText('KARR CHECKPOINT');
     });
 
-    test('should change generate nav log button to open nav log after successful generation', async ({ page }) => {
+    test('should change generate nav log button to close nav log while the nav log is visible', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
         await page.fill('.destination-icao', 'KARR');
@@ -499,6 +633,10 @@ test.describe('OpenFlight AI - UI Tests', () => {
 
         await expect(page.locator('#generate-btn')).toHaveText('GENERATE NAV LOG');
         await page.click('#generate-btn');
+        await expect(page.locator('#nav-log-container')).toBeVisible();
+        await expect(page.locator('#generate-btn')).toHaveText('CLOSE NAV LOG');
+        await page.click('#generate-btn');
+        await expect(page.locator('#nav-log-container')).toBeHidden();
         await expect(page.locator('#generate-btn')).toHaveText('OPEN NAV LOG');
     });
 
@@ -540,7 +678,7 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.fill('.destination-icao', 'KARR');
         await page.locator('.destination-icao').blur();
         await page.click('#generate-btn');
-        await expect(page.locator('#generate-btn')).toHaveText('OPEN NAV LOG');
+        await expect(page.locator('#generate-btn')).toHaveText('CLOSE NAV LOG');
 
         await page.click('#menu-toggle');
         await page.click('#open-checkpoints-btn');
@@ -549,7 +687,7 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.click('#menu-toggle');
         await page.click('text=Back To Flight Setup');
         await expect(page).toHaveURL(/index\.html$/);
-        await expect(page.locator('#generate-btn')).toHaveText('OPEN NAV LOG');
+        await expect(page.locator('#generate-btn')).toHaveText('CLOSE NAV LOG');
     });
 
     test('should reset nav log state after saving changed checkpoints in the planner', async ({ page }) => {
@@ -558,7 +696,7 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.fill('.destination-icao', 'KARR');
         await page.locator('.destination-icao').blur();
         await page.click('#generate-btn');
-        await expect(page.locator('#generate-btn')).toHaveText('OPEN NAV LOG');
+        await expect(page.locator('#generate-btn')).toHaveText('CLOSE NAV LOG');
 
         await page.click('#menu-toggle');
         await page.click('#open-checkpoints-btn');
@@ -804,6 +942,54 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.click('#menu-toggle');
         await page.click('#open-checkpoints-btn');
         await expect(page.locator('[data-field="name"]').first()).toHaveValue('KORD-KARR CP1');
+        expect(generateCalls).toBe(1);
+    });
+
+    test('should reuse home-page generated checkpoints when opening the map and then the planner', async ({ page }) => {
+        let generateCalls = 0;
+        await page.unroute('**/api/checkpoints/generate*');
+        await page.route('**/api/checkpoints/generate*', async (route) => {
+            generateCalls += 1;
+            const draft = route.request().postDataJSON();
+            const legs = draft.legs.map((leg, index) => ({
+                legIndex: index,
+                fromIcao: index === 0 ? draft.departure.icao : draft.legs[index - 1].icao,
+                toIcao: leg.icao,
+                legDistanceNm: 20,
+                spacingNm: 6.7,
+                checkpoints: [
+                    {
+                        name: `${leg.icao} CHECKPOINT`,
+                        distanceFromLegStartNm: 7,
+                        comms: airportCommsFixtures[leg.icao]?.summary || 'VIS',
+                    },
+                ],
+            }));
+
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ routeSignature, legs }),
+            });
+        });
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('text=GENERATE NAV LOG');
+        await expect(page.locator('#table3-body tr').first().locator('td').first()).toHaveText('KARR CHECKPOINT');
+        expect(generateCalls).toBe(1);
+
+        await page.click('#menu-toggle');
+        await page.click('#open-map-btn');
+        await expect(page).toHaveURL(/map\.html$/);
+
+        await page.evaluate(() => {
+            window.location.assign('/checkpoints.html');
+        });
+        await expect(page).toHaveURL(/checkpoints\.html$/);
+        await expect(page.locator('[data-field="name"]').first()).toHaveValue('KARR CHECKPOINT');
         expect(generateCalls).toBe(1);
     });
 

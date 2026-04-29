@@ -25,14 +25,20 @@ const checkpointTypeFilter = document.getElementById("checkpoint-type-filter");
 const checkpointSourceFilter = document.getElementById("checkpoint-source-filter");
 const menuToggleButton = document.getElementById("menu-toggle");
 const sideMenu = document.getElementById("side-menu");
+const menuMapLink = document.getElementById("menu-map-link");
+const menuFlightSetupLink = document.getElementById("menu-flight-setup-link");
+const menuNavLinks = Array.from(document.querySelectorAll(".menu-nav-link"));
 
 let currentDraft = null;
 let currentPlan = null;
 let plannerMode = "classic";
 let activeTypeFilter = "all";
 let activeSourceFilter = "all";
+const MIN_PROGRESS_VISIBLE_MS = 1200;
 let progressTimer = null;
 let progressValue = 0;
+let progressStartedAt = 0;
+let plannerBusy = false;
 
 document.addEventListener("DOMContentLoaded", () => {
     menuToggleButton.addEventListener("click", () => {
@@ -67,6 +73,23 @@ document.addEventListener("DOMContentLoaded", () => {
     saveButton.addEventListener("click", savePlan);
     openMapButton.addEventListener("click", openCurrentRouteOnMap);
     clearButton.addEventListener("click", clearPlan);
+    menuMapLink?.addEventListener("click", (event) => {
+        event.preventDefault();
+        if (plannerBusy) {
+            showStatus("Checkpoint regeneration is still in progress. Wait for the loading bar to finish.", "info");
+            return;
+        }
+        openCurrentRouteOnMap();
+    });
+    menuFlightSetupLink?.addEventListener("click", (event) => {
+        event.preventDefault();
+        if (plannerBusy) {
+            showStatus("Checkpoint regeneration is still in progress. Wait for the loading bar to finish.", "info");
+            return;
+        }
+        persistPlannerPlan();
+        window.location.assign("/index.html?restoreDraft=1");
+    });
 });
 
 function handleDocumentClick(event) {
@@ -202,15 +225,7 @@ function savePlan() {
         return;
     }
 
-    const previousPlan = loadCheckpointPlan();
-    currentPlan.routeSignature = createRouteSignature(currentDraft);
-    currentPlan.version = CHECKPOINT_PLAN_VERSION;
-    currentPlan.savedAt = new Date().toISOString();
-    currentPlan.mode = plannerMode;
-    saveCheckpointPlan(currentPlan);
-    if (!checkpointPlansEqual(previousPlan, currentPlan)) {
-        clearNavLogSnapshot();
-    }
+    persistPlannerPlan();
     showStatus("Checkpoint plan saved. Return to Flight Setup and generate the nav log to populate Table 3.", "info");
 }
 
@@ -219,12 +234,44 @@ function openCurrentRouteOnMap() {
         return;
     }
 
+    persistPlannerPlan();
+    window.location.assign("/map.html");
+}
+
+function persistPlannerPlan() {
+    if (!currentDraft || !currentPlan) {
+        return false;
+    }
+
+    const previousPlan = loadCheckpointPlan();
+    const comparablePlan = {
+        ...currentPlan,
+        routeSignature: createRouteSignature(currentDraft),
+        version: CHECKPOINT_PLAN_VERSION,
+        mode: plannerMode,
+    };
     currentPlan.routeSignature = createRouteSignature(currentDraft);
     currentPlan.version = CHECKPOINT_PLAN_VERSION;
     currentPlan.savedAt = new Date().toISOString();
     currentPlan.mode = plannerMode;
     saveCheckpointPlan(currentPlan);
-    window.location.assign("/map.html");
+    const changed = !checkpointPlansEqual(stripPlanTimestamp(previousPlan), stripPlanTimestamp(comparablePlan));
+    if (changed) {
+        clearNavLogSnapshot();
+    }
+    return changed;
+}
+
+function stripPlanTimestamp(plan) {
+    if (!plan) {
+        return null;
+    }
+
+    const { savedAt, ...rest } = plan;
+    return {
+        ...rest,
+        mode: rest.mode || "classic",
+    };
 }
 
 function clearPlan() {
@@ -248,8 +295,10 @@ async function regeneratePlan(message = "Draft checkpoints regenerated for the c
     try {
         setPlannerBusy(true, "Loading checkpoints...");
         currentPlan = await fetchGeneratedCheckpointPlan();
+        setLoadingProgressLabel("Applying checkpoint results...");
         renderPlanner();
-        showStatus(message, "info");
+        await waitForPlannerRender();
+        clearStatus();
     } catch (error) {
         showStatus(error.message, "error");
     } finally {
@@ -280,8 +329,12 @@ function showStatus(message, type) {
     statusBanner.classList.add(type);
 }
 
+function clearStatus() {
+    statusBanner.textContent = "";
+    statusBanner.className = "status-banner";
+}
+
 async function fetchGeneratedCheckpointPlan() {
-    setPlannerBusy(true, "Loading checkpoints...");
     const url = plannerMode === "enhanced"
         ? `/api/checkpoints/generate?mode=${encodeURIComponent(plannerMode)}`
         : "/api/checkpoints/generate";
@@ -341,13 +394,22 @@ function matchesCheckpointFilters(checkpoint) {
 }
 
 function setPlannerBusy(isBusy, message = "") {
+    plannerBusy = isBusy;
     regenerateButton.disabled = isBusy;
     saveButton.disabled = isBusy;
     openMapButton.disabled = isBusy;
     clearButton.disabled = isBusy;
+    plannerModeSelect.disabled = isBusy;
+    checkpointTypeFilter.disabled = isBusy;
+    checkpointSourceFilter.disabled = isBusy;
+    menuNavLinks.forEach((link) => {
+        link.classList.toggle("is-disabled", isBusy);
+        link.setAttribute("aria-disabled", String(isBusy));
+        link.tabIndex = isBusy ? -1 : 0;
+    });
     if (isBusy) {
         startLoadingProgress(message || "Loading checkpoints...");
-        showStatus(message || "Loading checkpoints...", "info");
+        clearStatus();
     } else {
         stopLoadingProgress();
     }
@@ -410,9 +472,10 @@ function formatCheckpointSource(source) {
 }
 
 function startLoadingProgress(initialMessage) {
-    stopLoadingProgress();
+    stopLoadingProgressInternal(true);
 
     progressValue = 8;
+    progressStartedAt = Date.now();
     loadingProgress.classList.add("active");
     loadingProgressBar.style.width = `${progressValue}%`;
     loadingProgressLabel.textContent = initialMessage;
@@ -439,21 +502,53 @@ function startLoadingProgress(initialMessage) {
         loadingProgressBar.style.width = `${progressValue}%`;
 
         const currentPhase = phases.find((phase) => progressValue <= phase.until) ?? phases[phases.length - 1];
-        loadingProgressLabel.textContent = currentPhase.label;
+        setLoadingProgressLabel(currentPhase.label);
     }, 350);
 }
 
+function setLoadingProgressLabel(message) {
+    loadingProgressLabel.textContent = message;
+}
+
 function stopLoadingProgress() {
+    return stopLoadingProgressInternal(false);
+}
+
+async function waitForPlannerRender() {
+    await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+    await new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+}
+
+function stopLoadingProgressInternal(immediate = false) {
     if (progressTimer) {
         window.clearInterval(progressTimer);
         progressTimer = null;
     }
 
-    if (loadingProgress.classList.contains("active")) {
-        loadingProgressBar.style.width = "100%";
-        window.setTimeout(() => {
-            loadingProgress.classList.remove("active");
-            loadingProgressBar.style.width = "0%";
-        }, 180);
+    if (!loadingProgress.classList.contains("active")) {
+        return Promise.resolve();
     }
+
+    const finish = () => {
+        loadingProgressBar.style.width = "100%";
+        return new Promise((resolve) => {
+            window.setTimeout(() => {
+                loadingProgress.classList.remove("active");
+                loadingProgressBar.style.width = "0%";
+                resolve();
+            }, 180);
+        });
+    };
+
+    if (immediate) {
+        return finish();
+    }
+
+    const elapsed = Date.now() - progressStartedAt;
+    const waitMs = Math.max(0, MIN_PROGRESS_VISIBLE_MS - elapsed);
+    return new Promise((resolve) => {
+        window.setTimeout(() => {
+            finish().then(resolve);
+        }, waitMs);
+    });
 }

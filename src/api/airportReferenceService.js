@@ -93,6 +93,24 @@ export async function generateNamedCheckpointsForRoute(draft) {
     return generateClassicCheckpointsForRoute(draft);
 }
 
+export function getCuratedVisualCheckpointsInBounds(bounds) {
+    const minLat = Number(bounds?.minLat);
+    const minLon = Number(bounds?.minLon);
+    const maxLat = Number(bounds?.maxLat);
+    const maxLon = Number(bounds?.maxLon);
+
+    if (![minLat, minLon, maxLat, maxLon].every(Number.isFinite)) {
+        return [];
+    }
+
+    return CURATED_VISUAL_CHECKPOINTS.filter((checkpoint) => (
+        checkpoint.lat >= minLat
+        && checkpoint.lat <= maxLat
+        && checkpoint.lon >= minLon
+        && checkpoint.lon <= maxLon
+    ));
+}
+
 export async function generateClassicCheckpointsForRoute(draft) {
     const airports = await loadAirportReferenceData();
     const usableAirports = airports.filter((airport) => AIRPORT_TYPES_FOR_CHECKPOINTS.has(airport.type));

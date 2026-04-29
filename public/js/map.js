@@ -63,6 +63,7 @@ const statusBanner = document.getElementById("status-banner");
 const mapRoot = document.getElementById("map-root");
 const menuToggleButton = document.getElementById("menu-toggle");
 const sideMenu = document.getElementById("side-menu");
+const container = document.querySelector(".container");
 
 const state = {
     map: null,
@@ -76,6 +77,9 @@ const state = {
     legSegments: [],
     checkpointMarkers: [],
     checkpointButtons: [],
+    referenceCheckpointMarkers: [],
+    showReferenceCheckpoints: false,
+    mapMaximized: false,
     activeCheckpointIndex: null,
     activeLegIndex: null,
     currentMode: MAP_MODES.street,
@@ -139,6 +143,9 @@ function renderMapPage(draft) {
                     <button type="button" class="map-mode-button active" data-map-mode="${MAP_MODES.street}">Street</button>
                     <button type="button" class="map-mode-button" data-map-mode="${MAP_MODES.terrain}">Terrain</button>
                     <button type="button" class="map-mode-button" data-map-mode="${MAP_MODES.sectional}">FAA Sectional Ref</button>
+                    <button type="button" class="map-secondary-button" id="toggle-reference-checkpoints-btn">Show Nearby Reference Checkpoints</button>
+                    <span class="map-toolbar-spacer"></span>
+                    <button type="button" class="map-secondary-button" id="maximize-map-btn">Maximize Map</button>
                     <button type="button" class="map-export-button" id="export-kml-btn">Export KML</button>
                 </div>
                 <p id="map-status" class="route-summary">Route plotted for ${draft.legs.length} leg${draft.legs.length === 1 ? "" : "s"}.</p>
@@ -223,6 +230,7 @@ function renderMapPage(draft) {
                     `).join("")}
                 </div>
                 <p id="sectional-note" class="sectional-note">FAA publishes sectional and TAC files as downloads, not ready-made browser tile layers. This mode helps you identify the likely official charts for the plotted route while keeping a free live map underneath.</p>
+                <p class="reference-checkpoint-note">Nearby reference checkpoints come from the curated visual checkpoint dataset and are shown separately from the trip checkpoints.</p>
             </aside>
         </div>
     `;
@@ -301,6 +309,11 @@ function initializeLeafletMap(routePoints, legSegments, checkpointMarkers) {
     };
     state.routeLines = routeLines;
     state.routeBounds = routeGroup.getBounds();
+    map.on("moveend", () => {
+        if (state.showReferenceCheckpoints) {
+            void refreshReferenceCheckpoints();
+        }
+    });
 }
 
 function attachMapPageHandlers(checkpointMarkers) {
@@ -344,6 +357,10 @@ function attachMapPageHandlers(checkpointMarkers) {
     });
 
     document.getElementById("export-kml-btn")?.addEventListener("click", exportCurrentRouteKml);
+    document.getElementById("toggle-reference-checkpoints-btn")?.addEventListener("click", () => {
+        void toggleReferenceCheckpoints();
+    });
+    document.getElementById("maximize-map-btn")?.addEventListener("click", toggleMapMaximized);
     applyCheckpointFilters();
 }
 
@@ -579,6 +596,86 @@ function buildCheckpointMarkers(routePoints, checkpointPlan) {
             };
         });
     });
+}
+
+async function toggleReferenceCheckpoints() {
+    state.showReferenceCheckpoints = !state.showReferenceCheckpoints;
+    updateReferenceCheckpointButton();
+
+    if (state.showReferenceCheckpoints) {
+        await refreshReferenceCheckpoints();
+    } else {
+        clearReferenceCheckpointMarkers();
+    }
+}
+
+async function refreshReferenceCheckpoints() {
+    if (!state.map) {
+        return;
+    }
+
+    const bounds = state.map.getBounds();
+    const response = await fetch(`/api/checkpoints/reference?minLat=${encodeURIComponent(bounds.getSouth())}&minLon=${encodeURIComponent(bounds.getWest())}&maxLat=${encodeURIComponent(bounds.getNorth())}&maxLon=${encodeURIComponent(bounds.getEast())}`);
+    if (!response.ok) {
+        return;
+    }
+
+    const payload = await response.json();
+    const selectedNames = new Set(state.checkpointMarkers.map((checkpoint) => checkpoint.name));
+    const references = Array.isArray(payload.checkpoints)
+        ? payload.checkpoints.filter((checkpoint) => !selectedNames.has(checkpoint.name))
+        : [];
+
+    clearReferenceCheckpointMarkers();
+    state.referenceCheckpointMarkers = references.map((checkpoint) => {
+        const marker = window.L.circleMarker([checkpoint.lat, checkpoint.lon], {
+            radius: 5,
+            color: "#a78bfa",
+            fillColor: "#a78bfa",
+            fillOpacity: 0.9,
+            weight: 2,
+            dashArray: "3 3",
+        }).addTo(state.map);
+
+        marker.bindPopup(`<strong>${escapeHtml(checkpoint.name)}</strong><br>${escapeHtml(checkpoint.notes || "Curated nearby visual checkpoint")}`);
+        return { ...checkpoint, marker };
+    });
+}
+
+function clearReferenceCheckpointMarkers() {
+    state.referenceCheckpointMarkers.forEach((checkpoint) => {
+        if (checkpoint.marker && state.map && state.map.hasLayer(checkpoint.marker)) {
+            state.map.removeLayer(checkpoint.marker);
+        }
+    });
+    state.referenceCheckpointMarkers = [];
+}
+
+function updateReferenceCheckpointButton() {
+    const button = document.getElementById("toggle-reference-checkpoints-btn");
+    if (!button) {
+        return;
+    }
+
+    button.textContent = state.showReferenceCheckpoints
+        ? "Hide Nearby Reference Checkpoints"
+        : "Show Nearby Reference Checkpoints";
+}
+
+function toggleMapMaximized() {
+    state.mapMaximized = !state.mapMaximized;
+    container.classList.toggle("map-maximized", state.mapMaximized);
+    const button = document.getElementById("maximize-map-btn");
+    if (button) {
+        button.textContent = state.mapMaximized ? "Exit Fullscreen" : "Maximize Map";
+    }
+
+    window.setTimeout(() => {
+        state.map?.invalidateSize();
+        if (state.routeBounds) {
+            state.map?.fitBounds(state.routeBounds, { padding: [30, 30] });
+        }
+    }, 100);
 }
 
 function buildChartReferences(routePoints) {

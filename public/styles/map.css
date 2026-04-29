@@ -99,6 +99,42 @@
     font-size: 13px;
 }
 
+.checkpoint-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.checkpoint-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.checkpoint-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.checkpoint-filter-group label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #94a3b8;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.checkpoint-filter-group select {
+    padding: 8px 10px;
+    background: var(--map-field-bg);
+    border: 1px solid var(--map-border-color);
+    border-radius: 6px;
+    color: #f8fafc;
+    font-size: 13px;
+}
+
 .route-list,
 .checkpoint-list {
     margin: 0 0 18px;
@@ -189,6 +225,12 @@
     cursor: pointer;
 }
 
+.checkpoint-button {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
 .checkpoint-button:hover,
 .checkpoint-button.active,
 .chart-link-button:hover {
@@ -199,9 +241,46 @@
 .checkpoint-subtitle,
 .chart-description {
     display: block;
-    margin-top: 4px;
     font-size: 12px;
     color: #cbd5e1;
+}
+
+.checkpoint-meta {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.checkpoint-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    color: #bae6fd;
+}
+
+.checkpoint-badge.visual {
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #fecaca;
+}
+
+.checkpoint-badge.airport {
+    background: rgba(16, 185, 129, 0.14);
+    border-color: rgba(16, 185, 129, 0.4);
+    color: #bbf7d0;
+}
+
+.checkpoint-badge.manual {
+    background: rgba(245, 158, 11, 0.14);
+    border-color: rgba(245, 158, 11, 0.4);
+    color: #fde68a;
 }
 
 .chart-list {
@@ -225,6 +304,10 @@
     color: #cbd5e1;
 }
 
+.checkpoint-list-item.is-hidden {
+    display: none;
+}
+
 @media (max-width: 1024px) {
     .map-layout {
         grid-template-columns: 1fr;
@@ -232,5 +315,9 @@
 
     #route-map {
         height: 420px;
+    }
+
+    .checkpoint-filter-grid {
+        grid-template-columns: 1fr;
     }
 }

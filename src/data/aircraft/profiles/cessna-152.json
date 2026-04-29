@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "cessna-152",
+  "aircraft": "Cessna 152",
+  "manufacturer": "Cessna",
+  "model": "152",
+  "engine": "Lycoming O-235-L2C",
+  "source_notes": "Seed profile based on the 1979 Cessna 152 Pilot Operating Handbook mirrored on ManualsLib for speeds, climb rate, and limits, with cruise fuel burn filled from published Cessna 152 operating summaries when the mirrored POH text did not expose a clean searchable GPH row online.",
+  "profiles": {
+    "climb": {
+      "speed_kts": 70,
+      "rpm": 2550,
+      "fuel_burn_gph": 6.5,
+      "rate_of_climb_fpm": 715,
+      "climbTable": [
+        { "altitude_ft": 0, "speed_kts": 70, "rate_of_climb_fpm": 715 }
+      ]
+    },
+    "cruise65": {
+      "speed_kts": 91,
+      "rpm": 2200,
+      "fuel_burn_gph": 5.4
+    }
+  },
+  "limits": {
+    "vne_kts": 149,
+    "vs_kts": 48,
+    "max_rpm": 2550
+  }
+}

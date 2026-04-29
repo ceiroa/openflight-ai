@@ -75,6 +75,8 @@ function registerEventHandlers() {
     });
     printButton.addEventListener("click", () => window.print());
     menuToggleButton.addEventListener("click", toggleMenu);
+    document.addEventListener("click", handleDocumentClick, true);
+    document.addEventListener("keydown", handleDocumentKeydown);
     openCheckpointsButton.addEventListener("click", openCheckpointPlanner);
     openMapButton.addEventListener("click", openRouteMap);
     openAircraftButton.addEventListener("click", openAircraftProfiles);
@@ -134,8 +136,30 @@ function registerEventHandlers() {
 }
 
 function toggleMenu() {
-    sideMenu.classList.toggle("open");
-    menuToggleButton.classList.toggle("open");
+    setMenuOpenState(!sideMenu.classList.contains("open"));
+}
+
+function handleDocumentClick(event) {
+    if (!sideMenu.classList.contains("open")) {
+        return;
+    }
+
+    if (sideMenu.contains(event.target) || menuToggleButton.contains(event.target)) {
+        return;
+    }
+
+    setMenuOpenState(false);
+}
+
+function handleDocumentKeydown(event) {
+    if (event.key === "Escape" && sideMenu.classList.contains("open")) {
+        setMenuOpenState(false);
+    }
+}
+
+function setMenuOpenState(isOpen) {
+    sideMenu.classList.toggle("open", isOpen);
+    menuToggleButton.classList.toggle("open", isOpen);
 }
 
 function showStatus(message, type = "info") {

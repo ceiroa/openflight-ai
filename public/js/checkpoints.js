@@ -14,17 +14,24 @@ const regenerateButton = document.getElementById("regenerate-btn");
 const saveButton = document.getElementById("save-btn");
 const openMapButton = document.getElementById("open-map-btn");
 const clearButton = document.getElementById("clear-btn");
+const plannerModeSelect = document.getElementById("planner-mode");
+const checkpointTypeFilter = document.getElementById("checkpoint-type-filter");
+const checkpointSourceFilter = document.getElementById("checkpoint-source-filter");
 const menuToggleButton = document.getElementById("menu-toggle");
 const sideMenu = document.getElementById("side-menu");
 
 let currentDraft = null;
 let currentPlan = null;
+let plannerMode = "classic";
+let activeTypeFilter = "all";
+let activeSourceFilter = "all";
 
 document.addEventListener("DOMContentLoaded", () => {
     menuToggleButton.addEventListener("click", () => {
-        sideMenu.classList.toggle("open");
-        menuToggleButton.classList.toggle("open");
+        setMenuOpenState(!sideMenu.classList.contains("open"));
     });
+    document.addEventListener("click", handleDocumentClick, true);
+    document.addEventListener("keydown", handleDocumentKeydown);
 
     currentDraft = loadFlightDraft();
     if (!isUsableDraft(currentDraft)) {
@@ -38,10 +45,44 @@ document.addEventListener("DOMContentLoaded", () => {
         regeneratePlan();
     });
 
+    plannerModeSelect.addEventListener("change", () => {
+        plannerMode = plannerModeSelect.value;
+    });
+    checkpointTypeFilter.addEventListener("change", () => {
+        activeTypeFilter = checkpointTypeFilter.value;
+        renderPlanner();
+    });
+    checkpointSourceFilter.addEventListener("change", () => {
+        activeSourceFilter = checkpointSourceFilter.value;
+        renderPlanner();
+    });
     saveButton.addEventListener("click", savePlan);
     openMapButton.addEventListener("click", openCurrentRouteOnMap);
     clearButton.addEventListener("click", clearPlan);
 });
+
+function handleDocumentClick(event) {
+    if (!sideMenu.classList.contains("open")) {
+        return;
+    }
+
+    if (sideMenu.contains(event.target) || menuToggleButton.contains(event.target)) {
+        return;
+    }
+
+    setMenuOpenState(false);
+}
+
+function handleDocumentKeydown(event) {
+    if (event.key === "Escape" && sideMenu.classList.contains("open")) {
+        setMenuOpenState(false);
+    }
+}
+
+function setMenuOpenState(isOpen) {
+    sideMenu.classList.toggle("open", isOpen);
+    menuToggleButton.classList.toggle("open", isOpen);
+}
 
 async function initializePlanner() {
     try {
@@ -58,10 +99,14 @@ async function hydratePlan() {
     const savedPlan = getCheckpointPlanForRoute(currentDraft);
     if (savedPlan) {
         currentPlan = savedPlan;
+        plannerMode = savedPlan.mode || "classic";
+        plannerModeSelect.value = plannerMode;
         return;
     }
 
     currentPlan = await fetchGeneratedCheckpointPlan();
+    plannerMode = currentPlan.mode || plannerMode;
+    plannerModeSelect.value = plannerMode;
 }
 
 function renderPlanner() {
@@ -70,9 +115,14 @@ function renderPlanner() {
     currentPlan.legs.forEach((legPlan, index) => {
         const legCard = document.createElement("section");
         legCard.className = "leg-card";
+        const visibleCheckpoints = legPlan.checkpoints
+            .map((checkpoint, checkpointIndex) => ({ checkpoint, checkpointIndex }))
+            .filter(({ checkpoint }) => matchesCheckpointFilters(checkpoint));
 
         const checkpointsHtml = legPlan.checkpoints.length === 0
             ? `<div class="empty-state">This leg is short enough that no intermediate checkpoints were generated.</div>`
+            : visibleCheckpoints.length === 0
+                ? `<div class="empty-state">No checkpoints match the current filters for this leg.</div>`
             : `
                 <table>
                     <thead>
@@ -84,11 +134,19 @@ function renderPlanner() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${legPlan.checkpoints.map((checkpoint, checkpointIndex) => `
+                        ${visibleCheckpoints.map(({ checkpoint, checkpointIndex }) => `
                             <tr data-checkpoint-row="${index}:${checkpointIndex}">
-                                <td><input type="text" value="${escapeHtml(checkpoint.name)}" data-field="name"></td>
+                                <td>
+                                    <div class="checkpoint-name-cell">
+                                        <input type="text" value="${escapeHtml(checkpoint.name)}" data-field="name">
+                                        ${renderCheckpointMeta(checkpoint)}
+                                    </div>
+                                </td>
                                 <td><input type="number" step="0.1" min="0" max="${legPlan.legDistanceNm.toFixed(1)}" value="${checkpoint.distanceFromLegStartNm.toFixed(1)}" data-field="distance"></td>
-                                <td><input type="text" value="${escapeHtml(checkpoint.comms || "VIS")}" data-field="comms"></td>
+                                <td>
+                                    <input type="text" value="${escapeHtml(checkpoint.comms || "VIS")}" data-field="comms">
+                                    ${checkpoint.notes ? `<div class="checkpoint-note">${escapeHtml(checkpoint.notes)}</div>` : ""}
+                                </td>
                                 <td><button type="button" class="ghost remove-checkpoint-btn">Remove</button></td>
                             </tr>
                         `).join("")}
@@ -139,6 +197,7 @@ function savePlan() {
     currentPlan.routeSignature = createRouteSignature(currentDraft);
     currentPlan.version = CHECKPOINT_PLAN_VERSION;
     currentPlan.savedAt = new Date().toISOString();
+    currentPlan.mode = plannerMode;
     saveCheckpointPlan(currentPlan);
     showStatus("Checkpoint plan saved. Return to Flight Setup and generate the nav log to populate Table 3.", "info");
 }
@@ -151,6 +210,7 @@ function openCurrentRouteOnMap() {
     currentPlan.routeSignature = createRouteSignature(currentDraft);
     currentPlan.version = CHECKPOINT_PLAN_VERSION;
     currentPlan.savedAt = new Date().toISOString();
+    currentPlan.mode = plannerMode;
     saveCheckpointPlan(currentPlan);
     window.location.assign("/map.html");
 }
@@ -210,7 +270,10 @@ function showStatus(message, type) {
 
 async function fetchGeneratedCheckpointPlan() {
     setPlannerBusy(true, "Loading checkpoints...");
-    const response = await fetch("/api/checkpoints/generate", {
+    const url = plannerMode === "enhanced"
+        ? `/api/checkpoints/generate?mode=${encodeURIComponent(plannerMode)}`
+        : "/api/checkpoints/generate";
+    const response = await fetch(url, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -227,6 +290,7 @@ async function fetchGeneratedCheckpointPlan() {
     const normalizedPlan = {
         version: CHECKPOINT_PLAN_VERSION,
         routeSignature: createRouteSignature(currentDraft),
+        mode: plannerMode,
         legs: plan.legs || [],
     };
     saveCheckpointPlan(normalizedPlan);
@@ -251,8 +315,17 @@ function addCheckpointToLeg(legIndex) {
         name: `Custom Checkpoint ${legPlan.checkpoints.length + 1}`,
         distanceFromLegStartNm: Math.round(suggestedDistance * 10) / 10,
         comms: "",
+        type: "manual",
+        source: "user",
+        notes: "User-added checkpoint.",
     });
     renderPlanner();
+}
+
+function matchesCheckpointFilters(checkpoint) {
+    const matchesType = activeTypeFilter === "all" || checkpoint.type === activeTypeFilter;
+    const matchesSource = activeSourceFilter === "all" || checkpoint.source === activeSourceFilter;
+    return matchesType && matchesSource;
 }
 
 function setPlannerBusy(isBusy, message = "") {
@@ -279,4 +352,44 @@ function escapeHtml(value) {
         .replaceAll("\"", "&quot;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;");
+}
+
+function renderCheckpointMeta(checkpoint) {
+    const badges = [];
+
+    if (checkpoint.type) {
+        badges.push(`<span class="checkpoint-badge">${escapeHtml(formatCheckpointType(checkpoint.type))}</span>`);
+    }
+    if (checkpoint.source) {
+        badges.push(`<span class="checkpoint-badge">${escapeHtml(formatCheckpointSource(checkpoint.source))}</span>`);
+    }
+    if (typeof checkpoint.score === "number" && Number.isFinite(checkpoint.score)) {
+        badges.push(`<span class="checkpoint-badge">Score ${escapeHtml(checkpoint.score.toFixed(1))}</span>`);
+    }
+
+    if (badges.length === 0) {
+        return "";
+    }
+
+    return `<div class="checkpoint-meta">${badges.join("")}</div>`;
+}
+
+function formatCheckpointType(type) {
+    return String(type || "")
+        .replaceAll("_", " ")
+        .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function formatCheckpointSource(source) {
+    const normalized = String(source || "").replaceAll("_", " ");
+    if (normalized === "chart candidate") {
+        return "Visual Priority";
+    }
+    if (normalized === "curated visual checkpoint") {
+        return "Curated Visual";
+    }
+    if (normalized === "airport reference") {
+        return "Airport Data";
+    }
+    return normalized.replace(/\b\w/g, (character) => character.toUpperCase());
 }

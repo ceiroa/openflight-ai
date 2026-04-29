@@ -67,6 +67,9 @@ const sideMenu = document.getElementById("side-menu");
 const state = {
     map: null,
     baseLayers: {},
+    sectionalOverlayLayer: null,
+    sectionalOverlayMetadata: null,
+    sectionalOverlayPromise: null,
     routeLines: [],
     routeBounds: null,
     routePoints: [],
@@ -76,13 +79,18 @@ const state = {
     activeCheckpointIndex: null,
     activeLegIndex: null,
     currentMode: MAP_MODES.street,
+    checkpointFilters: {
+        type: "all",
+        source: "all",
+    },
 };
 
 document.addEventListener("DOMContentLoaded", () => {
     menuToggleButton.addEventListener("click", () => {
-        sideMenu.classList.toggle("open");
-        menuToggleButton.classList.toggle("open");
+        setMenuOpenState(!sideMenu.classList.contains("open"));
     });
+    document.addEventListener("click", handleDocumentClick, true);
+    document.addEventListener("keydown", handleDocumentKeydown);
 
     const draft = loadFlightDraft();
     if (!isUsableDraft(draft)) {
@@ -92,6 +100,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
     renderMapPage(draft);
 });
+
+function handleDocumentClick(event) {
+    if (!sideMenu.classList.contains("open")) {
+        return;
+    }
+
+    if (sideMenu.contains(event.target) || menuToggleButton.contains(event.target)) {
+        return;
+    }
+
+    setMenuOpenState(false);
+}
+
+function handleDocumentKeydown(event) {
+    if (event.key === "Escape" && sideMenu.classList.contains("open")) {
+        setMenuOpenState(false);
+    }
+}
+
+function setMenuOpenState(isOpen) {
+    sideMenu.classList.toggle("open", isOpen);
+    menuToggleButton.classList.toggle("open", isOpen);
+}
 
 function renderMapPage(draft) {
     const routePoints = buildRoutePoints(draft);
@@ -139,15 +170,44 @@ function renderMapPage(draft) {
                     `).join("")}
                 </div>
                 <h3>Saved Checkpoints</h3>
+                <div class="checkpoint-filters">
+                    <div class="checkpoint-filter-grid">
+                        <div class="checkpoint-filter-group">
+                            <label for="map-checkpoint-type-filter">Filter By Type</label>
+                            <select id="map-checkpoint-type-filter">
+                                <option value="all">All Types</option>
+                                <option value="visual_checkpoint">Visual Checkpoints</option>
+                                <option value="airport">Airports</option>
+                                <option value="landmark">Landmarks</option>
+                                <option value="manual">Manual</option>
+                                <option value="synthetic">Synthetic</option>
+                            </select>
+                        </div>
+                        <div class="checkpoint-filter-group">
+                            <label for="map-checkpoint-source-filter">Filter By Source</label>
+                            <select id="map-checkpoint-source-filter">
+                                <option value="all">All Sources</option>
+                                <option value="curated_visual_checkpoint">Curated Visual</option>
+                                <option value="chart_candidate">Visual Priority</option>
+                                <option value="airport_reference">Airport Data</option>
+                                <option value="landmark">Landmark Search</option>
+                                <option value="user">User Added</option>
+                                <option value="fallback">Fallback</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
                 ${checkpointMarkers.length === 0
                     ? `<div class="empty-state">No saved checkpoints for this route yet.</div>`
                     : `
                         <ol class="checkpoint-list">
                             ${checkpointMarkers.map((checkpoint, index) => `
-                                <li>
+                                <li class="checkpoint-list-item" data-checkpoint-item="${index}">
                                     <button type="button" class="checkpoint-button" data-checkpoint-index="${index}">
-                                        ${escapeHtml(checkpoint.name)}
+                                        <span>${escapeHtml(checkpoint.name)}</span>
+                                        ${renderCheckpointMeta(checkpoint)}
                                         <span class="checkpoint-subtitle">${escapeHtml(checkpoint.fromIcao)} to ${escapeHtml(checkpoint.toIcao)} at ${checkpoint.distanceFromLegStartNm.toFixed(1)} NM</span>
+                                        ${checkpoint.notes ? `<span class="checkpoint-subtitle">${escapeHtml(checkpoint.notes)}</span>` : ""}
                                     </button>
                                 </li>
                             `).join("")}
@@ -216,15 +276,16 @@ function initializeLeafletMap(routePoints, legSegments, checkpointMarkers) {
     });
 
     checkpointMarkers.forEach((checkpoint, index) => {
+        const markerStyle = getCheckpointMarkerStyle(checkpoint);
         checkpoint.marker = window.L.circleMarker([checkpoint.lat, checkpoint.lon], {
-            radius: 6,
-            color: "#f59e0b",
-            fillColor: "#f59e0b",
+            radius: markerStyle.radius,
+            color: markerStyle.color,
+            fillColor: markerStyle.fillColor,
             fillOpacity: 0.95,
             weight: 2,
         }).addTo(map);
 
-        checkpoint.marker.bindPopup(`<strong>${escapeHtml(checkpoint.name)}</strong><br>${escapeHtml(checkpoint.fromIcao)} to ${escapeHtml(checkpoint.toIcao)}`);
+        checkpoint.marker.bindPopup(buildCheckpointPopup(checkpoint));
         checkpoint.marker.on("click", () => highlightCheckpoint(index));
     });
 
@@ -273,7 +334,17 @@ function attachMapPageHandlers(checkpointMarkers) {
         highlightCheckpoint(0, false);
     }
 
+    document.getElementById("map-checkpoint-type-filter")?.addEventListener("change", (event) => {
+        state.checkpointFilters.type = event.target.value;
+        applyCheckpointFilters();
+    });
+    document.getElementById("map-checkpoint-source-filter")?.addEventListener("change", (event) => {
+        state.checkpointFilters.source = event.target.value;
+        applyCheckpointFilters();
+    });
+
     document.getElementById("export-kml-btn")?.addEventListener("click", exportCurrentRouteKml);
+    applyCheckpointFilters();
 }
 
 function applyMapMode(mode) {
@@ -294,17 +365,20 @@ function applyMapMode(mode) {
     }
 
     if (mode === MAP_MODES.street) {
+        removeSectionalOverlay();
         state.baseLayers.street.addTo(state.map);
         state.routeLines.forEach((line, index) => line.setStyle({ color: state.legSegments[index].color, weight: 4, dashArray: null }));
         updateMapStatus("Street map mode. Route, airports, and checkpoints are plotted on OpenStreetMap.");
     } else if (mode === MAP_MODES.terrain) {
+        removeSectionalOverlay();
         state.baseLayers.terrain.addTo(state.map);
         state.routeLines.forEach((line, index) => line.setStyle({ color: state.legSegments[index].color, weight: 4, dashArray: null }));
         updateMapStatus("Terrain mode. Use this to compare the route to terrain and surface features.");
     } else {
         state.baseLayers.terrain.addTo(state.map);
         state.routeLines.forEach((line) => line.setStyle({ color: "#f59e0b", weight: 5, dashArray: "10 8" }));
-        updateMapStatus("FAA sectional reference mode. Review the route on terrain and use the chart links on the right for official FAA VFR charts.");
+        updateMapStatus("Loading FAA sectional overlay...");
+        void ensureSectionalOverlay();
     }
 }
 
@@ -355,6 +429,11 @@ function focusLeg(legIndex) {
 }
 
 function highlightCheckpoint(index, pan = true) {
+    const checkpoint = state.checkpointMarkers[index];
+    if (!checkpoint || !matchesCheckpointFilters(checkpoint)) {
+        return;
+    }
+
     state.activeCheckpointIndex = index;
 
     state.checkpointMarkers.forEach((checkpoint, markerIndex) => {
@@ -363,10 +442,11 @@ function highlightCheckpoint(index, pan = true) {
         }
 
         const isActive = markerIndex === index;
+        const markerStyle = getCheckpointMarkerStyle(checkpoint);
         checkpoint.marker.setStyle({
-            radius: isActive ? 8 : 6,
-            color: isActive ? "#f8fafc" : "#f59e0b",
-            fillColor: isActive ? "#ef4444" : "#f59e0b",
+            radius: isActive ? Math.max(8, markerStyle.radius + 1) : markerStyle.radius,
+            color: isActive ? "#f8fafc" : markerStyle.color,
+            fillColor: isActive ? "#ef4444" : markerStyle.fillColor,
             fillOpacity: 0.95,
             weight: 2,
         });
@@ -376,8 +456,7 @@ function highlightCheckpoint(index, pan = true) {
         button.classList.toggle("active", buttonIndex === index);
     });
 
-    const checkpoint = state.checkpointMarkers[index];
-    if (!checkpoint || !checkpoint.marker) {
+    if (!checkpoint.marker) {
         return;
     }
 
@@ -388,6 +467,48 @@ function highlightCheckpoint(index, pan = true) {
             duration: 0.75,
         });
     }
+}
+
+function applyCheckpointFilters() {
+    const items = Array.from(document.querySelectorAll("[data-checkpoint-item]"));
+
+    state.checkpointMarkers.forEach((checkpoint, index) => {
+        const isVisible = matchesCheckpointFilters(checkpoint);
+        const listItem = items[index];
+
+        if (listItem) {
+            listItem.classList.toggle("is-hidden", !isVisible);
+        }
+
+        if (!checkpoint.marker || !state.map) {
+            return;
+        }
+
+        if (isVisible) {
+            checkpoint.marker.addTo(state.map);
+        } else if (state.map.hasLayer(checkpoint.marker)) {
+            checkpoint.marker.removeFrom(state.map);
+        }
+    });
+
+    if (!state.checkpointMarkers.some(matchesCheckpointFilters)) {
+        state.activeCheckpointIndex = null;
+        state.checkpointButtons.forEach((button) => button.classList.remove("active"));
+        return;
+    }
+
+    if (state.activeCheckpointIndex === null || !matchesCheckpointFilters(state.checkpointMarkers[state.activeCheckpointIndex])) {
+        const nextVisibleIndex = state.checkpointMarkers.findIndex(matchesCheckpointFilters);
+        if (nextVisibleIndex >= 0) {
+            highlightCheckpoint(nextVisibleIndex, false);
+        }
+    }
+}
+
+function matchesCheckpointFilters(checkpoint) {
+    const matchesType = state.checkpointFilters.type === "all" || checkpoint.type === state.checkpointFilters.type;
+    const matchesSource = state.checkpointFilters.source === "all" || checkpoint.source === state.checkpointFilters.source;
+    return matchesType && matchesSource;
 }
 
 function buildRoutePoints(draft) {
@@ -445,8 +566,16 @@ function buildCheckpointMarkers(routePoints, checkpointPlan) {
                 fromIcao: leg.fromIcao,
                 toIcao: leg.toIcao,
                 distanceFromLegStartNm,
-                lat: fromPoint.lat + ((toPoint.lat - fromPoint.lat) * fraction),
-                lon: fromPoint.lon + ((toPoint.lon - fromPoint.lon) * fraction),
+                lat: Number.isFinite(Number(checkpoint.lat))
+                    ? Number(checkpoint.lat)
+                    : fromPoint.lat + ((toPoint.lat - fromPoint.lat) * fraction),
+                lon: Number.isFinite(Number(checkpoint.lon))
+                    ? Number(checkpoint.lon)
+                    : fromPoint.lon + ((toPoint.lon - fromPoint.lon) * fraction),
+                type: checkpoint.type || "",
+                source: checkpoint.source || "",
+                notes: checkpoint.notes || "",
+                score: Number.isFinite(Number(checkpoint.score)) ? Number(checkpoint.score) : null,
             };
         });
     });
@@ -474,6 +603,7 @@ function buildChartReferences(routePoints) {
 
     const references = nearestSectionals.map((chart, index) => ({
         name: chart.name,
+        type: chart.type,
         description: `${index === 0 ? "Primary likely sectional" : "Nearby sectional alternative"} for this route. Open the official FAA chart pages for current PDF/GeoTIFF downloads.`,
         url: FAA_SECTIONAL_INFO_URL,
     }));
@@ -481,6 +611,7 @@ function buildChartReferences(routePoints) {
     if (nearestTac) {
         references.push({
             name: nearestTac.name,
+            type: nearestTac.type,
             description: "Likely TAC coverage if you want a larger-scale chart around the metro area.",
             url: FAA_TAC_INFO_URL,
         });
@@ -488,6 +619,7 @@ function buildChartReferences(routePoints) {
 
     references.push({
         name: "FAA VFR Raster Charts",
+        type: "catalog",
         description: "Official FAA digital chart download page for current PDF and GeoTIFF files.",
         url: FAA_VFR_CHARTS_URL,
     });
@@ -608,4 +740,189 @@ function escapeXml(value) {
         .replaceAll("\"", "&quot;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;");
+}
+
+function renderCheckpointMeta(checkpoint) {
+    const badges = [];
+    const typeClass = checkpoint.type === "visual_checkpoint"
+        ? "visual"
+        : checkpoint.type === "airport"
+            ? "airport"
+            : checkpoint.type === "manual"
+                ? "manual"
+                : "";
+
+    if (checkpoint.type) {
+        badges.push(`<span class="checkpoint-badge ${typeClass}">${escapeHtml(formatCheckpointType(checkpoint.type))}</span>`);
+    }
+    if (checkpoint.source) {
+        badges.push(`<span class="checkpoint-badge">${escapeHtml(formatCheckpointSource(checkpoint.source))}</span>`);
+    }
+    if (typeof checkpoint.score === "number" && Number.isFinite(checkpoint.score)) {
+        badges.push(`<span class="checkpoint-badge">Score ${escapeHtml(checkpoint.score.toFixed(1))}</span>`);
+    }
+
+    if (badges.length === 0) {
+        return "";
+    }
+
+    return `<span class="checkpoint-meta">${badges.join("")}</span>`;
+}
+
+function buildCheckpointPopup(checkpoint) {
+    const details = [
+        `<strong>${escapeHtml(checkpoint.name)}</strong>`,
+        `${escapeHtml(checkpoint.fromIcao)} to ${escapeHtml(checkpoint.toIcao)}`,
+    ];
+
+    if (checkpoint.type) {
+        details.push(`Type: ${escapeHtml(formatCheckpointType(checkpoint.type))}`);
+    }
+    if (checkpoint.source) {
+        details.push(`Source: ${escapeHtml(formatCheckpointSource(checkpoint.source))}`);
+    }
+    if (checkpoint.comms) {
+        details.push(`Comms: ${escapeHtml(checkpoint.comms)}`);
+    }
+    if (checkpoint.notes) {
+        details.push(escapeHtml(checkpoint.notes));
+    }
+
+    return details.join("<br>");
+}
+
+function getCheckpointMarkerStyle(checkpoint) {
+    if (checkpoint.type === "visual_checkpoint") {
+        return {
+            radius: 7,
+            color: "#ef4444",
+            fillColor: "#ef4444",
+        };
+    }
+    if (checkpoint.type === "airport") {
+        return {
+            radius: 6,
+            color: "#10b981",
+            fillColor: "#10b981",
+        };
+    }
+    if (checkpoint.type === "manual") {
+        return {
+            radius: 6,
+            color: "#f59e0b",
+            fillColor: "#f59e0b",
+        };
+    }
+    return {
+        radius: 6,
+        color: "#38bdf8",
+        fillColor: "#38bdf8",
+    };
+}
+
+function formatCheckpointType(type) {
+    return String(type || "")
+        .replaceAll("_", " ")
+        .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function formatCheckpointSource(source) {
+    const normalized = String(source || "").replaceAll("_", " ");
+    if (normalized === "chart candidate") {
+        return "Visual Priority";
+    }
+    if (normalized === "curated visual checkpoint") {
+        return "Curated Visual";
+    }
+    if (normalized === "airport reference") {
+        return "Airport Data";
+    }
+    return normalized.replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+async function ensureSectionalOverlay() {
+    if (!state.map) {
+        return;
+    }
+
+    const primarySectional = findPrimarySectionalReference();
+    if (!primarySectional) {
+        updateMapStatus("FAA sectional overlay is only available for routes with a nearby sectional chart reference.");
+        return;
+    }
+
+    if (!window.JSZip || !window.parseGeoraster || !window.GeoRasterLayer) {
+        updateMapStatus("FAA sectional overlay libraries are unavailable. Falling back to terrain.");
+        return;
+    }
+
+    try {
+        if (state.sectionalOverlayLayer) {
+            state.sectionalOverlayLayer.addTo(state.map);
+            updateMapStatus(`FAA sectional overlay loaded: ${primarySectional.name}.`);
+            return;
+        }
+
+        if (!state.sectionalOverlayPromise) {
+            state.sectionalOverlayPromise = loadSectionalOverlay(primarySectional.name);
+        }
+
+        const layer = await state.sectionalOverlayPromise;
+        state.sectionalOverlayLayer = layer;
+        state.sectionalOverlayLayer.addTo(state.map);
+        updateMapStatus(`FAA sectional overlay loaded: ${primarySectional.name}.`);
+    } catch (error) {
+        removeSectionalOverlay();
+        state.sectionalOverlayPromise = null;
+        updateMapStatus(`FAA sectional overlay unavailable. Using terrain only. ${error.message}`);
+    }
+}
+
+async function loadSectionalOverlay(chartName) {
+    const metadataResponse = await fetch(`/api/charts/sectional?name=${encodeURIComponent(chartName)}`);
+    if (!metadataResponse.ok) {
+        const failure = await metadataResponse.json().catch(() => ({ error: "FAA sectional metadata request failed." }));
+        throw new Error(failure.error || "FAA sectional metadata request failed.");
+    }
+
+    const metadata = await metadataResponse.json();
+    state.sectionalOverlayMetadata = metadata;
+
+    const zipResponse = await fetch(`/api/charts/sectional/content?name=${encodeURIComponent(chartName)}`);
+    if (!zipResponse.ok) {
+        throw new Error(`FAA chart ZIP returned ${zipResponse.status}`);
+    }
+
+    const zipBuffer = await zipResponse.arrayBuffer();
+    const zip = await window.JSZip.loadAsync(zipBuffer);
+    const tifEntry = Object.values(zip.files).find((file) => !file.dir && /\.tif$/i.test(file.name));
+    if (!tifEntry) {
+        throw new Error("FAA chart ZIP did not contain a GeoTIFF file.");
+    }
+
+    const tifBuffer = await tifEntry.async("arraybuffer");
+    const georaster = await window.parseGeoraster(tifBuffer);
+    return new window.GeoRasterLayer({
+        georaster,
+        opacity: 0.72,
+        resolution: 256,
+    });
+}
+
+function removeSectionalOverlay() {
+    if (state.sectionalOverlayLayer && state.map && state.map.hasLayer(state.sectionalOverlayLayer)) {
+        state.map.removeLayer(state.sectionalOverlayLayer);
+    }
+}
+
+function findPrimarySectionalReference() {
+    const chartLinks = Array.from(document.querySelectorAll("#chart-reference-list .chart-link-button"));
+    const sectionalLink = chartLinks.find((link) => link.textContent.includes("Sectional"));
+    if (!sectionalLink) {
+        return null;
+    }
+
+    return {
+        name: sectionalLink.childNodes[0]?.textContent?.trim() || sectionalLink.textContent.trim(),
+    };
 }

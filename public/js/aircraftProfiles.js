@@ -12,15 +12,39 @@ let activeProfileId = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
     menuToggleButton.addEventListener("click", () => {
-        sideMenu.classList.toggle("open");
-        menuToggleButton.classList.toggle("open");
+        setMenuOpenState(!sideMenu.classList.contains("open"));
     });
+    document.addEventListener("click", handleDocumentClick, true);
+    document.addEventListener("keydown", handleDocumentKeydown);
     newProfileButton.addEventListener("click", () => selectProfile(createEmptyProfile()));
     refreshProfilesButton.addEventListener("click", loadProfiles);
     saveProfileButton.addEventListener("click", saveProfile);
 
     await loadProfiles();
 });
+
+function handleDocumentClick(event) {
+    if (!sideMenu.classList.contains("open")) {
+        return;
+    }
+
+    if (sideMenu.contains(event.target) || menuToggleButton.contains(event.target)) {
+        return;
+    }
+
+    setMenuOpenState(false);
+}
+
+function handleDocumentKeydown(event) {
+    if (event.key === "Escape" && sideMenu.classList.contains("open")) {
+        setMenuOpenState(false);
+    }
+}
+
+function setMenuOpenState(isOpen) {
+    sideMenu.classList.toggle("open", isOpen);
+    menuToggleButton.classList.toggle("open", isOpen);
+}
 
 async function loadProfiles() {
     try {
@@ -63,10 +87,10 @@ function renderProfileList() {
     profileList.innerHTML = profiles.map((profile) => `
         <button type="button" class="profile-card${profile.id === activeProfileId ? ' active' : ''}" data-profile-id="${profile.id}">
             <div class="profile-card-header">
-                <strong class="profile-card-title">${escapeHtml(profile.aircraft)}</strong>
+                <strong class="profile-card-title">${escapeHtml(formatProfileCardTitle(profile))}</strong>
                 <span class="badge ${profile.complete ? 'complete' : 'incomplete'}">${profile.complete ? 'Complete' : 'Needs Work'}</span>
             </div>
-            <div class="profile-card-meta">${escapeHtml(profile.manufacturer || profile.model || profile.id)}</div>
+            <div class="profile-card-meta">${escapeHtml(formatProfileCardMeta(profile))}</div>
         </button>
     `).join("");
 
@@ -221,4 +245,15 @@ function escapeHtml(value) {
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
         .replaceAll("\"", "&quot;");
+}
+
+function formatProfileCardTitle(profile) {
+    const aircraftName = String(profile.aircraft || profile.id || "").trim();
+    const engineName = String(profile.engine || "").trim();
+    return engineName ? `${aircraftName} / ${engineName}` : aircraftName;
+}
+
+function formatProfileCardMeta(profile) {
+    const details = [profile.manufacturer, profile.model].filter(Boolean);
+    return details.join(" | ") || profile.id;
 }

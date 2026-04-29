@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "cessna-172s-skyhawk",
+  "aircraft": "Cessna 172S Skyhawk",
+  "manufacturer": "Cessna",
+  "model": "172S Skyhawk",
+  "engine": "Lycoming IO-360-L2A",
+  "source_notes": "Seed profile based on Textron Aviation's current Cessna Skyhawk specifications for climb rate, stall speed, and VNE, plus the Cessna 172S NAV III Pilot Operating Handbook mirrored on ManualsLib for a representative 65% cruise row.",
+  "profiles": {
+    "climb": {
+      "speed_kts": 74,
+      "rpm": 2700,
+      "fuel_burn_gph": 10.4,
+      "rate_of_climb_fpm": 730,
+      "climbTable": [
+        { "altitude_ft": 0, "speed_kts": 74, "rate_of_climb_fpm": 730 }
+      ]
+    },
+    "cruise65": {
+      "speed_kts": 112,
+      "rpm": 2500,
+      "fuel_burn_gph": 8.6
+    }
+  },
+  "limits": {
+    "vne_kts": 163,
+    "vs_kts": 53,
+    "max_rpm": 2700
+  }
+}

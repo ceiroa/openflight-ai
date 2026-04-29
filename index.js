@@ -11,9 +11,12 @@ import {
     validateAircraftProfile,
 } from './src/aircraftProfiles.js';
 import {
+    generateClassicCheckpointsForRoute,
+    generateEnhancedCheckpointsForRoute,
     generateNamedCheckpointsForRoute,
     getAirportCommsByCode,
 } from './src/api/airportReferenceService.js';
+import { getCurrentSectionalChartMetadata } from './src/api/faaChartsService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -88,11 +91,61 @@ app.get('/api/airport/:icao/comms', async (req, res) => {
     }
 });
 
+app.get('/api/charts/sectional', async (req, res) => {
+    try {
+        const name = String(req.query.name || '').trim();
+        if (!name) {
+            res.status(400).json({ error: 'Sectional chart name is required.' });
+            return;
+        }
+
+        const metadata = await getCurrentSectionalChartMetadata(name);
+        res.json(metadata);
+    } catch (error) {
+        res.status(500).json({ error: error.message || 'Failed to load FAA sectional chart metadata' });
+    }
+});
+
+app.get('/api/charts/sectional/content', async (req, res) => {
+    try {
+        const name = String(req.query.name || '').trim();
+        if (!name) {
+            res.status(400).json({ error: 'Sectional chart name is required.' });
+            return;
+        }
+
+        const metadata = await getCurrentSectionalChartMetadata(name);
+        const upstream = await fetch(metadata.zipUrl, {
+            headers: {
+                'User-Agent': 'OpenFlight-AI/1.0 faa-chart-overlay',
+            },
+        });
+
+        if (!upstream.ok) {
+            res.status(502).json({ error: `FAA chart ZIP returned ${upstream.status}` });
+            return;
+        }
+
+        const buffer = Buffer.from(await upstream.arrayBuffer());
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Cache-Control', 'no-store');
+        res.send(buffer);
+    } catch (error) {
+        res.status(500).json({ error: error.message || 'Failed to load FAA sectional chart content' });
+    }
+});
+
 app.post('/api/checkpoints/generate', async (req, res) => {
     try {
         const draft = req.body;
-        const legs = await generateNamedCheckpointsForRoute(draft);
+        const mode = String(req.query.mode || 'classic').toLowerCase();
+        const legs = mode === 'enhanced'
+            ? await generateEnhancedCheckpointsForRoute(draft)
+            : mode === 'classic'
+                ? await generateClassicCheckpointsForRoute(draft)
+                : await generateNamedCheckpointsForRoute(draft);
         res.json({
+            mode,
             routeSignature: draft ? JSON.stringify({
                 departure: {
                     icao: draft.departure?.icao || '',

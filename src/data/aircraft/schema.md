@@ -37,6 +37,15 @@ Each file uses this shape:
 }
 ```
 
+Each profile should represent a specific aircraft configuration, including the engine installed in that aircraft.
+
+Good examples:
+
+- `cessna-172s-skyhawk` with `Lycoming IO-360-L2A`
+- `evektor-harmony-lsa` with `Rotax 912 ULS`
+
+Avoid standalone engine-only profiles such as `rotax-912` unless the project is explicitly modeling engines separately, which it is not today.
+
 Required for a complete profile:
 
 - `id`

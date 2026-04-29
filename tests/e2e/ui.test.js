@@ -49,7 +49,7 @@ test.describe('OpenFlight AI - UI Tests', () => {
 
         await page.route('**/api/checkpoints/generate*', async (route) => {
             const url = new URL(route.request().url());
-            const mode = url.searchParams.get('mode') || 'classic';
+            const mode = url.searchParams.get('mode') || 'enhanced';
             const draft = route.request().postDataJSON();
             const legs = draft.legs.map((leg, index) => ({
                 legIndex: index,
@@ -357,12 +357,12 @@ test.describe('OpenFlight AI - UI Tests', () => {
         expect(generateCalls).toBe(1);
     });
 
-    test('should keep classic checkpoint generation as default and allow enhanced mode opt-in', async ({ page }) => {
+    test('should default to enhanced checkpoint generation in the planner', async ({ page }) => {
         let requestedModes = [];
         await page.unroute('**/api/checkpoints/generate*');
         await page.route('**/api/checkpoints/generate*', async (route) => {
             const url = new URL(route.request().url());
-            const mode = url.searchParams.get('mode') || 'classic';
+            const mode = url.searchParams.get('mode') || 'enhanced';
             requestedModes.push(mode);
             const draft = route.request().postDataJSON();
             const legs = draft.legs.map((leg, index) => ({
@@ -396,14 +396,10 @@ test.describe('OpenFlight AI - UI Tests', () => {
 
         await page.click('#menu-toggle');
         await page.click('#open-checkpoints-btn');
-        await expect(page.locator('[data-field="name"]').first()).toHaveValue('KARR CHECKPOINT');
-        expect(requestedModes[0]).toBe('classic');
-
-        await page.selectOption('#planner-mode', 'enhanced');
-        await page.click('#regenerate-btn');
         await expect(page.locator('[data-field="name"]').first()).toHaveValue('KARR VISUAL CHECKPOINT');
         await expect(page.locator('.checkpoint-badge')).toContainText(['Visual Checkpoint', 'Visual Priority']);
-        expect(requestedModes).toContain('enhanced');
+        await expect(page.locator('#planner-mode option')).toHaveCount(1);
+        expect(requestedModes[0]).toBe('enhanced');
     });
 
     test('should show enhanced checkpoints on the map after regenerating from the planner menu path', async ({ page }) => {
@@ -414,10 +410,6 @@ test.describe('OpenFlight AI - UI Tests', () => {
 
         await page.click('#menu-toggle');
         await page.click('#open-checkpoints-btn');
-        await expect(page.locator('[data-field="name"]').first()).toHaveValue('KARR CHECKPOINT');
-
-        await page.selectOption('#planner-mode', 'enhanced');
-        await page.click('#regenerate-btn');
         await expect(page.locator('[data-field="name"]').first()).toHaveValue('KARR VISUAL CHECKPOINT');
 
         await page.click('#menu-toggle');
@@ -449,8 +441,6 @@ test.describe('OpenFlight AI - UI Tests', () => {
         });
         await expect(page).toHaveURL(/checkpoints\.html$/);
 
-        await page.selectOption('#planner-mode', 'enhanced');
-        await page.click('#regenerate-btn');
         await expect(page.locator('[data-field="name"]').first()).toHaveValue('KARR VISUAL CHECKPOINT');
     });
 
@@ -494,7 +484,6 @@ test.describe('OpenFlight AI - UI Tests', () => {
 
         await page.click('#menu-toggle');
         await page.click('#open-checkpoints-btn');
-        await page.selectOption('#planner-mode', 'enhanced');
         await page.click('#regenerate-btn');
 
         await expect(page.locator('#loading-progress')).toBeVisible();
@@ -548,7 +537,6 @@ test.describe('OpenFlight AI - UI Tests', () => {
 
         await page.click('#menu-toggle');
         await page.click('#open-checkpoints-btn');
-        await page.selectOption('#planner-mode', 'enhanced');
         await page.click('#regenerate-btn');
         await page.click('#save-btn');
         await page.click('#open-map-btn');
@@ -566,7 +554,6 @@ test.describe('OpenFlight AI - UI Tests', () => {
 
         await page.click('#menu-toggle');
         await page.click('#open-checkpoints-btn');
-        await page.selectOption('#planner-mode', 'enhanced');
         await page.click('#regenerate-btn');
 
         await expect(page.locator('[data-checkpoint-row]')).toHaveCount(1);
@@ -602,7 +589,7 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.click('#menu-toggle');
         await page.click('#open-checkpoints-btn');
 
-        await expect(page.locator('[data-field="name"]').first()).toHaveValue('KARR CHECKPOINT');
+        await expect(page.locator('[data-field="name"]').first()).toHaveValue('KARR VISUAL CHECKPOINT');
     });
 
     test('should load checkpoints for the nav log instead of using legacy CP placeholders', async ({ page }) => {
@@ -622,7 +609,7 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.locator('.destination-icao').blur();
         await page.click('text=GENERATE NAV LOG');
 
-        await expect(page.locator('#table3-body tr').first().locator('td').first()).toHaveText('KARR CHECKPOINT');
+        await expect(page.locator('#table3-body tr').first().locator('td').first()).toHaveText('KARR VISUAL CHECKPOINT');
     });
 
     test('should change generate nav log button to close nav log while the nav log is visible', async ({ page }) => {

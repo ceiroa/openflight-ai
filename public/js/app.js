@@ -22,6 +22,7 @@ import {
 } from "./flightStore.js";
 
 const DEFAULT_AIRCRAFT_NAME = "Evektor Harmony LSA";
+const DEFAULT_CHECKPOINT_MODE = "enhanced";
 
 const state = {
     aircraftData: null,
@@ -1078,7 +1079,7 @@ async function getApprovedCheckpoints(inputs) {
     startLoadingProgress("Loading checkpoints...");
 
     try {
-        const response = await fetch("/api/checkpoints/generate", {
+        const response = await fetch(`/api/checkpoints/generate?mode=${encodeURIComponent(DEFAULT_CHECKPOINT_MODE)}`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -1095,6 +1096,7 @@ async function getApprovedCheckpoints(inputs) {
         const normalizedPlan = {
             version: CHECKPOINT_PLAN_VERSION,
             routeSignature: createRouteSignature(inputs),
+            mode: DEFAULT_CHECKPOINT_MODE,
             legs: Array.isArray(plan.legs) ? plan.legs : [],
         };
 

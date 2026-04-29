@@ -31,7 +31,7 @@ const menuNavLinks = Array.from(document.querySelectorAll(".menu-nav-link"));
 
 let currentDraft = null;
 let currentPlan = null;
-let plannerMode = "classic";
+let plannerMode = "enhanced";
 let activeTypeFilter = "all";
 let activeSourceFilter = "all";
 const MIN_PROGRESS_VISIBLE_MS = 1200;
@@ -130,7 +130,7 @@ async function hydratePlan() {
     const savedPlan = getCheckpointPlanForRoute(currentDraft);
     if (savedPlan) {
         currentPlan = savedPlan;
-        plannerMode = savedPlan.mode || "classic";
+        plannerMode = savedPlan.mode === "classic" ? "enhanced" : (savedPlan.mode || "enhanced");
         plannerModeSelect.value = plannerMode;
         return;
     }
@@ -335,9 +335,7 @@ function clearStatus() {
 }
 
 async function fetchGeneratedCheckpointPlan() {
-    const url = plannerMode === "enhanced"
-        ? `/api/checkpoints/generate?mode=${encodeURIComponent(plannerMode)}`
-        : "/api/checkpoints/generate";
+    const url = `/api/checkpoints/generate?mode=${encodeURIComponent(plannerMode)}`;
     const response = await fetch(url, {
         method: "POST",
         headers: {

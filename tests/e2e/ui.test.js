@@ -358,6 +358,54 @@ test.describe('OpenFlight AI - UI Tests', () => {
         expect(requestedModes).toContain('enhanced');
     });
 
+    test('should show a loading progress bar while regenerating checkpoints', async ({ page }) => {
+        await page.unroute('**/api/checkpoints/generate*');
+        await page.route('**/api/checkpoints/generate*', async (route) => {
+            const url = new URL(route.request().url());
+            const mode = url.searchParams.get('mode') || 'classic';
+            const draft = route.request().postDataJSON();
+
+            await new Promise((resolve) => setTimeout(resolve, 700));
+
+            const legs = draft.legs.map((leg, index) => ({
+                legIndex: index,
+                fromIcao: index === 0 ? draft.departure.icao : draft.legs[index - 1].icao,
+                toIcao: leg.icao,
+                legDistanceNm: 20,
+                spacingNm: 6.7,
+                checkpoints: [
+                    {
+                        name: mode === 'enhanced' ? `${leg.icao} VISUAL CHECKPOINT` : `${leg.icao} CHECKPOINT`,
+                        distanceFromLegStartNm: 7,
+                        comms: airportCommsFixtures[leg.icao]?.summary || 'VIS',
+                        type: mode === 'enhanced' ? 'visual_checkpoint' : undefined,
+                        source: mode === 'enhanced' ? 'chart_candidate' : undefined,
+                    },
+                ],
+            }));
+
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ routeSignature, mode, legs }),
+            });
+        });
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+
+        await page.click('#menu-toggle');
+        await page.click('#open-checkpoints-btn');
+        await page.selectOption('#planner-mode', 'enhanced');
+        await page.click('#regenerate-btn');
+
+        await expect(page.locator('#loading-progress')).toBeVisible();
+        await expect(page.locator('#loading-progress-label')).toContainText('Loading');
+        await expect(page.locator('#loading-progress')).toBeHidden();
+    });
+
     test('should show enhanced checkpoint metadata on the route map', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
@@ -502,6 +550,26 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.click('text=Back To Flight Setup');
         await expect(page).toHaveURL(/index\.html$/);
         await expect(page.locator('#generate-btn')).toHaveText('OPEN NAV LOG');
+    });
+
+    test('should reset nav log state after saving changed checkpoints in the planner', async ({ page }) => {
+        await page.fill('#departure-icao', 'KLOT');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#generate-btn');
+        await expect(page.locator('#generate-btn')).toHaveText('OPEN NAV LOG');
+
+        await page.click('#menu-toggle');
+        await page.click('#open-checkpoints-btn');
+        await expect(page).toHaveURL(/checkpoints\.html$/);
+        await page.locator('[data-field="name"]').first().fill('UPDATED CHECKPOINT');
+        await page.click('#save-btn');
+
+        await page.click('#menu-toggle');
+        await page.click('text=Back To Flight Setup');
+        await expect(page).toHaveURL(/index\.html$/);
+        await expect(page.locator('#generate-btn')).toHaveText('GENERATE NAV LOG');
     });
 
     test('should preserve nav-log draft data when returning from aircraft profiles', async ({ page }) => {

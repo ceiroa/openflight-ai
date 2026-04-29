@@ -14,10 +14,20 @@ const LANDMARK_TYPE_SCORES = {
     prison: 1.15,
     bridge: 1.2,
     airport: 1.25,
-    motorway_junction: 1.35,
     landmark: 1.5,
 };
-const VISUAL_FEATURE_TYPES = new Set(['bridge', 'motorway_junction', 'airport', 'prison']);
+const VISUAL_FEATURE_TYPES = new Set(['bridge', 'airport', 'prison']);
+const DISALLOWED_LANDMARK_NAME_PATTERNS = [
+    /\btrail\b/i,
+    /\broad\b/i,
+    /\bstreet\b/i,
+    /\bavenue\b/i,
+    /\blane\b/i,
+    /\bdrive\b/i,
+    /\bboulevard\b/i,
+    /\bhighway\b/i,
+    /\broute\b/i,
+];
 const CLASSIC_TARGET_SPACING_NM = 7;
 const ENHANCED_TARGET_SPACING_NM = 6.5;
 const ENHANCED_MIN_SPACING_NM = 4.5;
@@ -277,8 +287,6 @@ async function fetchLandmarkCandidatesForLeg(start, end) {
   node["name"]["bridge"="yes"](${bbox});
   way["name"]["bridge"="yes"](${bbox});
   relation["name"]["bridge"="yes"](${bbox});
-  node["name"]["highway"="motorway_junction"](${bbox});
-  way["name"]["highway"="motorway_junction"](${bbox});
   node["name"]["aeroway"="aerodrome"](${bbox});
   way["name"]["aeroway"="aerodrome"](${bbox});
   relation["name"]["aeroway"="aerodrome"](${bbox});
@@ -622,6 +630,10 @@ function normalizeLandmarks(elements) {
             continue;
         }
 
+        if (isDisallowedLandmarkName(name)) {
+            continue;
+        }
+
         const featureType = classifyLandmark(tags);
         const dedupeKey = `${featureType}:${name.toLowerCase()}`;
         if (seen.has(dedupeKey)) {
@@ -641,9 +653,6 @@ function classifyLandmark(tags) {
     }
     if (tags.amenity === 'prison') {
         return 'prison';
-    }
-    if (tags.highway === 'motorway_junction') {
-        return 'motorway_junction';
     }
     if (tags.bridge === 'yes') {
         return 'bridge';
@@ -670,6 +679,10 @@ function classifyLandmark(tags) {
         return 'landmark';
     }
     return 'landmark';
+}
+
+function isDisallowedLandmarkName(name) {
+    return DISALLOWED_LANDMARK_NAME_PATTERNS.some((pattern) => pattern.test(name));
 }
 
 function buildExpandedBoundingBox(start, end, expansionDegrees) {

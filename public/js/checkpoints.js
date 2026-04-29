@@ -1,7 +1,9 @@
 import {
     CHECKPOINT_PLAN_VERSION,
-    checkpointPlanLooksLegacy,
+    checkpointPlansEqual,
+    clearNavLogSnapshot,
     loadFlightDraft,
+    loadCheckpointPlan,
     saveCheckpointPlan,
     getCheckpointPlanForRoute,
     clearCheckpointPlan,
@@ -10,6 +12,10 @@ import {
 
 const plannerRoot = document.getElementById("planner-root");
 const statusBanner = document.getElementById("status-banner");
+const loadingProgress = document.getElementById("loading-progress");
+const loadingProgressLabel = document.getElementById("loading-progress-label");
+const loadingProgressBar = document.getElementById("loading-progress-bar");
+const loadingProgressNote = document.getElementById("loading-progress-note");
 const regenerateButton = document.getElementById("regenerate-btn");
 const saveButton = document.getElementById("save-btn");
 const openMapButton = document.getElementById("open-map-btn");
@@ -25,6 +31,8 @@ let currentPlan = null;
 let plannerMode = "classic";
 let activeTypeFilter = "all";
 let activeSourceFilter = "all";
+let progressTimer = null;
+let progressValue = 0;
 
 document.addEventListener("DOMContentLoaded", () => {
     menuToggleButton.addEventListener("click", () => {
@@ -194,11 +202,15 @@ function savePlan() {
         return;
     }
 
+    const previousPlan = loadCheckpointPlan();
     currentPlan.routeSignature = createRouteSignature(currentDraft);
     currentPlan.version = CHECKPOINT_PLAN_VERSION;
     currentPlan.savedAt = new Date().toISOString();
     currentPlan.mode = plannerMode;
     saveCheckpointPlan(currentPlan);
+    if (!checkpointPlansEqual(previousPlan, currentPlan)) {
+        clearNavLogSnapshot();
+    }
     showStatus("Checkpoint plan saved. Return to Flight Setup and generate the nav log to populate Table 3.", "info");
 }
 
@@ -334,7 +346,10 @@ function setPlannerBusy(isBusy, message = "") {
     openMapButton.disabled = isBusy;
     clearButton.disabled = isBusy;
     if (isBusy) {
+        startLoadingProgress(message || "Loading checkpoints...");
         showStatus(message || "Loading checkpoints...", "info");
+    } else {
+        stopLoadingProgress();
     }
 }
 
@@ -392,4 +407,53 @@ function formatCheckpointSource(source) {
         return "Airport Data";
     }
     return normalized.replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function startLoadingProgress(initialMessage) {
+    stopLoadingProgress();
+
+    progressValue = 8;
+    loadingProgress.classList.add("active");
+    loadingProgressBar.style.width = `${progressValue}%`;
+    loadingProgressLabel.textContent = initialMessage;
+    loadingProgressNote.textContent = plannerMode === "enhanced"
+        ? "Enhanced checkpoint generation may take a few seconds while candidates are ranked."
+        : "Classic checkpoint generation usually finishes quickly.";
+
+    const phases = plannerMode === "enhanced"
+        ? [
+            { until: 24, label: "Loading route data..." },
+            { until: 48, label: "Searching checkpoint candidates..." },
+            { until: 72, label: "Ranking visual checkpoints..." },
+            { until: 90, label: "Preparing planner results..." },
+        ]
+        : [
+            { until: 35, label: "Loading route data..." },
+            { until: 68, label: "Generating draft checkpoints..." },
+            { until: 90, label: "Preparing planner results..." },
+        ];
+
+    progressTimer = window.setInterval(() => {
+        const increment = plannerMode === "enhanced" ? 6 : 10;
+        progressValue = Math.min(progressValue + increment, 92);
+        loadingProgressBar.style.width = `${progressValue}%`;
+
+        const currentPhase = phases.find((phase) => progressValue <= phase.until) ?? phases[phases.length - 1];
+        loadingProgressLabel.textContent = currentPhase.label;
+    }, 350);
+}
+
+function stopLoadingProgress() {
+    if (progressTimer) {
+        window.clearInterval(progressTimer);
+        progressTimer = null;
+    }
+
+    if (loadingProgress.classList.contains("active")) {
+        loadingProgressBar.style.width = "100%";
+        window.setTimeout(() => {
+            loadingProgress.classList.remove("active");
+            loadingProgressBar.style.width = "0%";
+        }, 180);
+    }
 }

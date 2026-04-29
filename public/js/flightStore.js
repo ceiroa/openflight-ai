@@ -66,6 +66,10 @@ export function clearNavLogSnapshot() {
     localStorage.removeItem(NAV_LOG_STORAGE_KEY);
 }
 
+export function checkpointPlansEqual(left, right) {
+    return stableStringify(left) === stableStringify(right);
+}
+
 export function checkpointPlanLooksLegacy(plan) {
     return !Array.isArray(plan?.legs)
         || plan.version !== CHECKPOINT_PLAN_VERSION;
@@ -108,4 +112,17 @@ function normalizeNumber(value) {
     }
 
     return Math.round(numeric * 10000) / 10000;
+}
+
+function stableStringify(value) {
+    if (value === null || typeof value !== "object") {
+        return JSON.stringify(value);
+    }
+
+    if (Array.isArray(value)) {
+        return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+    }
+
+    const keys = Object.keys(value).sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
 }

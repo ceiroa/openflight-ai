@@ -6,6 +6,8 @@ import {
 const FAA_VFR_CHARTS_URL = "https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/vfr/index.cfm";
 const FAA_SECTIONAL_INFO_URL = "https://www.faa.gov/air_traffic/flight_info/aeronav/productcatalog/vfrcharts/sectional/";
 const FAA_TAC_INFO_URL = "https://www.faa.gov/air_traffic/flight_info/aeronav/productcatalog/vfrcharts/terminalarea/";
+const AIRSPACE_CACHE_STORAGE_KEY = "openflight-airspace-cache-v1";
+const AIRSPACE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 const SECTIONAL_CHARTS = [
     { name: "Chicago Sectional", lat: 41.8781, lon: -87.6298, type: "sectional" },
@@ -706,6 +708,14 @@ async function refreshAirspaceOverlay() {
     }
 
     const bounds = state.map.getBounds();
+    const cacheKey = buildAirspaceCacheKey(bounds);
+    const cached = loadCachedAirspace(cacheKey);
+    if (cached) {
+        renderAirspaceOverlay(cached);
+        updateAirspaceStatus(`FAA airspace overlay loaded from local cache (${cached.features?.length || 0} feature${cached.features?.length === 1 ? "" : "s"}).`);
+        return;
+    }
+
     updateAirspaceStatus("Loading FAA airspace…");
 
     const response = await fetch(buildAirspaceUrl(bounds));
@@ -716,6 +726,7 @@ async function refreshAirspaceOverlay() {
     }
 
     const payload = await response.json();
+    cacheAirspace(cacheKey, payload);
     renderAirspaceOverlay(payload);
     updateAirspaceStatus(`FAA airspace overlay loaded for the current view (${payload.features?.length || 0} feature${payload.features?.length === 1 ? "" : "s"}).`);
 }
@@ -761,6 +772,67 @@ function buildAirspaceUrl(bounds) {
     return `/api/airspace?${params.toString()}`;
 }
 
+function buildAirspaceCacheKey(bounds) {
+    return [
+        "B,C,D,E",
+        normalizeAirspaceBoundsValue(bounds.getSouth()),
+        normalizeAirspaceBoundsValue(bounds.getWest()),
+        normalizeAirspaceBoundsValue(bounds.getNorth()),
+        normalizeAirspaceBoundsValue(bounds.getEast()),
+    ].join("|");
+}
+
+function normalizeAirspaceBoundsValue(value) {
+    return Number(value).toFixed(3);
+}
+
+function loadCachedAirspace(cacheKey) {
+    const cache = readAirspaceCache();
+    const entry = cache[cacheKey];
+    if (!entry) {
+        return null;
+    }
+
+    if (!entry.savedAt || Date.now() - Number(entry.savedAt) > AIRSPACE_CACHE_TTL_MS) {
+        delete cache[cacheKey];
+        writeAirspaceCache(cache);
+        return null;
+    }
+
+    return entry.payload || null;
+}
+
+function cacheAirspace(cacheKey, payload) {
+    const cache = readAirspaceCache();
+    cache[cacheKey] = {
+        savedAt: Date.now(),
+        payload,
+    };
+    writeAirspaceCache(cache);
+}
+
+function readAirspaceCache() {
+    try {
+        const raw = window.localStorage.getItem(AIRSPACE_CACHE_STORAGE_KEY);
+        if (!raw) {
+            return {};
+        }
+
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (error) {
+        return {};
+    }
+}
+
+function writeAirspaceCache(cache) {
+    try {
+        window.localStorage.setItem(AIRSPACE_CACHE_STORAGE_KEY, JSON.stringify(cache));
+    } catch (error) {
+        // Ignore storage failures and continue without persistent cache.
+    }
+}
+
 function buildAirspacePopup(properties) {
     const lines = [
         `<strong>${escapeHtml(properties.name || "Unnamed Airspace")}</strong>`,
@@ -789,33 +861,33 @@ function buildAirspacePopup(properties) {
 function getAirspaceStyle(airspaceClass) {
     if (airspaceClass === "B") {
         return {
-            color: "#60a5fa",
-            weight: 2.2,
-            fillColor: "#60a5fa",
-            fillOpacity: 0.08,
+            color: "#1d4ed8",
+            weight: 2.6,
+            fillColor: "#2563eb",
+            fillOpacity: 0.11,
         };
     }
     if (airspaceClass === "C") {
         return {
-            color: "#c084fc",
-            weight: 2,
-            fillColor: "#c084fc",
-            fillOpacity: 0.07,
+            color: "#7c3aed",
+            weight: 2.4,
+            fillColor: "#8b5cf6",
+            fillOpacity: 0.1,
         };
     }
     if (airspaceClass === "D") {
         return {
-            color: "#22d3ee",
-            weight: 1.8,
-            fillColor: "#22d3ee",
-            fillOpacity: 0.06,
+            color: "#0f766e",
+            weight: 2.2,
+            fillColor: "#14b8a6",
+            fillOpacity: 0.09,
         };
     }
     return {
-        color: "#fbbf24",
-        weight: 1.6,
-        fillColor: "#fbbf24",
-        fillOpacity: 0.04,
+        color: "#b45309",
+        weight: 2,
+        fillColor: "#f59e0b",
+        fillOpacity: 0.07,
         dashArray: "6 4",
     };
 }

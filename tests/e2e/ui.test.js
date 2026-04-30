@@ -449,6 +449,18 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.click('#toggle-airspace-btn');
         await expect(page.locator('#toggle-airspace-btn')).toHaveText('Show FAA Airspace');
         await expect(page.locator('#map-airspace-status')).toHaveText('FAA airspace overlay is off.');
+
+        await page.click('#toggle-airspace-btn');
+        await expect(page.locator('#toggle-airspace-btn')).toHaveText('Hide FAA Airspace');
+        await expect(page.locator('#map-airspace-status')).toContainText('loaded from local cache');
+        expect(airspaceCalls).toBe(1);
+
+        await page.goto('/index.html?restoreDraft=1');
+        await page.click('#menu-toggle');
+        await page.click('#open-map-btn');
+        await page.click('#toggle-airspace-btn');
+        await expect(page.locator('#map-airspace-status')).toContainText('loaded from local cache');
+        expect(airspaceCalls).toBe(1);
     });
 
     test('should toggle current location on the route map', async ({ page }) => {

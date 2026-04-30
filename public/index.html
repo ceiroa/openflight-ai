@@ -16,6 +16,17 @@
         .title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
         .no-print { background: var(--container-bg); padding: 24px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); margin-bottom: 32px; }
+        .home-disclaimer {
+            margin: 12px 0 18px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            background: rgba(245, 158, 11, 0.08);
+            color: #fde68a;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .home-disclaimer strong { color: #fef3c7; }
 
         h1 { margin-top: 0; color: var(--accent-color); font-size: 1.5rem; }
         .title-heading { display: flex; align-items: center; gap: 10px; }
@@ -149,6 +160,9 @@
         </aside>
         <div class="container">
         <canvas id="flightGraph" width="1000" height="180"></canvas>
+        <div class="home-disclaimer">
+            <strong>Educational Use Only:</strong> OpenFlight AI is an experimental planning aid. Do not rely on it as your sole source for navigation planning, weather judgment, or in-flight decision-making.
+        </div>
 
         <div class="no-print">
             <div class="title-row">
@@ -173,8 +187,8 @@
                         <input type="number" id="cruise-alt" required value="3000" min="0">
                     </div>
                     <div class="form-group">
-                        <label for="date">Flight Date</label>
-                        <input type="date" id="date" required>
+                        <label for="date">Flight Date &amp; Time</label>
+                        <input type="datetime-local" id="date" required>
                     </div>
                 </div>
 

@@ -87,6 +87,10 @@ const state = {
         type: "all",
         source: "all",
     },
+    currentLocationMarker: null,
+    currentLocationAccuracyCircle: null,
+    locationWatchId: null,
+    showCurrentLocation: false,
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -143,13 +147,17 @@ function renderMapPage(draft) {
                     <button type="button" class="map-mode-button active" data-map-mode="${MAP_MODES.street}">Street</button>
                     <button type="button" class="map-mode-button" data-map-mode="${MAP_MODES.terrain}">Terrain</button>
                     <button type="button" class="map-mode-button" data-map-mode="${MAP_MODES.sectional}">FAA Sectional Ref</button>
+                    <button type="button" class="map-secondary-button" id="toggle-location-btn">Show Current Location</button>
                     <button type="button" class="map-secondary-button" id="toggle-reference-checkpoints-btn">Show Nearby Reference Checkpoints</button>
                     <span class="map-toolbar-spacer"></span>
-                    <button type="button" class="map-secondary-button" id="maximize-map-btn">Maximize Map</button>
                     <button type="button" class="map-export-button" id="export-kml-btn">Export KML</button>
                 </div>
                 <p id="map-status" class="route-summary">Route plotted for ${draft.legs.length} leg${draft.legs.length === 1 ? "" : "s"}.</p>
-                <div id="route-map" role="img" aria-label="Map of the current route"></div>
+                <p id="map-location-status" class="map-location-status">Current location is off.</p>
+                <div class="route-map-shell">
+                    <button type="button" class="map-secondary-button map-overlay-button" id="maximize-map-btn">Maximize Map</button>
+                    <div id="route-map" role="img" aria-label="Map of the current route"></div>
+                </div>
             </section>
             <aside class="route-panel">
                 <h2>Route Summary</h2>
@@ -357,6 +365,9 @@ function attachMapPageHandlers(checkpointMarkers) {
     });
 
     document.getElementById("export-kml-btn")?.addEventListener("click", exportCurrentRouteKml);
+    document.getElementById("toggle-location-btn")?.addEventListener("click", () => {
+        void toggleCurrentLocation();
+    });
     document.getElementById("toggle-reference-checkpoints-btn")?.addEventListener("click", () => {
         void toggleReferenceCheckpoints();
     });
@@ -676,6 +687,146 @@ function toggleMapMaximized() {
             state.map?.fitBounds(state.routeBounds, { padding: [30, 30] });
         }
     }, 100);
+}
+
+async function toggleCurrentLocation() {
+    if (state.showCurrentLocation) {
+        stopCurrentLocationTracking("Current location is off.");
+        return;
+    }
+
+    startCurrentLocationTracking();
+}
+
+function startCurrentLocationTracking() {
+    if (!navigator.geolocation) {
+        updateLocationStatus("Current location is unavailable in this browser.", "error");
+        return;
+    }
+
+    state.showCurrentLocation = true;
+    updateLocationToggleButton();
+    updateLocationStatus("Waiting for device location...", "info");
+
+    state.locationWatchId = navigator.geolocation.watchPosition(
+        (position) => {
+            updateCurrentLocation(position);
+        },
+        (error) => {
+            const message = error.code === error.PERMISSION_DENIED
+                ? "Location permission was denied."
+                : error.code === error.POSITION_UNAVAILABLE
+                    ? "Current location is unavailable right now."
+                    : error.code === error.TIMEOUT
+                        ? "Current location request timed out."
+                        : "Current location request failed.";
+            stopCurrentLocationTracking(message, "error");
+        },
+        {
+            enableHighAccuracy: true,
+            maximumAge: 5000,
+            timeout: 10000,
+        },
+    );
+}
+
+function stopCurrentLocationTracking(message = "Current location is off.", status = "info") {
+    if (typeof state.locationWatchId === "number" && navigator.geolocation) {
+        navigator.geolocation.clearWatch(state.locationWatchId);
+    }
+    state.locationWatchId = null;
+    state.showCurrentLocation = false;
+
+    if (state.currentLocationMarker && state.map?.hasLayer(state.currentLocationMarker)) {
+        state.map.removeLayer(state.currentLocationMarker);
+    }
+    if (state.currentLocationAccuracyCircle && state.map?.hasLayer(state.currentLocationAccuracyCircle)) {
+        state.map.removeLayer(state.currentLocationAccuracyCircle);
+    }
+    state.currentLocationMarker = null;
+    state.currentLocationAccuracyCircle = null;
+    updateLocationToggleButton();
+    updateLocationStatus(message, status);
+}
+
+function updateCurrentLocation(position) {
+    if (!state.map) {
+        return;
+    }
+
+    const lat = Number(position.coords.latitude);
+    const lon = Number(position.coords.longitude);
+    const accuracyMeters = Number(position.coords.accuracy) || 0;
+
+    if (!state.currentLocationMarker) {
+        state.currentLocationMarker = window.L.marker([lat, lon], {
+            icon: buildCurrentLocationIcon(),
+        }).addTo(state.map);
+        state.currentLocationMarker.bindPopup("<strong>Current Location</strong>");
+    } else {
+        state.currentLocationMarker.setLatLng([lat, lon]);
+    }
+
+    if (!state.currentLocationAccuracyCircle) {
+        state.currentLocationAccuracyCircle = window.L.circle([lat, lon], {
+            radius: accuracyMeters,
+            color: "#22c55e",
+            fillColor: "#22c55e",
+            fillOpacity: 0.12,
+            weight: 1,
+        }).addTo(state.map);
+    } else {
+        state.currentLocationAccuracyCircle.setLatLng([lat, lon]);
+        state.currentLocationAccuracyCircle.setRadius(accuracyMeters);
+    }
+
+    updateLocationStatus(
+        `Current location active at ${lat.toFixed(4)}, ${lon.toFixed(4)} (±${Math.round(accuracyMeters)} m).`,
+        "active",
+    );
+}
+
+function buildCurrentLocationIcon() {
+    return window.L.divIcon({
+        className: "current-location-icon",
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -12],
+        html: `
+            <div class="current-location-plane" aria-hidden="true">
+                <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" role="presentation">
+                    <path d="M24 4 L29 18 L42 21 L42 27 L29 30 L24 44 L20 44 L21 29 L9 33 L7 30 L15 24 L7 18 L9 15 L21 19 L20 4 Z" fill="#1e3a8a" stroke="#f8fafc" stroke-width="2.2" stroke-linejoin="round"/>
+                </svg>
+            </div>
+        `,
+    });
+}
+
+function updateLocationToggleButton() {
+    const button = document.getElementById("toggle-location-btn");
+    if (!button) {
+        return;
+    }
+
+    button.textContent = state.showCurrentLocation
+        ? "Hide Current Location"
+        : "Show Current Location";
+}
+
+function updateLocationStatus(message, status = "info") {
+    const statusNode = document.getElementById("map-location-status");
+    if (!statusNode) {
+        return;
+    }
+
+    statusNode.textContent = message;
+    statusNode.className = "map-location-status";
+    if (status === "active") {
+        statusNode.classList.add("active");
+    }
+    if (status === "error") {
+        statusNode.classList.add("error");
+    }
 }
 
 function buildChartReferences(routePoints) {

@@ -87,6 +87,11 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('#flightGraph')).toBeVisible();
     });
 
+    test('should show the educational-use disclaimer on the home page', async ({ page }) => {
+        await expect(page.locator('.home-disclaimer')).toContainText('Educational Use Only');
+        await expect(page.locator('.home-disclaimer')).toContainText('Do not rely on it as your sole source');
+    });
+
     test('should populate departure weather when ICAO is entered', async ({ page }) => {
         const depInput = page.locator('#departure-icao');
         await depInput.fill('KORD');
@@ -96,6 +101,60 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('#dep-altim')).toHaveValue('29.70');
         await expect(page.locator('#dep-lat')).toHaveValue('41.9602');
         await expect(page.locator('#dep-var')).toHaveValue('-3.96');
+    });
+
+    test('should use FAA forecast data for future date and time selections', async ({ page }) => {
+        await page.unroute('**/api/weather/*');
+        await page.route('**/api/weather/*', async (route) => {
+            const url = new URL(route.request().url());
+            expect(url.searchParams.get('datetime')).toBeTruthy();
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    temperature: 19,
+                    altimeter: 29.73,
+                    windSpeed: 14,
+                    windDirection: 230,
+                    elevation: 663,
+                    lat: 41.9602,
+                    lon: -87.9316,
+                    variation: -3.96,
+                    forecast: {
+                        isForecast: true,
+                        source: 'TAF',
+                        message: 'Forecast loaded for KORD. Wind and temperature come from the FAA TAF; altimeter uses the latest available observation.',
+                    },
+                }),
+            });
+        });
+
+        await page.fill('#date', '2026-05-01T14:30');
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+
+        await expect(page.locator('#dep-temp')).toHaveValue('19');
+        await expect(page.locator('#dep-altim')).toHaveValue('29.73');
+        await expect(page.locator('#dep-weather-status')).toContainText('Forecast loaded for KORD.');
+    });
+
+    test('should show a clear message when no FAA forecast is available for the selected future time', async ({ page }) => {
+        await page.unroute('**/api/weather/*');
+        await page.route('**/api/weather/*', async (route) => {
+            await route.fulfill({
+                status: 404,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    error: 'No FAA forecast data is available for KORD at the selected date and time. TAF coverage is usually limited to about 24 to 30 hours.',
+                }),
+            });
+        });
+
+        await page.fill('#date', '2026-06-15T14:30');
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+
+        await expect(page.locator('#dep-weather-status')).toContainText('No FAA forecast data is available for KORD at the selected date and time');
     });
 
     test('should keep default cruise altitude at 3000', async ({ page }) => {
@@ -290,6 +349,48 @@ test.describe('OpenFlight AI - UI Tests', () => {
 
         await page.click('#toggle-reference-checkpoints-btn');
         await expect(page.locator('#toggle-reference-checkpoints-btn')).toHaveText('Hide Nearby Reference Checkpoints');
+    });
+
+    test('should toggle current location on the route map', async ({ page }) => {
+        await page.addInitScript(() => {
+            let nextWatchId = 1;
+            Object.defineProperty(navigator, 'geolocation', {
+                configurable: true,
+                value: {
+                    watchPosition(success) {
+                        const watchId = nextWatchId++;
+                        window.setTimeout(() => {
+                            success({
+                                coords: {
+                                    latitude: 41.8001,
+                                    longitude: -88.2102,
+                                    accuracy: 42,
+                                },
+                            });
+                        }, 50);
+                        return watchId;
+                    },
+                    clearWatch() {},
+                },
+            });
+        });
+
+        await page.reload();
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#menu-toggle');
+        await page.click('#open-map-btn');
+
+        await expect(page.locator('#map-location-status')).toHaveText('Current location is off.');
+        await page.click('#toggle-location-btn');
+        await expect(page.locator('#toggle-location-btn')).toHaveText('Hide Current Location');
+        await expect(page.locator('#map-location-status')).toContainText('Current location active at 41.8001, -88.2102');
+
+        await page.click('#toggle-location-btn');
+        await expect(page.locator('#toggle-location-btn')).toHaveText('Show Current Location');
+        await expect(page.locator('#map-location-status')).toHaveText('Current location is off.');
     });
 
     test('should fall back cleanly when the FAA sectional overlay cannot be loaded', async ({ page }) => {

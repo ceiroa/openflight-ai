@@ -16,11 +16,11 @@
 .container.map-maximized {
     max-width: none;
     width: calc(100vw - 40px);
-    min-height: calc(100vh - 40px);
+    min-height: calc(100vh - 24px);
 }
 
 .container.map-maximized .map-layout {
-    min-height: calc(100vh - 120px);
+    min-height: calc(100vh - 84px);
     align-items: stretch;
 }
 
@@ -36,7 +36,7 @@
 
 .container.map-maximized #route-map {
     flex: 1 1 auto;
-    min-height: calc(100vh - 280px);
+    min-height: calc(100vh - 210px);
 }
 
 .status-banner {
@@ -124,9 +124,60 @@
     background: #0b1120;
 }
 
+.route-map-shell {
+    position: relative;
+}
+
+.map-overlay-button {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 700;
+    background: rgba(248, 250, 252, 0.92);
+    color: #0f172a !important;
+    border-color: rgba(15, 23, 42, 0.2);
+    backdrop-filter: blur(6px);
+}
+
 .route-summary {
     margin-bottom: 16px;
     font-size: 13px;
+}
+
+.map-location-status {
+    margin-top: -6px;
+    margin-bottom: 16px;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.map-location-status.active {
+    color: #bbf7d0;
+}
+
+.map-location-status.error {
+    color: #fecaca;
+}
+
+.current-location-icon {
+    background: transparent;
+    border: none;
+}
+
+.current-location-plane {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: drop-shadow(0 0 6px rgba(34, 197, 94, 0.35));
+}
+
+.current-location-plane svg {
+    width: 24px;
+    height: 24px;
+    display: block;
+    transform: rotate(-20deg);
 }
 
 .checkpoint-filters {
@@ -361,7 +412,7 @@
 
     .container.map-maximized {
         width: calc(100vw - 20px);
-        min-height: calc(100vh - 20px);
+        min-height: calc(100vh - 12px);
     }
 
     .container.map-maximized .map-layout {
@@ -369,7 +420,7 @@
     }
 
     .container.map-maximized #route-map {
-        min-height: 65vh;
+        min-height: 72vh;
     }
 
     .checkpoint-filter-grid {

@@ -184,11 +184,13 @@ app.post('/api/checkpoints/generate', async (req, res) => {
 app.get('/api/weather/:icao', async (req, res) => {
     const { icao } = req.params;
     try {
-        const weather = await getWeatherData(icao.toUpperCase());
+        const weather = await getWeatherData(icao.toUpperCase(), {
+            datetime: req.query.datetime,
+        });
         res.json(weather);
     } catch (error) {
         console.error(`Error in /api/weather/${icao}:`, error);
-        if (error.message.includes('No METAR found')) {
+        if (error.message.includes('No METAR found') || error.message.includes('No FAA forecast data is available')) {
             res.status(404).json({ error: error.message });
         } else {
             res.status(500).json({ error: error.message || 'Failed to fetch weather data' });
@@ -202,11 +204,13 @@ app.get('/api/weather', async (req, res) => {
     if (!icao) return res.status(400).json({ error: 'ICAO code is required' });
     
     try {
-        const weather = await getWeatherData(icao.toUpperCase());
+        const weather = await getWeatherData(icao.toUpperCase(), {
+            datetime: req.query.datetime,
+        });
         res.json(weather);
     } catch (error) {
         console.error(`Error in /api/weather?icao=${icao}:`, error);
-        res.status(error.message.includes('No METAR') ? 404 : 500).json({ error: error.message || 'Failed to fetch weather data' });
+        res.status(error.message.includes('No METAR') || error.message.includes('No FAA forecast data is available') ? 404 : 500).json({ error: error.message || 'Failed to fetch weather data' });
     }
 });
 

@@ -2,6 +2,7 @@ import { magvar } from 'magvar';
 import { findAirportInReferenceData } from './airportReferenceService.js';
 
 const METAR_BASE_URL = 'https://aviationweather.gov/api/data/metar';
+const TAF_BASE_URL = 'https://aviationweather.gov/api/data/taf';
 const STATION_INFO_BASE_URL = 'https://aviationweather.gov/api/data/stationinfo';
 const AIRPORT_INFO_BASE_URL = 'https://aviationweather.gov/api/data/airport';
 const STATIONS_CACHE_URL = 'https://aviationweather.gov/data/cache/stations.cache.json.gz';
@@ -10,7 +11,16 @@ const MAX_FETCH_ATTEMPTS = 3;
 
 let stationCachePromise;
 
-export async function getWeatherData(icao) {
+export async function getWeatherData(icao, options = {}) {
+    const requestedTime = parseRequestedTime(options.datetime);
+    if (requestedTime && requestedTime.getTime() > Date.now() + 60000) {
+        return getForecastWeatherData(icao, requestedTime);
+    }
+
+    return getObservedWeatherData(icao);
+}
+
+async function getObservedWeatherData(icao) {
     const metarUrl = `${METAR_BASE_URL}?ids=${icao}&format=json`;
 
     const metar = await fetchFirstRecord(metarUrl, `METAR API`, { allowNoContent: true });
@@ -40,6 +50,69 @@ export async function getWeatherData(icao) {
         lon: location.lon,
         variation,
         forecast: null,
+    };
+}
+
+async function getForecastWeatherData(icao, requestedTime) {
+    const [taf, latestMetar] = await Promise.all([
+        fetchFirstRecord(`${TAF_BASE_URL}?ids=${icao}&format=json`, 'TAF API', { allowNoContent: true }),
+        fetchFirstRecord(`${METAR_BASE_URL}?ids=${icao}&format=json`, 'METAR API', { allowNoContent: true }),
+    ]);
+
+    if (!taf) {
+        throw new Error(`No FAA forecast data is available for ${icao} at the selected date and time.`);
+    }
+
+    const forecastSegment = selectTafForecastSegment(taf, requestedTime);
+    if (!forecastSegment) {
+        throw new Error(`No FAA forecast data is available for ${icao} at the selected date and time. TAF coverage is usually limited to about 24 to 30 hours.`);
+    }
+
+    const location = latestMetar
+        ? await resolveLocationData(icao, latestMetar)
+        : await resolveAirportLocationWithoutMetar(icao);
+    const altimeter = normalizeAltimeter(latestMetar?.altim);
+    if (!Number.isFinite(altimeter)) {
+        throw new Error(`Forecast data is available for ${icao}, but no current altimeter setting is available to support the nav log calculations.`);
+    }
+
+    const temperature = extractFirstFiniteNumber(
+        forecastSegment,
+        ['temp', 'tempC', 'temperature', 'temperatureC', 'airTemp'],
+    );
+    const windSpeed = extractFirstFiniteNumber(
+        forecastSegment,
+        ['wspd', 'windSpeed', 'wind_speed_kt', 'speed', 'spd'],
+    );
+    const windDirection = extractFirstFiniteNumber(
+        forecastSegment,
+        ['wdir', 'windDirection', 'wind_dir_degrees', 'direction', 'dir'],
+        0,
+    );
+
+    if (![temperature, windSpeed].every(Number.isFinite)) {
+        throw new Error(`Incomplete forecast data returned for ${icao} at the selected date and time.`);
+    }
+
+    const variation = calculateMagneticVariation(location.lat, location.lon, location.elevation);
+
+    return {
+        temperature,
+        altimeter: Number(altimeter.toFixed(2)),
+        windSpeed,
+        windDirection,
+        elevation: location.elevation,
+        lat: location.lat,
+        lon: location.lon,
+        variation,
+        forecast: {
+            isForecast: true,
+            source: 'TAF',
+            requestedTime: requestedTime.toISOString(),
+            validFrom: extractDateValue(forecastSegment, ['fcstTimeFrom', 'startTime', 'validTimeFrom', 'timeFrom'])?.toISOString() || null,
+            validTo: extractDateValue(forecastSegment, ['fcstTimeTo', 'endTime', 'validTimeTo', 'timeTo'])?.toISOString() || null,
+            message: `Forecast loaded for ${icao}. Wind and temperature come from the FAA TAF; altimeter uses the latest available observation.`,
+        },
     };
 }
 
@@ -87,6 +160,74 @@ async function getNearestStationWeather(icao) {
 function calculateMagneticVariation(lat, lon, elevationFeet = 0) {
     const altitudeKm = Number.isFinite(elevationFeet) ? elevationFeet / 3280.84 : 0;
     return Math.round(magvar(lat, lon, altitudeKm) * 100) / 100;
+}
+
+function parseRequestedTime(value) {
+    if (!value) {
+        return null;
+    }
+
+    const parsed = new Date(value);
+    return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+function normalizeAltimeter(value) {
+    if (!Number.isFinite(Number(value))) {
+        return null;
+    }
+
+    let altimeter = Number(value);
+    if (altimeter > 50) {
+        altimeter = altimeter / 33.8639;
+    }
+
+    return altimeter;
+}
+
+function selectTafForecastSegment(taf, requestedTime) {
+    const forecastSegments = []
+        .concat(taf)
+        .concat(Array.isArray(taf?.fcsts) ? taf.fcsts : [])
+        .filter(Boolean);
+
+    const match = forecastSegments.find((segment) => {
+        const start = extractDateValue(segment, ['fcstTimeFrom', 'startTime', 'validTimeFrom', 'timeFrom']);
+        const end = extractDateValue(segment, ['fcstTimeTo', 'endTime', 'validTimeTo', 'timeTo']);
+        if (!start || !end) {
+            return false;
+        }
+
+        return requestedTime >= start && requestedTime <= end;
+    });
+
+    return match ?? null;
+}
+
+function extractDateValue(record, keys) {
+    for (const key of keys) {
+        const value = record?.[key];
+        if (!value) {
+            continue;
+        }
+
+        const parsed = new Date(value);
+        if (Number.isFinite(parsed.getTime())) {
+            return parsed;
+        }
+    }
+
+    return null;
+}
+
+function extractFirstFiniteNumber(record, keys, fallback = null) {
+    for (const key of keys) {
+        const value = Number(record?.[key]);
+        if (Number.isFinite(value)) {
+            return value;
+        }
+    }
+
+    return fallback;
 }
 
 async function resolveLocationData(icao, metar) {

@@ -264,4 +264,96 @@ describe('getWeatherData', () => {
         expect(result.temperature).toBe(21);
         expect(global.fetch).toHaveBeenCalledTimes(3);
     });
+
+    test('uses FAA TAF forecast data for future dates and latest METAR altimeter', async () => {
+        global.fetch = jest.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    value: [{
+                        fcsts: [
+                            {
+                                fcstTimeFrom: '2026-04-30T18:00:00.000Z',
+                                fcstTimeTo: '2026-04-30T21:00:00.000Z',
+                                temp: 19,
+                                wspd: 14,
+                                wdir: 230,
+                            },
+                        ],
+                    }],
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    value: [{
+                        temp: 21,
+                        altim: 1006.9,
+                        wspd: 16,
+                        wdir: 250,
+                        lat: 41.6031,
+                        lon: -88.1017,
+                        elev: 205,
+                    }],
+                }),
+            });
+
+        const result = await getWeatherData('KLOT', {
+            datetime: '2026-04-30T19:30:00.000Z',
+        });
+
+        expect(result).toMatchObject({
+            temperature: 19,
+            altimeter: 29.73,
+            windSpeed: 14,
+            windDirection: 230,
+            lat: 41.6031,
+            lon: -88.1017,
+            elevation: 673,
+            forecast: expect.objectContaining({
+                isForecast: true,
+                source: 'TAF',
+            }),
+        });
+        expect(global.fetch.mock.calls[0][0]).toContain('/taf?ids=KLOT');
+        expect(global.fetch.mock.calls[1][0]).toContain('/metar?ids=KLOT');
+    });
+
+    test('returns a clear error when no FAA forecast covers the selected future time', async () => {
+        global.fetch = jest.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    value: [{
+                        fcsts: [
+                            {
+                                fcstTimeFrom: '2026-04-30T00:00:00.000Z',
+                                fcstTimeTo: '2026-04-30T06:00:00.000Z',
+                                temp: 16,
+                                wspd: 11,
+                                wdir: 210,
+                            },
+                        ],
+                    }],
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    value: [{
+                        temp: 21,
+                        altim: 1006.9,
+                        wspd: 16,
+                        wdir: 250,
+                        lat: 41.6031,
+                        lon: -88.1017,
+                        elev: 205,
+                    }],
+                }),
+            });
+
+        await expect(getWeatherData('KLOT', {
+            datetime: '2026-05-02T19:30:00.000Z',
+        })).rejects.toThrow('No FAA forecast data is available for KLOT at the selected date and time');
+    });
 });

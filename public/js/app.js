@@ -52,13 +52,14 @@ const loadingProgress = document.getElementById("loading-progress");
 const loadingProgressLabel = document.getElementById("loading-progress-label");
 const loadingProgressBar = document.getElementById("loading-progress-bar");
 const loadingProgressNote = document.getElementById("loading-progress-note");
+const dateInput = document.getElementById("date");
 const MIN_PROGRESS_VISIBLE_MS = 700;
 let progressTimer = null;
 let progressValue = 0;
 let progressStartedAt = 0;
 
 document.addEventListener("DOMContentLoaded", async () => {
-    document.getElementById("date").value = new Date().toISOString().split("T")[0];
+    dateInput.value = normalizeDateTimeLocalInput(dateInput.value) || getCurrentDateTimeInputValue();
     drawGraph();
     registerEventHandlers();
     await loadAircraftOptions();
@@ -105,6 +106,12 @@ function registerEventHandlers() {
     document.getElementById("aircraft").addEventListener("change", async (event) => {
         invalidateNavLogState();
         await loadAircraft(event.target.value.trim());
+    });
+
+    dateInput.addEventListener("change", async () => {
+        state.weatherCache.clear();
+        invalidateNavLogState();
+        await reloadWeatherForCurrentRoute();
     });
 
     document.getElementById("cruise-alt").addEventListener("input", (event) => {
@@ -510,14 +517,15 @@ async function handleWeather(input, type) {
 
     input.value = icao;
 
-    const cachedWeather = state.weatherCache.get(icao);
+    const weatherCacheKey = buildWeatherCacheKey(icao);
+    const cachedWeather = state.weatherCache.get(weatherCacheKey);
     if (cachedWeather) {
         applyWeatherData(input, type, cachedWeather);
-        setWeatherStatus(input, type, `Weather loaded for ${icao}.`, "success");
+        setWeatherStatus(input, type, buildWeatherLoadedMessage(icao, cachedWeather), "success");
         return;
     }
 
-    setWeatherStatus(input, type, `Loading weather for ${icao}...`, "loading");
+    setWeatherStatus(input, type, buildWeatherLoadingMessage(icao), "loading");
 
     log(`Fetching weather for ${icao}...`);
 
@@ -530,10 +538,10 @@ async function handleWeather(input, type) {
 
         const data = await response.json();
         validateWeatherData(data, icao);
-        state.weatherCache.set(icao, data);
+        state.weatherCache.set(weatherCacheKey, data);
         applyWeatherData(input, type, data);
         clearStatus();
-        setWeatherStatus(input, type, `Weather loaded for ${icao}.`, "success");
+        setWeatherStatus(input, type, buildWeatherLoadedMessage(icao, data), "success");
         log(`Success: Data loaded for ${icao}.`);
     } catch (error) {
         clearWeatherData(input, type);
@@ -623,7 +631,34 @@ function setWeatherStatus(input, type, message = "", status = "") {
 }
 
 function buildWeatherUrl(icao) {
-    return `/api/weather/${icao}`;
+    const datetime = dateInput.value;
+    if (!datetime) {
+        return `/api/weather/${icao}`;
+    }
+
+    return `/api/weather/${icao}?datetime=${encodeURIComponent(toIsoFromDateTimeLocal(datetime))}`;
+}
+
+function buildWeatherCacheKey(icao) {
+    return `${icao}|${dateInput.value || "current"}`;
+}
+
+function buildWeatherLoadingMessage(icao) {
+    return isFutureFlightDateTime(dateInput.value)
+        ? `Loading forecast for ${icao}...`
+        : `Loading weather for ${icao}...`;
+}
+
+function buildWeatherLoadedMessage(icao, data) {
+    if (data?.forecast?.isForecast) {
+        return data.forecast.message || `Forecast loaded for ${icao}.`;
+    }
+
+    if (data?.weatherSourceIcao) {
+        return `Weather loaded for ${icao} from nearby station ${data.weatherSourceIcao}.`;
+    }
+
+    return `Weather loaded for ${icao}.`;
 }
 
 async function getAirportComms(icao) {
@@ -678,7 +713,7 @@ function applyFlightDraftToForm(draft, options = {}) {
     const shouldInvalidateNavLog = options.invalidateNavLog !== false;
 
     document.getElementById("aircraft").value = draft.aircraftName || DEFAULT_AIRCRAFT_NAME;
-    document.getElementById("date").value = draft.date || document.getElementById("date").value;
+    dateInput.value = normalizeDateTimeLocalInput(draft.date) || dateInput.value;
     document.getElementById("cruise-alt").value = draft.legs?.[0]?.plannedAlt || "3000";
     document.getElementById("departure-icao").value = draft.departure?.icao || "";
     document.getElementById("dep-airport-alt").value = draft.departure?.airportAlt ?? 0;
@@ -927,7 +962,7 @@ function normalizeFlightPlanFile(payload) {
 
     const normalizedDraft = {
         aircraftName: draft.aircraftName || DEFAULT_AIRCRAFT_NAME,
-        date: draft.date || new Date().toISOString().split("T")[0],
+        date: normalizeDateTimeLocalInput(draft.date) || getCurrentDateTimeInputValue(),
         departure: {
             icao: normalizeAirportCode(draft.departure.icao || ""),
             airportAlt: Number(draft.departure.airportAlt) || 0,
@@ -1147,7 +1182,7 @@ async function generateLog() {
     setCheckpointStatus("");
 
     document.getElementById("out-aircraft").innerText = `Aircraft: ${inputs.aircraftName}`;
-    document.getElementById("out-date").innerText = `Date: ${inputs.date}`;
+    document.getElementById("out-date").innerText = `Date: ${formatFlightDateTime(inputs.date)}`;
 
     const table1Body = document.getElementById("table1-body");
     const table2Body = document.getElementById("table2-body");
@@ -1365,6 +1400,74 @@ function isFiniteValue(value, fallback = "") {
 function shouldRestoreDraftFromUrl() {
     const params = new URLSearchParams(window.location.search);
     return params.get("restoreDraft") === "1";
+}
+
+async function reloadWeatherForCurrentRoute() {
+    const departureInput = document.getElementById("departure-icao");
+    if (normalizeAirportCode(departureInput.value).length === 4) {
+        await handleWeather(departureInput, "dep");
+    }
+
+    for (const input of document.querySelectorAll(".destination-icao")) {
+        if (normalizeAirportCode(input.value).length === 4) {
+            await handleWeather(input, "dest");
+        }
+    }
+
+    saveCurrentFlightDraft();
+}
+
+function getCurrentDateTimeInputValue() {
+    const now = new Date();
+    const local = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
+    return local.toISOString().slice(0, 16);
+}
+
+function normalizeDateTimeLocalInput(value) {
+    if (!value) {
+        return "";
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+        return value;
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return `${value}T12:00`;
+    }
+
+    const parsed = new Date(value);
+    if (!Number.isFinite(parsed.getTime())) {
+        return "";
+    }
+
+    const local = new Date(parsed.getTime() - (parsed.getTimezoneOffset() * 60000));
+    return local.toISOString().slice(0, 16);
+}
+
+function toIsoFromDateTimeLocal(value) {
+    const parsed = new Date(value);
+    return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : value;
+}
+
+function isFutureFlightDateTime(value) {
+    const parsed = new Date(value);
+    return Number.isFinite(parsed.getTime()) && parsed.getTime() > Date.now() + 60000;
+}
+
+function formatFlightDateTime(value) {
+    const parsed = new Date(value);
+    if (!Number.isFinite(parsed.getTime())) {
+        return value;
+    }
+
+    return parsed.toLocaleString([], {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
 }
 
 function clearRestoreDraftFlagFromUrl() {

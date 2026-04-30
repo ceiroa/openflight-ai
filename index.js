@@ -29,6 +29,9 @@ const PORT = process.env.PORT || 3000;
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/docs', express.static(path.join(__dirname, 'docs')));
+app.use('/vendor/jszip', express.static(path.join(__dirname, 'node_modules', 'jszip', 'dist')));
+app.use('/vendor/georaster', express.static(path.join(__dirname, 'node_modules', 'georaster', 'dist')));
+app.use('/vendor/georaster-layer-for-leaflet', express.static(path.join(__dirname, 'node_modules', 'georaster-layer-for-leaflet', 'dist')));
 app.use(express.json());
 
 app.get('/docs', (req, res) => {

@@ -23,6 +23,9 @@
   "homepage": "https://github.com/ceiroa/openflight-ai#readme",
   "dependencies": {
     "express": "^5.2.1",
+    "georaster": "^1.6.0",
+    "georaster-layer-for-leaflet": "^4.1.2",
+    "jszip": "^3.10.1",
     "luxon": "^3.7.2",
     "magvar": "^2.0.1"
   },

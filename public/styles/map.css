@@ -14,14 +14,39 @@
 }
 
 .container.map-maximized {
+    position: fixed;
+    inset: 12px;
+    z-index: 1200;
     max-width: none;
-    width: calc(100vw - 40px);
-    min-height: calc(100vh - 24px);
+    width: calc(100vw - 24px);
+    min-height: 0;
+    height: calc(100vh - 24px);
+    margin: 0;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(2, 6, 23, 0.55);
+    box-sizing: border-box;
+}
+
+body.map-focus-mode {
+    overflow: hidden;
+}
+
+body.map-focus-mode .container > h1,
+body.map-focus-mode .container > p,
+body.map-focus-mode .container > .status-banner {
+    display: none;
 }
 
 .container.map-maximized .map-layout {
-    min-height: calc(100vh - 84px);
+    display: block;
+    height: 100%;
+    min-height: 100%;
     align-items: stretch;
+}
+
+.container.map-maximized #map-root {
+    height: 100%;
+    min-height: 100%;
 }
 
 .container.map-maximized .map-panel,
@@ -32,11 +57,42 @@
 .container.map-maximized .map-panel {
     display: flex;
     flex-direction: column;
+    min-height: 100%;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+}
+
+.container.map-maximized .route-map-shell {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.container.map-maximized .route-panel {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: 320px;
+    overflow-y: auto;
+    z-index: 1201;
+    background: rgba(2, 6, 23, 0.96);
+    box-shadow: 0 20px 50px rgba(2, 6, 23, 0.45);
+}
+
+.container.map-maximized .route-panel.collapsed {
+    display: none;
 }
 
 .container.map-maximized #route-map {
     flex: 1 1 auto;
-    min-height: calc(100vh - 210px);
+    min-height: 0;
+    height: 100%;
+    border-radius: 0;
+    border: none;
 }
 
 .status-banner {
@@ -74,6 +130,13 @@
     border-radius: 10px;
     background: rgba(15, 23, 42, 0.55);
     padding: 18px;
+}
+
+.container.map-maximized .map-panel h2,
+.container.map-maximized .map-panel .map-toolbar,
+.container.map-maximized .map-panel #map-status,
+.container.map-maximized .map-panel #map-location-status {
+    display: none;
 }
 
 .map-panel h2,
@@ -128,15 +191,25 @@
     position: relative;
 }
 
+.container.map-maximized .route-map-shell {
+    height: 100%;
+    min-height: 100%;
+}
+
 .map-overlay-button {
     position: absolute;
     top: 12px;
     right: 12px;
-    z-index: 700;
+    z-index: 1302;
     background: rgba(248, 250, 252, 0.92);
     color: #0f172a !important;
     border-color: rgba(15, 23, 42, 0.2);
     backdrop-filter: blur(6px);
+}
+
+.map-panel-toggle-button {
+    right: 154px;
+    display: none;
 }
 
 .route-summary {
@@ -411,16 +484,19 @@
     }
 
     .container.map-maximized {
-        width: calc(100vw - 20px);
-        min-height: calc(100vh - 12px);
+        inset: 6px;
+        width: calc(100vw - 12px);
+        height: calc(100vh - 12px);
     }
 
     .container.map-maximized .map-layout {
-        min-height: auto;
+        height: 100%;
+        min-height: 100%;
     }
 
     .container.map-maximized #route-map {
-        min-height: 72vh;
+        min-height: 0;
+        height: 72vh;
     }
 
     .checkpoint-filter-grid {

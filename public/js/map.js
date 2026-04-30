@@ -87,6 +87,7 @@ const state = {
         type: "all",
         source: "all",
     },
+    routePanelCollapsed: false,
     currentLocationMarker: null,
     currentLocationAccuracyCircle: null,
     locationWatchId: null,
@@ -156,10 +157,11 @@ function renderMapPage(draft) {
                 <p id="map-location-status" class="map-location-status">Current location is off.</p>
                 <div class="route-map-shell">
                     <button type="button" class="map-secondary-button map-overlay-button" id="maximize-map-btn">Maximize Map</button>
+                    <button type="button" class="map-secondary-button map-overlay-button map-panel-toggle-button" id="toggle-route-panel-btn">Hide Panel</button>
                     <div id="route-map" role="img" aria-label="Map of the current route"></div>
                 </div>
             </section>
-            <aside class="route-panel">
+            <aside class="route-panel" id="route-panel">
                 <h2>Route Summary</h2>
                 <p class="route-summary"><strong>Departure:</strong> ${escapeHtml(draft.departure.icao)}</p>
                 <ol class="route-list">
@@ -372,7 +374,9 @@ function attachMapPageHandlers(checkpointMarkers) {
         void toggleReferenceCheckpoints();
     });
     document.getElementById("maximize-map-btn")?.addEventListener("click", toggleMapMaximized);
+    document.getElementById("toggle-route-panel-btn")?.addEventListener("click", toggleRoutePanel);
     applyCheckpointFilters();
+    updateRoutePanelState();
 }
 
 function applyMapMode(mode) {
@@ -675,11 +679,18 @@ function updateReferenceCheckpointButton() {
 
 function toggleMapMaximized() {
     state.mapMaximized = !state.mapMaximized;
+    if (state.mapMaximized) {
+        state.routePanelCollapsed = true;
+    } else {
+        state.routePanelCollapsed = false;
+    }
     container.classList.toggle("map-maximized", state.mapMaximized);
+    document.body.classList.toggle("map-focus-mode", state.mapMaximized);
     const button = document.getElementById("maximize-map-btn");
     if (button) {
         button.textContent = state.mapMaximized ? "Exit Fullscreen" : "Maximize Map";
     }
+    updateRoutePanelState();
 
     window.setTimeout(() => {
         state.map?.invalidateSize();
@@ -687,6 +698,31 @@ function toggleMapMaximized() {
             state.map?.fitBounds(state.routeBounds, { padding: [30, 30] });
         }
     }, 100);
+}
+
+function toggleRoutePanel() {
+    state.routePanelCollapsed = !state.routePanelCollapsed;
+    updateRoutePanelState();
+    window.setTimeout(() => {
+        state.map?.invalidateSize();
+        if (state.routeBounds) {
+            state.map?.fitBounds(state.routeBounds, { padding: [30, 30] });
+        }
+    }, 100);
+}
+
+function updateRoutePanelState() {
+    const routePanel = document.getElementById("route-panel");
+    const toggleButton = document.getElementById("toggle-route-panel-btn");
+    if (!routePanel || !toggleButton) {
+        return;
+    }
+
+    const shouldCollapse = state.mapMaximized && state.routePanelCollapsed;
+    routePanel.classList.toggle("collapsed", shouldCollapse);
+    toggleButton.textContent = shouldCollapse ? "Show Panel" : "Hide Panel";
+    toggleButton.classList.toggle("active", !shouldCollapse);
+    toggleButton.style.display = state.mapMaximized ? "inline-flex" : "none";
 }
 
 async function toggleCurrentLocation() {

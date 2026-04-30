@@ -346,7 +346,19 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.click('#maximize-map-btn');
         await expect(page.locator('.container')).toHaveClass(/map-maximized/);
         await expect(page.locator('#maximize-map-btn')).toHaveText('Exit Fullscreen');
+        await expect(page.locator('body')).toHaveClass(/map-focus-mode/);
+        await expect(page.locator('#route-panel')).toHaveClass(/collapsed/);
+        await expect(page.locator('.container > h1')).toBeHidden();
+        await expect(page.locator('#toggle-route-panel-btn')).toHaveText('Show Panel');
 
+        await page.click('#toggle-route-panel-btn');
+        await expect(page.locator('#route-panel')).not.toHaveClass(/collapsed/);
+        await expect(page.locator('#toggle-route-panel-btn')).toHaveText('Hide Panel');
+        await page.click('#toggle-route-panel-btn');
+        await expect(page.locator('#route-panel')).toHaveClass(/collapsed/);
+
+        await page.click('#maximize-map-btn');
+        await expect(page.locator('.container')).not.toHaveClass(/map-maximized/);
         await page.click('#toggle-reference-checkpoints-btn');
         await expect(page.locator('#toggle-reference-checkpoints-btn')).toHaveText('Hide Nearby Reference Checkpoints');
     });
@@ -904,6 +916,31 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('#table3-body tr').nth(0).locator('td').first()).toHaveText('FOX RIVER');
         await expect(page.locator('#table3-body tr').nth(1).locator('td').first()).toHaveText('CUSTOM WATER TOWER');
         await expect(page.locator('#table3-body tr').nth(1).locator('td').nth(7)).toHaveText('AWOS 118.525 | CTAF 120.1');
+    });
+
+    test('should remove a planner checkpoint and reflect that removal in table 3', async ({ page }) => {
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+
+        await page.click('#menu-toggle');
+        await page.click('#open-checkpoints-btn');
+
+        await expect(page.locator('[data-field="name"]')).toHaveCount(1);
+        await page.locator('.add-checkpoint-btn').first().click();
+        await page.locator('[data-field="name"]').nth(1).fill('REMOVE ME');
+        await page.locator('.remove-checkpoint-btn').nth(1).click();
+        await expect(page.locator('[data-field="name"]')).toHaveCount(1);
+        await page.click('#save-btn');
+
+        await page.click('#menu-toggle');
+        await page.click('text=Back To Flight Setup');
+        await expect(page).toHaveURL(/index\.html/);
+        await page.click('text=GENERATE NAV LOG');
+
+        await expect(page.locator('#table3-body tr')).toHaveCount(2);
+        await expect(page.locator('#table3-body')).not.toContainText('REMOVE ME');
     });
 
     test('should reuse checkpoints generated on the home page when opening the planner', async ({ page }) => {

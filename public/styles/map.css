@@ -135,7 +135,8 @@ body.map-focus-mode .container > .status-banner {
 .container.map-maximized .map-panel h2,
 .container.map-maximized .map-panel .map-toolbar,
 .container.map-maximized .map-panel #map-status,
-.container.map-maximized .map-panel #map-location-status {
+.container.map-maximized .map-panel #map-location-status,
+.container.map-maximized .map-panel #map-airspace-status {
     display: none;
 }
 
@@ -219,6 +220,13 @@ body.map-focus-mode .container > .status-banner {
 
 .map-location-status {
     margin-top: -6px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.map-airspace-status {
+    margin-top: 0;
     margin-bottom: 16px;
     font-size: 12px;
     color: #94a3b8;

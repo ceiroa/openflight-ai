@@ -47,6 +47,41 @@ test.describe('OpenFlight AI - UI Tests', () => {
             });
         });
 
+        await page.route('**/api/airspace*', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    type: 'FeatureCollection',
+                    features: [
+                        {
+                            type: 'Feature',
+                            geometry: {
+                                type: 'Polygon',
+                                coordinates: [[
+                                    [-88.2, 41.7],
+                                    [-87.8, 41.7],
+                                    [-87.8, 42.0],
+                                    [-88.2, 42.0],
+                                    [-88.2, 41.7],
+                                ]],
+                            },
+                            properties: {
+                                name: 'Chicago Class B',
+                                class: 'B',
+                                typeCode: 'CLASS',
+                                lowerDesc: 'SFC',
+                                upperDesc: '10000 MSL',
+                                icaoId: 'KORD',
+                                commName: 'Chicago',
+                                sector: 'MAIN',
+                            },
+                        },
+                    ],
+                }),
+            });
+        });
+
         await page.route('**/api/checkpoints/generate*', async (route) => {
             const url = new URL(route.request().url());
             const mode = url.searchParams.get('mode') || 'enhanced';
@@ -361,6 +396,59 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('.container')).not.toHaveClass(/map-maximized/);
         await page.click('#toggle-reference-checkpoints-btn');
         await expect(page.locator('#toggle-reference-checkpoints-btn')).toHaveText('Hide Nearby Reference Checkpoints');
+    });
+
+    test('should toggle FAA airspace on the route map', async ({ page }) => {
+        let airspaceCalls = 0;
+        await page.unroute('**/api/airspace*');
+        await page.route('**/api/airspace*', async (route) => {
+            airspaceCalls += 1;
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    type: 'FeatureCollection',
+                    features: [
+                        {
+                            type: 'Feature',
+                            geometry: {
+                                type: 'Polygon',
+                                coordinates: [[
+                                    [-88.2, 41.7],
+                                    [-87.8, 41.7],
+                                    [-87.8, 42.0],
+                                    [-88.2, 42.0],
+                                    [-88.2, 41.7],
+                                ]],
+                            },
+                            properties: {
+                                name: 'Chicago Class B',
+                                class: 'B',
+                                typeCode: 'CLASS',
+                                lowerDesc: 'SFC',
+                                upperDesc: '10000 MSL',
+                            },
+                        },
+                    ],
+                }),
+            });
+        });
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#menu-toggle');
+        await page.click('#open-map-btn');
+
+        await page.click('#toggle-airspace-btn');
+        await expect(page.locator('#toggle-airspace-btn')).toHaveText('Hide FAA Airspace');
+        await expect(page.locator('#map-airspace-status')).toContainText('FAA airspace overlay loaded');
+        expect(airspaceCalls).toBeGreaterThan(0);
+
+        await page.click('#toggle-airspace-btn');
+        await expect(page.locator('#toggle-airspace-btn')).toHaveText('Show FAA Airspace');
+        await expect(page.locator('#map-airspace-status')).toHaveText('FAA airspace overlay is off.');
     });
 
     test('should toggle current location on the route map', async ({ page }) => {

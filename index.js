@@ -17,6 +17,7 @@ import {
     getCuratedVisualCheckpointsInBounds,
     getAirportCommsByCode,
 } from './src/api/airportReferenceService.js';
+import { getAirspaceForBounds } from './src/api/airspaceService.js';
 import { getCurrentSectionalChartMetadata } from './src/api/faaChartsService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -103,6 +104,25 @@ app.get('/api/checkpoints/reference', async (req, res) => {
         res.json({ checkpoints });
     } catch (error) {
         res.status(500).json({ error: error.message || 'Failed to load reference checkpoints' });
+    }
+});
+
+app.get('/api/airspace', async (req, res) => {
+    try {
+        const classes = String(req.query.classes || 'B,C,D,E')
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean);
+        const airspace = await getAirspaceForBounds({
+            minLat: req.query.minLat,
+            minLon: req.query.minLon,
+            maxLat: req.query.maxLat,
+            maxLon: req.query.maxLon,
+        }, { classes });
+        res.json(airspace);
+    } catch (error) {
+        const status = error.message?.includes('bounds') ? 400 : 500;
+        res.status(status).json({ error: error.message || 'Failed to load FAA airspace data' });
     }
 });
 

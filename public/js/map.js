@@ -92,6 +92,8 @@ const state = {
     currentLocationAccuracyCircle: null,
     locationWatchId: null,
     showCurrentLocation: false,
+    airspaceLayer: null,
+    showAirspace: false,
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -148,6 +150,7 @@ function renderMapPage(draft) {
                     <button type="button" class="map-mode-button active" data-map-mode="${MAP_MODES.street}">Street</button>
                     <button type="button" class="map-mode-button" data-map-mode="${MAP_MODES.terrain}">Terrain</button>
                     <button type="button" class="map-mode-button" data-map-mode="${MAP_MODES.sectional}">FAA Sectional Ref</button>
+                    <button type="button" class="map-secondary-button" id="toggle-airspace-btn">Show FAA Airspace</button>
                     <button type="button" class="map-secondary-button" id="toggle-location-btn">Show Current Location</button>
                     <button type="button" class="map-secondary-button" id="toggle-reference-checkpoints-btn">Show Nearby Reference Checkpoints</button>
                     <span class="map-toolbar-spacer"></span>
@@ -155,6 +158,7 @@ function renderMapPage(draft) {
                 </div>
                 <p id="map-status" class="route-summary">Route plotted for ${draft.legs.length} leg${draft.legs.length === 1 ? "" : "s"}.</p>
                 <p id="map-location-status" class="map-location-status">Current location is off.</p>
+                <p id="map-airspace-status" class="map-airspace-status">FAA airspace overlay is off.</p>
                 <div class="route-map-shell">
                     <button type="button" class="map-secondary-button map-overlay-button" id="maximize-map-btn">Maximize Map</button>
                     <button type="button" class="map-secondary-button map-overlay-button map-panel-toggle-button" id="toggle-route-panel-btn">Hide Panel</button>
@@ -323,6 +327,9 @@ function initializeLeafletMap(routePoints, legSegments, checkpointMarkers) {
         if (state.showReferenceCheckpoints) {
             void refreshReferenceCheckpoints();
         }
+        if (state.showAirspace) {
+            void refreshAirspaceOverlay();
+        }
     });
 }
 
@@ -367,6 +374,9 @@ function attachMapPageHandlers(checkpointMarkers) {
     });
 
     document.getElementById("export-kml-btn")?.addEventListener("click", exportCurrentRouteKml);
+    document.getElementById("toggle-airspace-btn")?.addEventListener("click", () => {
+        void toggleAirspaceOverlay();
+    });
     document.getElementById("toggle-location-btn")?.addEventListener("click", () => {
         void toggleCurrentLocation();
     });
@@ -675,6 +685,159 @@ function updateReferenceCheckpointButton() {
     button.textContent = state.showReferenceCheckpoints
         ? "Hide Nearby Reference Checkpoints"
         : "Show Nearby Reference Checkpoints";
+}
+
+async function toggleAirspaceOverlay() {
+    state.showAirspace = !state.showAirspace;
+    updateAirspaceToggleButton();
+
+    if (!state.showAirspace) {
+        clearAirspaceOverlay();
+        updateAirspaceStatus("FAA airspace overlay is off.");
+        return;
+    }
+
+    await refreshAirspaceOverlay();
+}
+
+async function refreshAirspaceOverlay() {
+    if (!state.map) {
+        return;
+    }
+
+    const bounds = state.map.getBounds();
+    updateAirspaceStatus("Loading FAA airspace…");
+
+    const response = await fetch(buildAirspaceUrl(bounds));
+    if (!response.ok) {
+        const failure = await response.json().catch(() => ({ error: "FAA airspace request failed." }));
+        updateAirspaceStatus(failure.error || "FAA airspace request failed.");
+        return;
+    }
+
+    const payload = await response.json();
+    renderAirspaceOverlay(payload);
+    updateAirspaceStatus(`FAA airspace overlay loaded for the current view (${payload.features?.length || 0} feature${payload.features?.length === 1 ? "" : "s"}).`);
+}
+
+function renderAirspaceOverlay(geojson) {
+    clearAirspaceOverlay();
+
+    state.airspaceLayer = window.L.geoJSON(geojson, {
+        pane: ensureAirspacePane(),
+        style: (feature) => {
+            const className = feature?.properties?.class;
+            return getAirspaceStyle(className);
+        },
+        onEachFeature: (feature, layer) => {
+            layer.bindPopup(buildAirspacePopup(feature.properties || {}));
+        },
+    }).addTo(state.map);
+}
+
+function clearAirspaceOverlay() {
+    if (state.airspaceLayer && state.map?.hasLayer(state.airspaceLayer)) {
+        state.map.removeLayer(state.airspaceLayer);
+    }
+    state.airspaceLayer = null;
+}
+
+function ensureAirspacePane() {
+    if (!state.map.getPane("airspace")) {
+        const pane = state.map.createPane("airspace");
+        pane.style.zIndex = "350";
+    }
+    return "airspace";
+}
+
+function buildAirspaceUrl(bounds) {
+    const params = new URLSearchParams({
+        minLat: String(bounds.getSouth()),
+        minLon: String(bounds.getWest()),
+        maxLat: String(bounds.getNorth()),
+        maxLon: String(bounds.getEast()),
+        classes: "B,C,D,E",
+    });
+    return `/api/airspace?${params.toString()}`;
+}
+
+function buildAirspacePopup(properties) {
+    const lines = [
+        `<strong>${escapeHtml(properties.name || "Unnamed Airspace")}</strong>`,
+        `Class ${escapeHtml(properties.class || "?")}`,
+    ];
+
+    if (properties.typeCode) {
+        lines.push(`Type: ${escapeHtml(properties.typeCode)}`);
+    }
+    if (properties.lowerDesc || properties.upperDesc) {
+        lines.push(`Altitudes: ${escapeHtml(properties.lowerDesc || "Unknown lower")} to ${escapeHtml(properties.upperDesc || "Unknown upper")}`);
+    }
+    if (properties.commName) {
+        lines.push(`Facility: ${escapeHtml(properties.commName)}`);
+    }
+    if (properties.icaoId) {
+        lines.push(`ICAO: ${escapeHtml(properties.icaoId)}`);
+    }
+    if (properties.sector) {
+        lines.push(`Sector: ${escapeHtml(properties.sector)}`);
+    }
+
+    return lines.join("<br>");
+}
+
+function getAirspaceStyle(airspaceClass) {
+    if (airspaceClass === "B") {
+        return {
+            color: "#60a5fa",
+            weight: 2.2,
+            fillColor: "#60a5fa",
+            fillOpacity: 0.08,
+        };
+    }
+    if (airspaceClass === "C") {
+        return {
+            color: "#c084fc",
+            weight: 2,
+            fillColor: "#c084fc",
+            fillOpacity: 0.07,
+        };
+    }
+    if (airspaceClass === "D") {
+        return {
+            color: "#22d3ee",
+            weight: 1.8,
+            fillColor: "#22d3ee",
+            fillOpacity: 0.06,
+        };
+    }
+    return {
+        color: "#fbbf24",
+        weight: 1.6,
+        fillColor: "#fbbf24",
+        fillOpacity: 0.04,
+        dashArray: "6 4",
+    };
+}
+
+function updateAirspaceToggleButton() {
+    const button = document.getElementById("toggle-airspace-btn");
+    if (!button) {
+        return;
+    }
+
+    button.textContent = state.showAirspace
+        ? "Hide FAA Airspace"
+        : "Show FAA Airspace";
+}
+
+function updateAirspaceStatus(message) {
+    const statusNode = document.getElementById("map-airspace-status");
+    if (!statusNode) {
+        return;
+    }
+
+    statusNode.textContent = message;
 }
 
 function toggleMapMaximized() {

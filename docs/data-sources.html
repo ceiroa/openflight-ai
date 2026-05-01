@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenFlight AI | Data Sources</title>
+    <meta name="description" content="Detailed data-source guide for OpenFlight AI: where the data comes from, how it is used, and what is cached locally.">
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <nav class="top-nav">
+        <div class="top-nav-inner">
+            <a class="top-nav-brand" href="./index.html">OpenFlight AI</a>
+            <div class="top-nav-links">
+                <a href="./index.html">Overview</a>
+                <a href="./data-sources.html">Data Sources</a>
+                <a href="https://github.com/ceiroa/openflight-ai" target="_blank" rel="noreferrer">GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="page docs-page">
+        <section class="section">
+            <div class="section-heading">
+                <p class="eyebrow">Reference</p>
+                <h1>Data Sources and How They Are Used</h1>
+            </div>
+            <div class="notice">
+                <p>
+                    <strong>Scope:</strong> This page documents where OpenFlight AI gets its data, which parts are local vs external,
+                    how each source is used in the workflow, and what is cached for reuse across pages.
+                </p>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="grid two">
+                <article class="card">
+                    <h3>External Sources</h3>
+                    <ul class="bullet-list">
+                        <li><strong>AviationWeather.gov:</strong> METAR, TAF, station info, airport lookup, and fallback weather resolution.</li>
+                        <li><strong>FAA Class Airspace service:</strong> polygon geometry and numeric B/C/D/E shelf values for map and altitude-profile work.</li>
+                        <li><strong>FAA chart metadata:</strong> sectional and TAC reference lookup for chart-review workflows.</li>
+                        <li><strong>USGS elevation service:</strong> route elevation samples used to derive terrain-aware Class E/G behavior.</li>
+                        <li><strong>OpenStreetMap / OpenTopoMap:</strong> base maps for route review, terrain context, and checkpoint visualization.</li>
+                    </ul>
+                </article>
+                <article class="card">
+                    <h3>Local / Offline Components</h3>
+                    <ul class="bullet-list">
+                        <li><strong><code>magvar</code>:</strong> computes magnetic variation locally from the World Magnetic Model.</li>
+                        <li><strong>Aircraft profile JSON:</strong> contributor-managed aircraft configurations stored in the repo.</li>
+                        <li><strong>Checkpoint plans:</strong> browser-side saved plan reused between the home page, planner, and route map.</li>
+                        <li><strong>Nav-log snapshots:</strong> saved browser-side so the generated log can be reopened without recalculation.</li>
+                        <li><strong>FAA airspace cache:</strong> browser-side cache reused between home, route map, and airspace profile.</li>
+                    </ul>
+                </article>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <p class="eyebrow">Weather</p>
+                <h2>Weather and Forecast Data</h2>
+            </div>
+            <div class="grid two">
+                <article class="card">
+                    <h3>Observed Conditions</h3>
+                    <p>
+                        When the selected flight time is current or in the past, the app uses FAA observation data from
+                        AviationWeather. The server normalizes METAR values into the fields the frontend needs for airport
+                        weather, nav-log calculations, and field-level status messages.
+                    </p>
+                </article>
+                <article class="card">
+                    <h3>Future-Dated Planning</h3>
+                    <p>
+                        When the selected flight date/time is in the future, the app switches to FAA TAF forecast data where
+                        available. Wind and temperature come from the forecast segment, while the latest usable observation can
+                        still supply context like altimeter or location fallback when appropriate.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <p class="eyebrow">Navigation</p>
+                <h2>Variation, Aircraft, and Checkpoints</h2>
+            </div>
+            <div class="grid three">
+                <article class="card">
+                    <h3>Magnetic Variation</h3>
+                    <p>
+                        Magnetic variation is computed locally with <code>magvar</code>, which uses the same World Magnetic Model
+                        family NOAA relies on. No external key or runtime lookup is needed for that step.
+                    </p>
+                </article>
+                <article class="card">
+                    <h3>Aircraft Profiles</h3>
+                    <p>
+                        Aircraft data is stored as JSON profile files inside the repository. The local backend exposes those files
+                        through a small CRUD API so the browser can select, edit, and save aircraft configurations.
+                    </p>
+                </article>
+                <article class="card">
+                    <h3>Checkpoint Data</h3>
+                    <p>
+                        Checkpoints combine route geometry, curated visual-checkpoint data, airport-reference data, and map-derived
+                        candidate logic. Once approved, the saved checkpoint plan becomes the source of truth for the nav log,
+                        route map, and planner.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <p class="eyebrow">Airspace</p>
+                <h2>Map and Altitude Profile Inputs</h2>
+            </div>
+            <div class="grid two">
+                <article class="card">
+                    <h3>FAA Airspace Geometry</h3>
+                    <p>
+                        The route map and airspace profile both use FAA class-airspace geometry. For Class B, C, and most D shelves,
+                        the same feed also provides usable numeric vertical values such as <code>LOWER_VAL</code>,
+                        <code>LOWER_CODE</code>, <code>UPPER_VAL</code>, and <code>UPPER_CODE</code>.
+                    </p>
+                </article>
+                <article class="card">
+                    <h3>Terrain and Class G</h3>
+                    <p>
+                        The altitude profile samples route elevation from USGS so surface-based and AGL-based floors can be interpreted
+                        meaningfully. That allows the chart to show terrain, convert some Class E floors to MSL, and derive Class G
+                        below the first controlled floor.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <p class="eyebrow">Caching</p>
+                <h2>What Gets Reused</h2>
+            </div>
+            <div class="grid two">
+                <article class="card">
+                    <h3>Browser Cache Reuse</h3>
+                    <p>
+                        Airspace, checkpoint plans, flight drafts, and nav-log snapshots are reused across page transitions. The home
+                        page now also prefetches FAA airspace after nav-log generation so later map/profile views start with less waiting.
+                    </p>
+                </article>
+                <article class="card">
+                    <h3>Live-Only Data</h3>
+                    <p>
+                        Weather is intentionally refreshed live rather than saved into the reusable plan file. That keeps plan structure
+                        portable while avoiding stale operational weather data.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <p class="eyebrow">Limitations</p>
+                <h2>Current Boundaries</h2>
+            </div>
+            <div class="grid two">
+                <article class="card">
+                    <h3>Good Fit Today</h3>
+                    <ul class="bullet-list">
+                        <li>Airport weather retrieval and forecast fallback</li>
+                        <li>Offline variation calculation</li>
+                        <li>FAA airspace map overlays</li>
+                        <li>B/C/D-focused altitude-profile rendering</li>
+                    </ul>
+                </article>
+                <article class="card">
+                    <h3>Still Evolving</h3>
+                    <ul class="bullet-list">
+                        <li>True FAA raster chart overlay experience</li>
+                        <li>Broader landmark and checkpoint ranking quality</li>
+                        <li>More complete treatment of all Class E edge cases</li>
+                        <li>Future weather overlays directly on the route map</li>
+                    </ul>
+                </article>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

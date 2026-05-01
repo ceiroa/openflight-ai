@@ -8,6 +8,16 @@
     <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+    <nav class="top-nav">
+        <div class="top-nav-inner">
+            <a class="top-nav-brand" href="./index.html">OpenFlight AI</a>
+            <div class="top-nav-links">
+                <a href="./index.html">Overview</a>
+                <a href="./data-sources.html">Data Sources</a>
+                <a href="https://github.com/ceiroa/openflight-ai" target="_blank" rel="noreferrer">GitHub</a>
+            </div>
+        </div>
+    </nav>
     <header class="hero">
         <div class="hero-band">
             <div class="hero-visual-shell">
@@ -23,7 +33,7 @@
                 <p class="hero-text">
                     OpenFlight AI is a browser-first cross-country planning tool for educational use.
                     It combines weather retrieval, aircraft performance profiles, checkpoint planning,
-                    and route review into a single local workflow.
+                    route review, airspace overlays, and altitude profiling into a single local workflow.
                 </p>
                 <div class="hero-actions">
                     <a class="button primary" href="https://github.com/ceiroa/openflight-ai" target="_blank" rel="noreferrer">View Repository</a>
@@ -59,6 +69,7 @@
                     <ul class="stat-list">
                         <li><strong>Weather:</strong> aviationweather.gov</li>
                         <li><strong>Variation:</strong> offline WMM via <code>magvar</code></li>
+                        <li><strong>Terrain:</strong> USGS elevation sampling</li>
                         <li><strong>Profiles:</strong> file-based aircraft JSON</li>
                     </ul>
                 </article>
@@ -92,7 +103,16 @@
                     <p>
                         The map page renders the active route on a free OpenStreetMap base layer,
                         supports per-leg focus and visibility toggles, highlights saved checkpoints,
-                        and exports the route to KML for Google Earth review.
+                        shows FAA airspace overlays, supports current-location display, and exports
+                        the route to KML for Google Earth review.
+                    </p>
+                </article>
+                <article class="card">
+                    <h3>Airspace Profile</h3>
+                    <p>
+                        A dedicated airspace profile page projects the route against FAA airspace,
+                        samples terrain, derives Class G below the first controlled floor, and shows
+                        altitude structure from the surface up to the Class A floor.
                     </p>
                 </article>
                 <article class="card">
@@ -119,9 +139,9 @@
                         <div class="flow-arrow">&rarr;</div>
                         <div class="flow-node">Browser State<br><span>drafts, checkpoints, nav-log snapshot</span></div>
                         <div class="flow-arrow">&rarr;</div>
-                        <div class="flow-node">Local API<br><span>weather, aircraft, checkpoint generation</span></div>
+                        <div class="flow-node">Local API<br><span>weather, aircraft, checkpoints, airspace, elevation</span></div>
                         <div class="flow-arrow">&rarr;</div>
-                        <div class="flow-node">External Data<br><span>AviationWeather + local datasets</span></div>
+                        <div class="flow-node">External Data<br><span>AviationWeather, FAA, USGS, local datasets</span></div>
                     </div>
                 </article>
                 <div class="grid three">
@@ -136,15 +156,17 @@
                         <p>
                             <code>public/js/flightStore.js</code> is the browser-side cache and contract
                             between pages. It keeps flight drafts, checkpoint plans, and nav-log state
-                            synchronized across page transitions.
+                            synchronized across page transitions, and also shares FAA airspace cache
+                            data between the home page, route map, and altitude-profile workflow.
                         </p>
                     </article>
                     <article class="card">
                         <h3>Backend</h3>
                         <p>
                             <code>index.js</code> exposes local endpoints for weather lookup, airport comms,
-                            checkpoint generation, and aircraft profile CRUD. Server-side normalization keeps
-                            third-party API quirks away from the UI.
+                            checkpoint generation, airspace lookup, elevation sampling, chart metadata,
+                            and aircraft profile CRUD. Server-side normalization keeps third-party API quirks
+                            away from the UI.
                         </p>
                     </article>
                 </div>
@@ -160,7 +182,9 @@
                 <article class="card">
                     <h3>External Services</h3>
                     <ul class="bullet-list">
-                        <li><strong>AviationWeather:</strong> METAR, station data, airport lookup, and fallback weather resolution.</li>
+                        <li><strong>AviationWeather:</strong> METAR, TAF, station data, airport lookup, and fallback weather resolution.</li>
+                        <li><strong>FAA:</strong> class-airspace geometry and vertical shelf values, plus sectional chart metadata.</li>
+                        <li><strong>USGS:</strong> route elevation samples used for terrain and Class E/G altitude derivation.</li>
                         <li><strong>OpenStreetMap / OpenTopoMap:</strong> route and terrain map tiles on the route map page.</li>
                     </ul>
                 </article>
@@ -169,9 +193,13 @@
                     <ul class="bullet-list">
                         <li><strong><code>magvar</code>:</strong> computes magnetic variation locally from the World Magnetic Model.</li>
                         <li><strong>Aircraft profile JSON files:</strong> contributor-managed data files under the aircraft profile directory.</li>
-                        <li><strong>Checkpoint plan cache:</strong> browser storage reused between home, planner, and map.</li>
+                        <li><strong>Checkpoint and nav-log cache:</strong> browser storage reused between home, planner, and map.</li>
+                        <li><strong>Airspace cache:</strong> shared browser-side FAA airspace cache reused by the route map and altitude profile.</li>
                     </ul>
                 </article>
+            </div>
+            <div class="section-actions">
+                <a class="button secondary" href="./data-sources.html">Open Detailed Data Source Guide</a>
             </div>
         </section>
 
@@ -186,6 +214,8 @@
                     <p>
                         Weather lookups show per-airport loading states, retry transient upstream failures,
                         and surface incomplete-data errors inline next to the field that triggered them.
+                        Future-dated planning switches to FAA forecast handling when observation-only
+                        data is no longer appropriate.
                     </p>
                 </article>
                 <article class="card">
@@ -199,7 +229,8 @@
                     <h3>Cross-Page Reuse</h3>
                     <p>
                         Once checkpoints or a nav log are generated, the stored plan is reused across
-                        pages instead of being recalculated every time the user navigates.
+                        pages instead of being recalculated every time the user navigates. The same pattern
+                        now applies to FAA airspace, which is prefetched and cached for later map/profile use.
                     </p>
                 </article>
             </div>
@@ -222,7 +253,8 @@
                     <h3>End-to-End Tests</h3>
                     <p>
                         Playwright validates the real user workflows: weather entry, checkpoint planning,
-                        nav-log generation, cross-page state reuse, and route map behavior.
+                        nav-log generation, cross-page state reuse, route map behavior, airspace caching,
+                        and the altitude-profile workflow.
                     </p>
                 </article>
             </div>
@@ -277,6 +309,7 @@ npm run test:ui</code></pre>
   index.html
   checkpoints.html
   map.html
+  airspace-profile.html
   aircraft.html
   js/
   styles/
@@ -308,7 +341,11 @@ docs/
                 </article>
                 <article class="card">
                     <h3>Chart Overlays</h3>
-                    <p>Add a true FAA raster chart overlay pipeline instead of the current chart-reference mode.</p>
+                    <p>Improve FAA sectional rendering and reduce the remaining friction around browser-side raster chart overlays.</p>
+                </article>
+                <article class="card">
+                    <h3>Weather On Map</h3>
+                    <p>Add weather-aware map overlays and route-centric weather presentation for the selected flight date and time.</p>
                 </article>
                 <article class="card">
                     <h3>Profile Expansion</h3>

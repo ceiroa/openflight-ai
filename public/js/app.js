@@ -16,13 +16,18 @@ import {
     CHECKPOINT_PLAN_VERSION,
     FLIGHT_PLAN_FILE_VERSION,
     loadFlightDraft,
+    loadAirspaceCache,
     saveCheckpointPlan,
+    saveAirspaceCache,
     saveFlightDraft,
     saveNavLogSnapshot,
 } from "./flightStore.js";
 
 const DEFAULT_AIRCRAFT_NAME = "Evektor Harmony LSA";
 const DEFAULT_CHECKPOINT_MODE = "enhanced";
+const AIRSPACE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const AIRSPACE_PREFETCH_CLASSES = "B,C,D,E";
+const AIRSPACE_PREFETCH_CORRIDOR_NM = 8;
 
 const state = {
     aircraftData: null,
@@ -40,6 +45,7 @@ const menuToggleButton = document.getElementById("menu-toggle");
 const sideMenu = document.getElementById("side-menu");
 const openCheckpointsButton = document.getElementById("open-checkpoints-btn");
 const openMapButton = document.getElementById("open-map-btn");
+const openAirspaceProfileButton = document.getElementById("open-airspace-profile-btn");
 const openAircraftButton = document.getElementById("open-aircraft-btn");
 const testFillButton = document.getElementById("test-fill-btn");
 const savePlanButton = document.getElementById("save-plan-btn");
@@ -94,6 +100,7 @@ function registerEventHandlers() {
     document.addEventListener("keydown", handleDocumentKeydown);
     openCheckpointsButton.addEventListener("click", openCheckpointPlanner);
     openMapButton.addEventListener("click", openRouteMap);
+    openAirspaceProfileButton.addEventListener("click", openAirspaceProfilePage);
     openAircraftButton.addEventListener("click", openAircraftProfiles);
     testFillButton.addEventListener("click", populateTestRoute);
     savePlanButton.addEventListener("click", savePlanToFile);
@@ -696,6 +703,11 @@ function openAircraftProfiles() {
 function openRouteMap() {
     saveCurrentFlightDraft();
     window.location.assign("/map.html");
+}
+
+function openAirspaceProfilePage() {
+    saveCurrentFlightDraft();
+    window.location.assign("/airspace-profile.html");
 }
 
 function restoreFlightDraft() {
@@ -1383,6 +1395,7 @@ async function generateLog() {
 
     document.getElementById("nav-log-container").style.display = "block";
     saveCurrentNavLogSnapshot(inputs);
+    void prefetchAirspaceForRoute(inputs);
     updateGenerateButtonState();
     if (checkpointResult.source === "error") {
         showStatus("Checkpoint generation failed. Destination rows were used instead.", "error");
@@ -1474,4 +1487,121 @@ function clearRestoreDraftFlagFromUrl() {
     const url = new URL(window.location.href);
     url.searchParams.delete("restoreDraft");
     window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+}
+
+async function prefetchAirspaceForRoute(inputs) {
+    try {
+        const routeSignature = createRouteSignature(inputs);
+        const routePoints = [
+            { lat: Number(inputs.departure.lat), lon: Number(inputs.departure.lon) },
+            ...inputs.legs.map((leg) => ({ lat: Number(leg.lat), lon: Number(leg.lon) })),
+        ];
+        const requestedBounds = expandAirspaceBounds(buildRouteBounds(routePoints), AIRSPACE_PREFETCH_CORRIDOR_NM);
+        const cacheKey = buildAirspaceCacheKey(requestedBounds);
+        const routeCacheKey = buildAirspaceRouteCacheKey(routeSignature);
+        const cache = readAirspaceCache();
+
+        if (cacheEntryIsUsable(cache[routeCacheKey], null) || cacheEntryIsUsable(cache[cacheKey], null)) {
+            return;
+        }
+
+        const response = await fetch(buildAirspaceUrl(requestedBounds));
+        if (!response.ok) {
+            return;
+        }
+
+        const payload = await response.json();
+        cache[cacheKey] = {
+            savedAt: Date.now(),
+            payload,
+            bounds: requestedBounds,
+            classes: AIRSPACE_PREFETCH_CLASSES,
+        };
+        cache[routeCacheKey] = cache[cacheKey];
+        saveAirspaceCache(cache);
+        log(`Prefetched FAA airspace for route ${routeSignature}.`);
+    } catch (error) {
+        log(`FAA airspace prefetch skipped: ${error.message}`);
+    }
+}
+
+function buildRouteBounds(routePoints) {
+    return routePoints.reduce((bounds, point) => ({
+        minLat: Math.min(bounds.minLat, point.lat),
+        minLon: Math.min(bounds.minLon, point.lon),
+        maxLat: Math.max(bounds.maxLat, point.lat),
+        maxLon: Math.max(bounds.maxLon, point.lon),
+    }), {
+        minLat: Number.POSITIVE_INFINITY,
+        minLon: Number.POSITIVE_INFINITY,
+        maxLat: Number.NEGATIVE_INFINITY,
+        maxLon: Number.NEGATIVE_INFINITY,
+    });
+}
+
+function expandAirspaceBounds(bounds, corridorNm) {
+    const latPadding = corridorNm / 60;
+    const centerLat = (bounds.minLat + bounds.maxLat) / 2;
+    const lonPadding = corridorNm / (60 * Math.max(Math.cos(centerLat * Math.PI / 180), 0.25));
+
+    return {
+        minLat: bounds.minLat - latPadding,
+        minLon: bounds.minLon - lonPadding,
+        maxLat: bounds.maxLat + latPadding,
+        maxLon: bounds.maxLon + lonPadding,
+    };
+}
+
+function buildAirspaceUrl(bounds) {
+    const params = new URLSearchParams({
+        minLat: String(bounds.minLat),
+        minLon: String(bounds.minLon),
+        maxLat: String(bounds.maxLat),
+        maxLon: String(bounds.maxLon),
+        classes: AIRSPACE_PREFETCH_CLASSES,
+    });
+    return `/api/airspace?${params.toString()}`;
+}
+
+function buildAirspaceCacheKey(bounds) {
+    return [
+        AIRSPACE_PREFETCH_CLASSES,
+        normalizeAirspaceBoundsValue(bounds.minLat),
+        normalizeAirspaceBoundsValue(bounds.minLon),
+        normalizeAirspaceBoundsValue(bounds.maxLat),
+        normalizeAirspaceBoundsValue(bounds.maxLon),
+    ].join("|");
+}
+
+function buildAirspaceRouteCacheKey(routeSignature) {
+    return routeSignature ? `route|${AIRSPACE_PREFETCH_CLASSES}|${routeSignature}` : "";
+}
+
+function normalizeAirspaceBoundsValue(value) {
+    return Number(value).toFixed(3);
+}
+
+function readAirspaceCache() {
+    try {
+        const parsed = loadAirspaceCache();
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+        return {};
+    }
+}
+
+function cacheEntryIsUsable(entry, requestedBounds) {
+    if (!entry?.savedAt || Date.now() - Number(entry.savedAt) > AIRSPACE_CACHE_TTL_MS) {
+        return false;
+    }
+
+    if (!requestedBounds) {
+        return true;
+    }
+
+    return entry.bounds
+        && entry.bounds.minLat <= requestedBounds.minLat
+        && entry.bounds.minLon <= requestedBounds.minLon
+        && entry.bounds.maxLat >= requestedBounds.maxLat
+        && entry.bounds.maxLon >= requestedBounds.maxLon;
 }

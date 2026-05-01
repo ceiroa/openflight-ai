@@ -3,15 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenFlight AI - Route Map</title>
+    <title>OpenFlight AI - Airspace Profile</title>
     <link rel="stylesheet" href="./styles/app-shell.css">
-    <link rel="stylesheet" href="./styles/map.css">
-    <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-        crossorigin=""
-    >
+    <link rel="stylesheet" href="./styles/airspace-profile.css">
 </head>
 <body>
     <div class="app-shell">
@@ -22,7 +16,7 @@
                 <p class="menu-copy">Use this menu for app settings and planning tools.</p>
                 <a class="link-button menu-nav-link" href="/index.html?restoreDraft=1">Flight Setup</a>
                 <a class="link-button menu-nav-link" href="/checkpoints.html">Checkpoints Planner</a>
-                <a class="link-button menu-nav-link" href="/airspace-profile.html">Airspace Profile</a>
+                <a class="link-button menu-nav-link" href="/map.html">Route Map</a>
                 <a class="link-button menu-nav-link" href="/aircraft.html">Aircraft Profiles</a>
             </div>
             <div class="menu-section">
@@ -35,21 +29,22 @@
             </div>
         </aside>
         <div class="container">
-            <h1>Route Map</h1>
-            <p>Plot the current route on a free OpenStreetMap base map. This first version focuses on route review, airport markers, and saved checkpoints.</p>
+            <h1>Airspace Profile</h1>
+            <p>Review the route against FAA airspace in a corridor around the flight path. The chart scrolls horizontally for longer flights and shows airspace floors and ceilings from the surface up to the Class A floor.</p>
+
             <div id="status-banner" class="status-banner" role="status" aria-live="polite"></div>
-            <div id="map-root"></div>
+            <div id="loading-progress" class="loading-progress" role="status" aria-live="polite">
+                <p id="loading-progress-label" class="loading-progress-label">Loading FAA airspace profile...</p>
+                <div class="loading-progress-track">
+                    <div id="loading-progress-bar" class="loading-progress-bar"></div>
+                </div>
+                <p id="loading-progress-note" class="loading-progress-note">This page fetches and caches FAA airspace for the current route corridor.</p>
+            </div>
+
+            <div id="profile-root"></div>
         </div>
     </div>
 
-    <script
-        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-        crossorigin=""
-    ></script>
-    <script src="/vendor/jszip/jszip.min.js"></script>
-    <script src="/vendor/georaster/georaster.browser.bundle.min.js"></script>
-    <script src="/vendor/georaster-layer-for-leaflet/georaster-layer-for-leaflet.min.js"></script>
-    <script type="module" src="./js/map.js"></script>
+    <script type="module" src="./js/airspaceProfile.js"></script>
 </body>
 </html>

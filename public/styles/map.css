@@ -163,20 +163,37 @@ body.map-focus-mode .container > .status-banner {
     margin-bottom: 14px;
 }
 
+.map-toolbar button {
+    min-height: 38px;
+    padding: 0 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    box-shadow: 0 8px 18px rgba(2, 6, 23, 0.2);
+    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.map-toolbar button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 22px rgba(2, 6, 23, 0.28);
+}
+
 .map-toolbar-spacer {
     flex: 1 1 auto;
 }
 
 .map-mode-button {
-    background: transparent;
-    border: 1px solid var(--map-border-color);
-    color: #cbd5e1;
+    background: rgba(30, 41, 59, 0.96);
+    border: 1px solid rgba(100, 116, 139, 0.85);
+    color: #e2e8f0;
 }
 
 .map-mode-button.active {
     background: var(--accent-color);
     color: #0f172a;
     border-color: var(--accent-color);
+    box-shadow: 0 12px 26px rgba(56, 189, 248, 0.28);
 }
 
 #route-map {
@@ -206,6 +223,26 @@ body.map-focus-mode .container > .status-banner {
     color: #0f172a !important;
     border-color: rgba(15, 23, 42, 0.2);
     backdrop-filter: blur(6px);
+    box-shadow: 0 12px 22px rgba(2, 6, 23, 0.18);
+}
+
+.map-overlay-button:hover {
+    background: rgba(248, 250, 252, 0.98);
+    border-color: rgba(15, 23, 42, 0.28);
+}
+
+#maximize-map-btn,
+#toggle-route-panel-btn {
+    background: rgba(248, 250, 252, 0.92) !important;
+    color: #0f172a !important;
+    border: 1px solid rgba(15, 23, 42, 0.2) !important;
+}
+
+#maximize-map-btn:hover,
+#toggle-route-panel-btn:hover {
+    background: rgba(248, 250, 252, 0.98) !important;
+    color: #020617 !important;
+    border-color: rgba(15, 23, 42, 0.28) !important;
 }
 
 .map-panel-toggle-button {
@@ -373,12 +410,18 @@ body.map-focus-mode .container > .status-banner {
 .map-export-button {
     background: #10b981;
     color: #ffffff;
+    border: 1px solid rgba(16, 185, 129, 0.8);
 }
 
 .map-secondary-button {
-    background: transparent;
-    border: 1px solid var(--map-border-color);
-    color: #cbd5e1;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(71, 85, 105, 0.95);
+    color: #e2e8f0;
+}
+
+.map-secondary-button:hover {
+    border-color: rgba(56, 189, 248, 0.6);
+    background: rgba(30, 41, 59, 0.96);
 }
 
 .checkpoint-button,

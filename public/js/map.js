@@ -1,12 +1,14 @@
 import {
+    createRouteSignature,
     getCheckpointPlanForRoute,
     loadFlightDraft,
+    loadAirspaceCache,
+    saveAirspaceCache,
 } from "./flightStore.js";
 
 const FAA_VFR_CHARTS_URL = "https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/vfr/index.cfm";
 const FAA_SECTIONAL_INFO_URL = "https://www.faa.gov/air_traffic/flight_info/aeronav/productcatalog/vfrcharts/sectional/";
 const FAA_TAC_INFO_URL = "https://www.faa.gov/air_traffic/flight_info/aeronav/productcatalog/vfrcharts/terminalarea/";
-const AIRSPACE_CACHE_STORAGE_KEY = "openflight-airspace-cache-v1";
 const AIRSPACE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 const SECTIONAL_CHARTS = [
@@ -96,6 +98,7 @@ const state = {
     showCurrentLocation: false,
     airspaceLayer: null,
     showAirspace: false,
+    routeSignature: "",
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -259,6 +262,7 @@ function renderMapPage(draft) {
     state.routePoints = routePoints;
     state.legSegments = legSegments;
     state.checkpointMarkers = checkpointMarkers;
+    state.routeSignature = createRouteSignature(draft);
     initializeLeafletMap(routePoints, legSegments, checkpointMarkers);
     attachMapPageHandlers(checkpointMarkers);
     applyMapMode(MAP_MODES.street);
@@ -708,8 +712,15 @@ async function refreshAirspaceOverlay() {
     }
 
     const bounds = state.map.getBounds();
+    const requestedBounds = {
+        minLat: bounds.getSouth(),
+        minLon: bounds.getWest(),
+        maxLat: bounds.getNorth(),
+        maxLon: bounds.getEast(),
+    };
     const cacheKey = buildAirspaceCacheKey(bounds);
-    const cached = loadCachedAirspace(cacheKey);
+    const routeCacheKey = buildAirspaceRouteCacheKey(state.routeSignature);
+    const cached = loadCachedAirspace(cacheKey, requestedBounds, routeCacheKey);
     if (cached) {
         renderAirspaceOverlay(cached);
         updateAirspaceStatus(`FAA airspace overlay loaded from local cache (${cached.features?.length || 0} feature${cached.features?.length === 1 ? "" : "s"}).`);
@@ -726,7 +737,7 @@ async function refreshAirspaceOverlay() {
     }
 
     const payload = await response.json();
-    cacheAirspace(cacheKey, payload);
+    cacheAirspace(cacheKey, payload, requestedBounds, routeCacheKey);
     renderAirspaceOverlay(payload);
     updateAirspaceStatus(`FAA airspace overlay loaded for the current view (${payload.features?.length || 0} feature${payload.features?.length === 1 ? "" : "s"}).`);
 }
@@ -782,43 +793,55 @@ function buildAirspaceCacheKey(bounds) {
     ].join("|");
 }
 
+function buildAirspaceRouteCacheKey(routeSignature) {
+    if (!routeSignature) {
+        return "";
+    }
+    return `route|B,C,D,E|${routeSignature}`;
+}
+
 function normalizeAirspaceBoundsValue(value) {
     return Number(value).toFixed(3);
 }
 
-function loadCachedAirspace(cacheKey) {
+function loadCachedAirspace(cacheKey, requestedBounds, routeCacheKey) {
     const cache = readAirspaceCache();
     const entry = cache[cacheKey];
-    if (!entry) {
-        return null;
+    if (entry && isUsableAirspaceCacheEntry(entry, null)) {
+        return entry.payload || null;
     }
 
-    if (!entry.savedAt || Date.now() - Number(entry.savedAt) > AIRSPACE_CACHE_TTL_MS) {
-        delete cache[cacheKey];
-        writeAirspaceCache(cache);
-        return null;
+    if (routeCacheKey && isUsableAirspaceCacheEntry(cache[routeCacheKey], null)) {
+        return cache[routeCacheKey].payload || null;
     }
 
-    return entry.payload || null;
+    const fallback = Object.values(cache).find((candidate) => isUsableAirspaceCacheEntry(candidate, requestedBounds));
+    if (fallback) {
+        return fallback.payload || null;
+    }
+
+    pruneExpiredAirspaceCache(cache);
+    return null;
 }
 
-function cacheAirspace(cacheKey, payload) {
+function cacheAirspace(cacheKey, payload, requestedBounds, routeCacheKey) {
     const cache = readAirspaceCache();
-    cache[cacheKey] = {
+    const entry = {
         savedAt: Date.now(),
         payload,
+        bounds: requestedBounds,
+        classes: "B,C,D,E",
     };
+    cache[cacheKey] = entry;
+    if (routeCacheKey) {
+        cache[routeCacheKey] = entry;
+    }
     writeAirspaceCache(cache);
 }
 
 function readAirspaceCache() {
     try {
-        const raw = window.localStorage.getItem(AIRSPACE_CACHE_STORAGE_KEY);
-        if (!raw) {
-            return {};
-        }
-
-        const parsed = JSON.parse(raw);
+        const parsed = loadAirspaceCache();
         return parsed && typeof parsed === "object" ? parsed : {};
     } catch (error) {
         return {};
@@ -827,10 +850,46 @@ function readAirspaceCache() {
 
 function writeAirspaceCache(cache) {
     try {
-        window.localStorage.setItem(AIRSPACE_CACHE_STORAGE_KEY, JSON.stringify(cache));
+        saveAirspaceCache(cache);
     } catch (error) {
         // Ignore storage failures and continue without persistent cache.
     }
+}
+
+function isUsableAirspaceCacheEntry(entry, requestedBounds) {
+    if (!entry?.savedAt || Date.now() - Number(entry.savedAt) > AIRSPACE_CACHE_TTL_MS) {
+        return false;
+    }
+
+    if (!requestedBounds) {
+        return true;
+    }
+
+    return boundsContain(entry.bounds, requestedBounds);
+}
+
+function pruneExpiredAirspaceCache(cache) {
+    let changed = false;
+    Object.entries(cache).forEach(([key, entry]) => {
+        if (!entry?.savedAt || Date.now() - Number(entry.savedAt) > AIRSPACE_CACHE_TTL_MS) {
+            delete cache[key];
+            changed = true;
+        }
+    });
+    if (changed) {
+        writeAirspaceCache(cache);
+    }
+}
+
+function boundsContain(outer, inner) {
+    if (!outer || !inner) {
+        return false;
+    }
+
+    return outer.minLat <= inner.minLat
+        && outer.minLon <= inner.minLon
+        && outer.maxLat >= inner.maxLat
+        && outer.maxLon >= inner.maxLon;
 }
 
 function buildAirspacePopup(properties) {

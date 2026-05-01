@@ -19,6 +19,7 @@ import {
 } from './src/api/airportReferenceService.js';
 import { getAirspaceForBounds } from './src/api/airspaceService.js';
 import { getCurrentSectionalChartMetadata } from './src/api/faaChartsService.js';
+import { getElevationsForPoints } from './src/api/elevationService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,6 +127,17 @@ app.get('/api/airspace', async (req, res) => {
     } catch (error) {
         const status = error.message?.includes('bounds') ? 400 : 500;
         res.status(status).json({ error: error.message || 'Failed to load FAA airspace data' });
+    }
+});
+
+app.post('/api/elevation-profile', async (req, res) => {
+    try {
+        const points = Array.isArray(req.body?.points) ? req.body.points : [];
+        const elevations = await getElevationsForPoints(points);
+        res.json({ points: elevations });
+    } catch (error) {
+        const status = error.message?.includes('point') ? 400 : 500;
+        res.status(status).json({ error: error.message || 'Failed to load route elevation data' });
     }
 });
 

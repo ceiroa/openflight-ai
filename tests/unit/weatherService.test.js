@@ -266,6 +266,7 @@ describe('getWeatherData', () => {
     });
 
     test('uses FAA TAF forecast data for future dates and latest METAR altimeter', async () => {
+        const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(new Date('2026-04-30T18:00:00.000Z').getTime());
         global.fetch = jest.fn()
             .mockResolvedValueOnce({
                 ok: true,
@@ -317,6 +318,7 @@ describe('getWeatherData', () => {
         });
         expect(global.fetch.mock.calls[0][0]).toContain('/taf?ids=KLOT');
         expect(global.fetch.mock.calls[1][0]).toContain('/metar?ids=KLOT');
+        nowSpy.mockRestore();
     });
 
     test('returns a clear error when no FAA forecast covers the selected future time', async () => {

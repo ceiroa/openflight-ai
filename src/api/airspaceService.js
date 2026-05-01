@@ -18,10 +18,21 @@ export async function getAirspaceForBounds(bounds, options = {}) {
             "TYPE_CODE",
             "LOCAL_TYPE",
             "LOWER_DESC",
+            "LOWER_VAL",
+            "LOWER_UOM",
+            "LOWER_CODE",
             "UPPER_DESC",
+            "UPPER_VAL",
+            "UPPER_UOM",
+            "UPPER_CODE",
             "ICAO_ID",
+            "IDENT",
             "COMM_NAME",
             "SECTOR",
+            "LEVEL_",
+            "ADHP_ID",
+            "CITY",
+            "STATE",
         ].join(","),
         returnGeometry: "true",
         outSR: "4326",
@@ -101,10 +112,26 @@ function normalizeFeature(feature) {
             typeCode: properties.TYPE_CODE || "",
             localType: properties.LOCAL_TYPE || "",
             lowerDesc: properties.LOWER_DESC || "",
+            lowerVal: normalizeNullableNumber(properties.LOWER_VAL),
+            lowerUom: properties.LOWER_UOM || "",
+            lowerCode: properties.LOWER_CODE || "",
             upperDesc: properties.UPPER_DESC || "",
+            upperVal: normalizeNullableNumber(properties.UPPER_VAL),
+            upperUom: properties.UPPER_UOM || "",
+            upperCode: properties.UPPER_CODE || "",
             icaoId: properties.ICAO_ID || "",
+            ident: properties.IDENT || "",
             commName: properties.COMM_NAME || "",
             sector: properties.SECTOR || "",
+            level: properties.LEVEL_ || "",
+            adhpId: properties.ADHP_ID || "",
+            city: properties.CITY || "",
+            state: properties.STATE || "",
         },
     };
+}
+
+function normalizeNullableNumber(value) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
 }

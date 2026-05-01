@@ -71,13 +71,35 @@ test.describe('OpenFlight AI - UI Tests', () => {
                                 class: 'B',
                                 typeCode: 'CLASS',
                                 lowerDesc: 'SFC',
+                                lowerVal: 0,
+                                lowerUom: 'FT',
+                                lowerCode: 'SFC',
                                 upperDesc: '10000 MSL',
+                                upperVal: 10000,
+                                upperUom: 'FT',
+                                upperCode: 'MSL',
                                 icaoId: 'KORD',
                                 commName: 'Chicago',
                                 sector: 'MAIN',
                             },
                         },
                     ],
+                }),
+            });
+        });
+
+        await page.route('**/api/elevation-profile', async (route) => {
+            const body = route.request().postDataJSON();
+            const points = Array.isArray(body?.points) ? body.points : [];
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    points: points.map((point, index) => ({
+                        lat: point.lat,
+                        lon: point.lon,
+                        elevationFt: 650 + index * 3,
+                    })),
                 }),
             });
         });
@@ -358,6 +380,30 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('#toggle-reference-checkpoints-btn')).toBeVisible();
     });
 
+    test('should prefetch FAA airspace after generating the nav log', async ({ page }) => {
+        let airspaceCalls = 0;
+        await page.unroute('**/api/airspace*');
+        await page.route('**/api/airspace*', async (route) => {
+            airspaceCalls += 1;
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    type: 'FeatureCollection',
+                    features: [],
+                }),
+            });
+        });
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#generate-btn');
+
+        await expect.poll(() => airspaceCalls).toBe(1);
+    });
+
     test('should maximize the map and toggle nearby reference checkpoints', async ({ page }) => {
         await page.route('**/api/checkpoints/reference*', async (route) => {
             await route.fulfill({
@@ -426,7 +472,13 @@ test.describe('OpenFlight AI - UI Tests', () => {
                                 class: 'B',
                                 typeCode: 'CLASS',
                                 lowerDesc: 'SFC',
+                                lowerVal: 0,
+                                lowerUom: 'FT',
+                                lowerCode: 'SFC',
                                 upperDesc: '10000 MSL',
+                                upperVal: 10000,
+                                upperUom: 'FT',
+                                upperCode: 'MSL',
                             },
                         },
                     ],
@@ -458,6 +510,67 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.goto('/index.html?restoreDraft=1');
         await page.click('#menu-toggle');
         await page.click('#open-map-btn');
+        await page.click('#toggle-airspace-btn');
+        await expect(page.locator('#map-airspace-status')).toContainText('loaded from local cache');
+        expect(airspaceCalls).toBe(1);
+    });
+
+    test('should load the airspace profile page and share cached FAA airspace with the map page', async ({ page }) => {
+        let airspaceCalls = 0;
+        await page.unroute('**/api/airspace*');
+        await page.route('**/api/airspace*', async (route) => {
+            airspaceCalls += 1;
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    type: 'FeatureCollection',
+                    features: [
+                        {
+                            type: 'Feature',
+                            geometry: {
+                                type: 'Polygon',
+                                coordinates: [[
+                                    [-88.2, 41.7],
+                                    [-87.8, 41.7],
+                                    [-87.8, 42.0],
+                                    [-88.2, 42.0],
+                                    [-88.2, 41.7],
+                                ]],
+                            },
+                            properties: {
+                                name: 'Chicago Class B',
+                                class: 'B',
+                                typeCode: 'CLASS',
+                                lowerDesc: 'SFC',
+                                lowerVal: 0,
+                                lowerUom: 'FT',
+                                lowerCode: 'SFC',
+                                upperDesc: '10000 MSL',
+                                upperVal: 10000,
+                                upperUom: 'FT',
+                                upperCode: 'MSL',
+                            },
+                        },
+                    ],
+                }),
+            });
+        });
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#menu-toggle');
+        await page.click('#open-airspace-profile-btn');
+
+        await expect(page).toHaveURL(/airspace-profile\.html$/);
+        await expect(page.locator('h1')).toHaveText('Airspace Profile');
+        await expect(page.locator('.profile-scroll svg')).toBeVisible();
+        expect(airspaceCalls).toBe(1);
+
+        await page.click('#menu-toggle');
+        await page.click('text=Route Map');
         await page.click('#toggle-airspace-btn');
         await expect(page.locator('#map-airspace-status')).toContainText('loaded from local cache');
         expect(airspaceCalls).toBe(1);

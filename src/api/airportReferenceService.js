@@ -317,7 +317,7 @@ out center;
             method: 'POST',
             headers: {
                 'Content-Type': 'text/plain;charset=UTF-8',
-                'User-Agent': 'OpenFlight-AI/1.0 checkpoint-planner',
+                'User-Agent': 'CieloRumbo/1.0 checkpoint-planner',
             },
             body: query,
         });

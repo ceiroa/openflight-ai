@@ -41,7 +41,7 @@ export async function getAirspaceForBounds(bounds, options = {}) {
 
     const response = await fetch(`${FAA_CLASS_AIRSPACE_QUERY_URL}?${params.toString()}`, {
         headers: {
-            "User-Agent": "OpenFlight-AI/1.0 faa-airspace-overlay",
+            "User-Agent": "CieloRumbo/1.0 faa-airspace-overlay",
         },
     });
 

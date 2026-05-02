@@ -1,6 +1,6 @@
-# OpenFlight-AI
+# CieloRumbo
 
-OpenFlight-AI is a sophisticated tool designed to assist pilots in VFR (Visual Flight Rules) cross-country planning. By leveraging modern computational logic, it simplifies complex navigational calculations, ensuring safer and more efficient flight preparation.
+CieloRumbo is a sophisticated tool designed to assist pilots in VFR (Visual Flight Rules) cross-country planning. By leveraging modern computational logic, it simplifies complex navigational calculations, ensuring safer and more efficient flight preparation.
 
 ## Disclaimer
 
@@ -49,7 +49,7 @@ npm run test:ui
 
 ## Engineering Principles
 
-OpenFlight-AI is built with a focus on precision and reliability. Our navigation engine uses the Law of Sines to provide exact trigonometric solutions for the wind triangle, a fundamental requirement for accurate cross-country navigation.
+CieloRumbo is built with a focus on precision and reliability. Our navigation engine uses the Law of Sines to provide exact trigonometric solutions for the wind triangle, a fundamental requirement for accurate cross-country navigation.
 
 ## Change Workflow
 

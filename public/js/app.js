@@ -915,7 +915,7 @@ function buildFlightPlanExport(inputs) {
     const checkpointPlan = getCheckpointPlanForRoute(inputs);
 
     return {
-        app: "openflight-ai",
+        app: "cielorumbo",
         version: FLIGHT_PLAN_FILE_VERSION,
         savedAt: new Date().toISOString(),
         flightDraft: {
@@ -1000,8 +1000,8 @@ async function loadPlanFromFile(file) {
 }
 
 function normalizeFlightPlanFile(payload) {
-    if (payload?.app !== "openflight-ai") {
-        throw new Error("This file is not an OpenFlight AI plan.");
+    if (!["openflight-ai", "cielorumbo"].includes(payload?.app)) {
+        throw new Error("This file is not a CieloRumbo plan.");
     }
 
     if (payload.version !== FLIGHT_PLAN_FILE_VERSION) {

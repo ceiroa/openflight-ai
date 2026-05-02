@@ -98,7 +98,7 @@ async function fetchElevationForPoint(point) {
 
     const response = await fetch(`${USGS_EPQS_URL}?${params.toString()}`, {
         headers: {
-            'User-Agent': 'OpenFlight-AI/1.0 usgs-elevation-profile',
+            'User-Agent': 'CieloRumbo/1.0 usgs-elevation-profile',
         },
     });
 

@@ -29,7 +29,7 @@ async function loadVfrRasterPage() {
     if (!vfrRasterPageCache) {
         vfrRasterPageCache = fetch(FAA_VFR_RASTER_URL, {
             headers: {
-                'User-Agent': 'OpenFlight-AI/1.0 faa-chart-overlay',
+                'User-Agent': 'CieloRumbo/1.0 faa-chart-overlay',
             },
         }).then(async (response) => {
             if (!response.ok) {

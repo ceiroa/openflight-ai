@@ -167,7 +167,7 @@ app.get('/api/charts/sectional/content', async (req, res) => {
         const metadata = await getCurrentSectionalChartMetadata(name);
         const upstream = await fetch(metadata.zipUrl, {
             headers: {
-                'User-Agent': 'OpenFlight-AI/1.0 faa-chart-overlay',
+                'User-Agent': 'CieloRumbo/1.0 faa-chart-overlay',
             },
         });
 
@@ -267,5 +267,5 @@ app.get('/api/weather', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`OpenFlight AI server running at http://localhost:${PORT}`);
+    console.log(`CieloRumbo server running at http://localhost:${PORT}`);
 });

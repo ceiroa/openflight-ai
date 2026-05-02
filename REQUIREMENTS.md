@@ -1,7 +1,7 @@
-# OpenFlight AI - Project Requirements & Specification
+# CieloRumbo - Project Requirements & Specification
 
 ## 1. Core Vision
-OpenFlight AI is a dark-themed flight planning and navigation log generator for GA pilots, with an initial focus on Light Sport Aircraft such as the Evektor Harmony LSA.
+CieloRumbo is a dark-themed flight planning and navigation log generator for GA pilots, with an initial focus on Light Sport Aircraft such as the Evektor Harmony LSA.
 
 ## 2. UI/UX Standards
 - **Theme:** High-contrast dark mode using a slate/blue palette.

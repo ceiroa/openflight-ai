@@ -22,7 +22,7 @@ const airportCommsFixtures = {
     KVYS: { summary: 'AWOS 118.525 | CTAF 122.8' },
 };
 
-test.describe('OpenFlight AI - UI Tests', () => {
+test.describe('CieloRumbo - UI Tests', () => {
     test.beforeEach(async ({ page }) => {
         await page.route('**/api/weather/area*', async (route) => {
             await route.fulfill({
@@ -1188,7 +1188,7 @@ test.describe('OpenFlight AI - UI Tests', () => {
 
     test('should load a saved plan file, refresh weather live, and restore planner and map state', async ({ page }) => {
         const plan = {
-            app: 'openflight-ai',
+            app: 'cielorumbo',
             version: 1,
             savedAt: '2026-04-27T12:00:00.000Z',
             flightDraft: {

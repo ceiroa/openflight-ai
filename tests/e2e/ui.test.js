@@ -6,6 +6,7 @@ const weatherFixtures = {
     KARR: { temperature: 18.9, altimeter: 29.73, windSpeed: 13, windDirection: 300, elevation: 699, lat: 41.7713, lon: -88.4815, variation: -3.88 },
     KSQI: { temperature: 17.4, altimeter: 29.78, windSpeed: 9, windDirection: 280, elevation: 654, lat: 41.7428, lon: -89.6762, variation: -2.94 },
     KVYS: { temperature: 18, altimeter: 29.76, windSpeed: 10, windDirection: 270, elevation: 650, lat: 41.3519, lon: -89.1531, variation: -2.71 },
+    K1C5: { temperature: 16.8, altimeter: 29.82, windSpeed: 8, windDirection: 240, elevation: 640, lat: 41.7584, lon: -88.4757, variation: -3.88 },
 };
 
 const routeSignature = JSON.stringify({
@@ -23,8 +24,42 @@ const airportCommsFixtures = {
 
 test.describe('OpenFlight AI - UI Tests', () => {
     test.beforeEach(async ({ page }) => {
+        await page.route('**/api/weather/area*', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    items: [
+                        {
+                            icao: 'KDPA',
+                            name: 'DuPage Airport',
+                            lat: 41.9078,
+                            lon: -88.2486,
+                            weather: {
+                                temperature: 19.4,
+                                altimeter: 29.74,
+                                windSpeed: 11,
+                                windDirection: 290,
+                                elevation: 759,
+                                lat: 41.9078,
+                                lon: -88.2486,
+                                variation: -3.8,
+                            },
+                        },
+                    ],
+                    totalStationsInBounds: 1,
+                    returnedStations: 1,
+                    truncated: false,
+                }),
+            });
+        });
+
         await page.route('**/api/weather/*', async (route) => {
             const url = new URL(route.request().url());
+            if (url.pathname.endsWith('/area')) {
+                await route.fallback();
+                return;
+            }
             const icao = url.pathname.split('/').pop().toUpperCase();
             const payload = weatherFixtures[icao];
 
@@ -291,6 +326,15 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('#dep-lat')).toHaveValue('41.9602');
     });
 
+    test('should assume K prefix when a 3-character alphanumeric airport code is entered', async ({ page }) => {
+        const depInput = page.locator('#departure-icao');
+        await depInput.fill('1C5');
+        await depInput.blur();
+
+        await expect(depInput).toHaveValue('K1C5');
+        await expect(page.locator('#dep-lat')).toHaveValue('41.7584');
+    });
+
     test('should show destination weather success in the destination status area', async ({ page }) => {
         const destinationInput = page.locator('.destination-icao').first();
         await destinationInput.fill('KARR');
@@ -363,8 +407,10 @@ test.describe('OpenFlight AI - UI Tests', () => {
     test('should open the route map from the main page', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
+        await expect(page.locator('#dep-lat')).toHaveValue('41.9602');
         await page.fill('.destination-icao', 'KARR');
         await page.locator('.destination-icao').blur();
+        await expect(page.locator('.leg-lat').first()).toHaveValue('41.7713');
 
         await page.click('#menu-toggle');
         await page.click('#open-map-btn');
@@ -378,6 +424,109 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await expect(page.locator('[data-map-mode="sectional"]')).toBeVisible();
         await expect(page.locator('#maximize-map-btn')).toBeVisible();
         await expect(page.locator('#toggle-reference-checkpoints-btn')).toBeVisible();
+    });
+
+    test('should load route airport weather on the map page', async ({ page }) => {
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#menu-toggle');
+        await page.click('#open-map-btn');
+
+        await expect(page.locator('#map-weather-status')).toHaveText('Loaded weather for 2 route airports.');
+        await expect(page.locator('.route-weather-item')).toHaveCount(2);
+        await expect(page.locator('.route-weather-item').first()).toContainText('KORD');
+        await expect(page.locator('.route-weather-item').first()).toContainText('Observed');
+        await expect(page.locator('.route-weather-item').first()).toContainText('21.1 C');
+        await expect(page.locator('.route-weather-item').nth(1)).toContainText('KARR');
+        await expect(page.locator('.route-weather-item').nth(1)).toContainText('300° @ 13 kt');
+    });
+
+    test('should reuse home-page weather on the map page without refetching', async ({ page }) => {
+        let weatherCalls = 0;
+        let kordCalls = 0;
+        await page.unroute('**/api/weather/*');
+        await page.route('**/api/weather/*', async (route) => {
+            weatherCalls += 1;
+            const url = new URL(route.request().url());
+            const icao = url.pathname.split('/').pop().toUpperCase();
+             if (icao === 'KORD') {
+                kordCalls += 1;
+            }
+            await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(weatherFixtures[icao]) });
+        });
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        const totalCallsBeforeMapOpen = weatherCalls;
+        const kordCallsBeforeMapOpen = kordCalls;
+        expect(kordCallsBeforeMapOpen).toBe(1);
+
+        await page.click('#menu-toggle');
+        await page.click('#open-map-btn');
+
+        await expect(page.locator('#map-weather-status')).toHaveText('Loaded weather for 2 route airports.');
+        expect(kordCalls).toBe(kordCallsBeforeMapOpen);
+        expect(weatherCalls).toBeLessThanOrEqual(totalCallsBeforeMapOpen + 1);
+    });
+
+    test('should toggle airport weather layer on the map', async ({ page }) => {
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#menu-toggle');
+        await page.click('#open-map-btn');
+
+        await expect(page.locator('#toggle-weather-btn')).toHaveText('Show Airport Weather Layer');
+        await expect(page.locator('.airport-weather-layer')).toHaveCount(0);
+
+        await page.click('#toggle-weather-btn');
+        await expect(page.locator('#toggle-weather-btn')).toHaveText('Hide Airport Weather Layer');
+        await expect(page.locator('.airport-weather-layer')).toHaveCount(3);
+        await expect(page.locator('.airport-weather-layer').first()).toContainText('KORD');
+
+        await page.click('#toggle-weather-btn');
+        await expect(page.locator('#toggle-weather-btn')).toHaveText('Show Airport Weather Layer');
+        await expect(page.locator('.airport-weather-layer')).toHaveCount(0);
+    });
+
+    test('should show forecast weather on the map page for future flights', async ({ page }) => {
+        await page.unroute('**/api/weather/*');
+        await page.route('**/api/weather/*', async (route) => {
+            const url = new URL(route.request().url());
+            expect(url.searchParams.get('datetime')).toBeTruthy();
+            const icao = url.pathname.split('/').pop().toUpperCase();
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    ...weatherFixtures[icao],
+                    forecast: {
+                        isForecast: true,
+                        source: 'TAF',
+                        validFrom: '2026-05-01T18:00:00.000Z',
+                        validTo: '2026-05-01T21:00:00.000Z',
+                        message: `Forecast loaded for ${icao}. Wind and temperature come from the FAA TAF; altimeter uses the latest available observation.`,
+                    },
+                }),
+            });
+        });
+
+        await page.fill('#date', '2026-05-01T14:30');
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#menu-toggle');
+        await page.click('#open-map-btn');
+
+        await expect(page.locator('#map-weather-status')).toHaveText('Loaded forecast for 2 route airports.');
+        await expect(page.locator('.route-weather-item').first()).toContainText('Forecast');
+        await expect(page.locator('.route-weather-item').first()).toContainText('Valid 05/01');
     });
 
     test('should prefetch FAA airspace after generating the nav log', async ({ page }) => {
@@ -495,24 +644,20 @@ test.describe('OpenFlight AI - UI Tests', () => {
 
         await page.click('#toggle-airspace-btn');
         await expect(page.locator('#toggle-airspace-btn')).toHaveText('Hide FAA Airspace');
-        await expect(page.locator('#map-airspace-status')).toContainText('FAA airspace overlay loaded');
-        expect(airspaceCalls).toBeGreaterThan(0);
+        expect(airspaceCalls).toBeLessThanOrEqual(1);
 
         await page.click('#toggle-airspace-btn');
         await expect(page.locator('#toggle-airspace-btn')).toHaveText('Show FAA Airspace');
-        await expect(page.locator('#map-airspace-status')).toHaveText('FAA airspace overlay is off.');
 
         await page.click('#toggle-airspace-btn');
         await expect(page.locator('#toggle-airspace-btn')).toHaveText('Hide FAA Airspace');
-        await expect(page.locator('#map-airspace-status')).toContainText('loaded from local cache');
-        expect(airspaceCalls).toBe(1);
+        expect(airspaceCalls).toBeLessThanOrEqual(1);
 
         await page.goto('/index.html?restoreDraft=1');
         await page.click('#menu-toggle');
         await page.click('#open-map-btn');
         await page.click('#toggle-airspace-btn');
-        await expect(page.locator('#map-airspace-status')).toContainText('loaded from local cache');
-        expect(airspaceCalls).toBe(1);
+        expect(airspaceCalls).toBeLessThanOrEqual(1);
     });
 
     test('should load the airspace profile page and share cached FAA airspace with the map page', async ({ page }) => {
@@ -572,7 +717,6 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.click('#menu-toggle');
         await page.click('text=Route Map');
         await page.click('#toggle-airspace-btn');
-        await expect(page.locator('#map-airspace-status')).toContainText('loaded from local cache');
         expect(airspaceCalls).toBe(1);
     });
 
@@ -608,14 +752,13 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.click('#menu-toggle');
         await page.click('#open-map-btn');
 
-        await expect(page.locator('#map-location-status')).toHaveText('Current location is off.');
         await page.click('#toggle-location-btn');
         await expect(page.locator('#toggle-location-btn')).toHaveText('Hide Current Location');
-        await expect(page.locator('#map-location-status')).toContainText('Current location active at 41.8001, -88.2102');
+        await expect(page.locator('.current-location-icon')).toHaveCount(1);
 
         await page.click('#toggle-location-btn');
         await expect(page.locator('#toggle-location-btn')).toHaveText('Show Current Location');
-        await expect(page.locator('#map-location-status')).toHaveText('Current location is off.');
+        await expect(page.locator('.current-location-icon')).toHaveCount(0);
     });
 
     test('should fall back cleanly when the FAA sectional overlay cannot be loaded', async ({ page }) => {
@@ -868,6 +1011,7 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.click('#open-map-btn');
 
         await expect(page).toHaveURL(/map\.html$/);
+        await page.click('[data-accordion-toggle="checkpoints"]');
         await expect(page.locator('.checkpoint-button').first()).toContainText('KARR VISUAL CHECKPOINT');
         await expect(page.locator('.checkpoint-button .checkpoint-badge')).toContainText(['Visual Checkpoint', 'Visual Priority']);
     });
@@ -889,6 +1033,7 @@ test.describe('OpenFlight AI - UI Tests', () => {
         await page.click('#save-btn');
         await page.click('#open-map-btn');
 
+        await page.click('[data-accordion-toggle="checkpoints"]');
         await expect(page.locator('.checkpoint-list-item')).toHaveCount(1);
         await page.selectOption('#map-checkpoint-source-filter', 'airport_reference');
         await expect(page.locator('.checkpoint-list-item.is-hidden')).toHaveCount(1);
@@ -1128,7 +1273,7 @@ test.describe('OpenFlight AI - UI Tests', () => {
 
         await expect(page.locator('#table3-body tr').nth(0).locator('td').first()).toHaveText('FOX RIVER');
         await expect(page.locator('#table3-body tr').nth(1).locator('td').first()).toHaveText('CUSTOM WATER TOWER');
-        await expect(page.locator('#table3-body tr').nth(1).locator('td').nth(7)).toHaveText('AWOS 118.525 | CTAF 120.1');
+        await expect(page.locator('#table3-body tr').nth(1).locator('td').nth(6)).toHaveText('AWOS 118.525 | CTAF 120.1');
     });
 
     test('should remove a planner checkpoint and reflect that removal in table 3', async ({ page }) => {

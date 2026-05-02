@@ -3,12 +3,13 @@ export const FLIGHT_DRAFT_STORAGE_KEY = "openflight-ai-flight-draft";
 export const CHECKPOINTS_STORAGE_KEY = "openflight-ai-checkpoints";
 export const NAV_LOG_STORAGE_KEY = "openflight-ai-nav-log";
 export const AIRSPACE_CACHE_STORAGE_KEY = "openflight-airspace-cache-v1";
+export const WEATHER_CACHE_STORAGE_KEY = "openflight-weather-cache-v1";
 export const CHECKPOINT_PLAN_VERSION = 2;
 export const FLIGHT_PLAN_FILE_VERSION = 1;
 
 export function normalizeAirportCode(value) {
     const normalized = value.trim().toUpperCase();
-    if (normalized.length === 3 && /^[A-Z]{3}$/.test(normalized)) {
+    if (normalized.length === 3 && /^[A-Z0-9]{3}$/.test(normalized)) {
         return `K${normalized}`;
     }
     return normalized;
@@ -73,6 +74,14 @@ export function loadAirspaceCache() {
 
 export function saveAirspaceCache(cache) {
     localStorage.setItem(AIRSPACE_CACHE_STORAGE_KEY, JSON.stringify(cache));
+}
+
+export function loadWeatherCache() {
+    return readJsonStorage(WEATHER_CACHE_STORAGE_KEY) || {};
+}
+
+export function saveWeatherCache(cache) {
+    localStorage.setItem(WEATHER_CACHE_STORAGE_KEY, JSON.stringify(cache));
 }
 
 export function checkpointPlansEqual(left, right) {

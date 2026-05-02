@@ -17,10 +17,12 @@ import {
     FLIGHT_PLAN_FILE_VERSION,
     loadFlightDraft,
     loadAirspaceCache,
+    loadWeatherCache,
     saveCheckpointPlan,
     saveAirspaceCache,
     saveFlightDraft,
     saveNavLogSnapshot,
+    saveWeatherCache,
 } from "./flightStore.js";
 
 const DEFAULT_AIRCRAFT_NAME = "Evektor Harmony LSA";
@@ -28,6 +30,7 @@ const DEFAULT_CHECKPOINT_MODE = "enhanced";
 const AIRSPACE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const AIRSPACE_PREFETCH_CLASSES = "B,C,D,E";
 const AIRSPACE_PREFETCH_CORRIDOR_NM = 8;
+const WEATHER_CACHE_TTL_MS = 15 * 60 * 1000;
 
 const state = {
     aircraftData: null,
@@ -65,6 +68,7 @@ let progressValue = 0;
 let progressStartedAt = 0;
 
 document.addEventListener("DOMContentLoaded", async () => {
+    clearExpiredSharedWeatherCacheEntries();
     dateInput.value = normalizeDateTimeLocalInput(dateInput.value) || getCurrentDateTimeInputValue();
     drawGraph();
     registerEventHandlers();
@@ -546,6 +550,7 @@ async function handleWeather(input, type) {
         const data = await response.json();
         validateWeatherData(data, icao);
         state.weatherCache.set(weatherCacheKey, data);
+        cacheSharedWeather(icao, dateInput.value, data);
         applyWeatherData(input, type, data);
         clearStatus();
         setWeatherStatus(input, type, buildWeatherLoadedMessage(icao, data), "success");
@@ -648,6 +653,42 @@ function buildWeatherUrl(icao) {
 
 function buildWeatherCacheKey(icao) {
     return `${icao}|${dateInput.value || "current"}`;
+}
+
+function buildSharedWeatherCacheKey(icao, datetimeValue = "") {
+    return `${normalizeAirportCode(icao)}|${datetimeValue || "current"}`;
+}
+
+function cacheSharedWeather(icao, datetimeValue, data) {
+    const cache = readSharedWeatherCache();
+    cache[buildSharedWeatherCacheKey(icao, datetimeValue)] = {
+        savedAt: Date.now(),
+        payload: data,
+    };
+    saveWeatherCache(cache);
+}
+
+function readSharedWeatherCache() {
+    try {
+        const parsed = loadWeatherCache();
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+        return {};
+    }
+}
+
+function clearExpiredSharedWeatherCacheEntries() {
+    const cache = readSharedWeatherCache();
+    let changed = false;
+    for (const [key, entry] of Object.entries(cache)) {
+        if (!entry?.savedAt || Date.now() - Number(entry.savedAt) > WEATHER_CACHE_TTL_MS) {
+            delete cache[key];
+            changed = true;
+        }
+    }
+    if (changed) {
+        saveWeatherCache(cache);
+    }
 }
 
 function buildWeatherLoadingMessage(icao) {
@@ -1338,16 +1379,15 @@ async function generateLog() {
             : [];
 
         if (legCheckpoints.length === 0) {
-            appendRow(table3Body, [
-                leg.icao,
-                cruiseMagHeading.toFixed(0),
-                legDistance.toFixed(1),
-                Math.max(0, totalDistanceRemaining - legDistance).toFixed(1),
-                cruiseWind.groundspeed.toFixed(0),
-                (climbTimeMinutes + cruiseTimeMinutes).toFixed(0),
-                "-",
-                airportCommsByCode.get(leg.icao)?.summary || "N/A",
-            ]);
+                appendRow(table3Body, [
+                    leg.icao,
+                    cruiseMagHeading.toFixed(0),
+                    legDistance.toFixed(1),
+                    Math.max(0, totalDistanceRemaining - legDistance).toFixed(1),
+                    cruiseWind.groundspeed.toFixed(0),
+                    (climbTimeMinutes + cruiseTimeMinutes).toFixed(0),
+                    airportCommsByCode.get(leg.icao)?.summary || "N/A",
+                ]);
         } else {
             let previousCheckpointDistance = 0;
             for (const checkpoint of legCheckpoints) {
@@ -1362,7 +1402,6 @@ async function generateLog() {
                     Math.max(0, totalDistanceRemaining - cumulativeDistance).toFixed(1),
                     cruiseWind.groundspeed.toFixed(0),
                     segmentMinutes.toFixed(0),
-                    "-",
                     checkpoint.comms || "VIS",
                 ]);
 
@@ -1378,7 +1417,6 @@ async function generateLog() {
                 Math.max(0, totalDistanceRemaining - legDistance).toFixed(1),
                 cruiseWind.groundspeed.toFixed(0),
                 finalMinutes.toFixed(0),
-                "-",
                 airportCommsByCode.get(leg.icao)?.summary || "N/A",
             ]);
         }

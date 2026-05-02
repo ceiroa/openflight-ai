@@ -121,7 +121,7 @@ body.map-focus-mode .container > .status-banner {
 .map-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 320px;
-    gap: 20px;
+    gap: 16px;
 }
 
 .map-panel,
@@ -129,14 +129,13 @@ body.map-focus-mode .container > .status-banner {
     border: 1px solid var(--map-border-color);
     border-radius: 10px;
     background: rgba(15, 23, 42, 0.55);
-    padding: 18px;
+    padding: 16px;
 }
 
 .container.map-maximized .map-panel h2,
 .container.map-maximized .map-panel .map-toolbar,
 .container.map-maximized .map-panel #map-status,
-.container.map-maximized .map-panel #map-location-status,
-.container.map-maximized .map-panel #map-airspace-status {
+.container.map-maximized .map-panel #map-weather-status {
     display: none;
 }
 
@@ -158,16 +157,16 @@ body.map-focus-mode .container > .status-banner {
 
 .map-toolbar {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
 }
 
 .map-toolbar button {
-    min-height: 38px;
-    padding: 0 14px;
+    min-height: 34px;
+    padding: 0 11px;
     border-radius: 999px;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.02em;
     box-shadow: 0 8px 18px rgba(2, 6, 23, 0.2);
@@ -183,13 +182,20 @@ body.map-focus-mode .container > .status-banner {
     flex: 1 1 auto;
 }
 
+.map-status-stack {
+    display: grid;
+    gap: 2px;
+    margin-bottom: 6px;
+}
+
 .map-mode-button {
     background: rgba(30, 41, 59, 0.96);
     border: 1px solid rgba(100, 116, 139, 0.85);
     color: #e2e8f0;
 }
 
-.map-mode-button.active {
+.map-mode-button.active,
+.map-secondary-button.active {
     background: var(--accent-color);
     color: #0f172a;
     border-color: var(--accent-color);
@@ -251,30 +257,60 @@ body.map-focus-mode .container > .status-banner {
 }
 
 .route-summary {
-    margin-bottom: 16px;
-    font-size: 13px;
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.25;
 }
 
-.map-location-status {
-    margin-top: -6px;
-    margin-bottom: 8px;
-    font-size: 12px;
-    color: #94a3b8;
+.map-weather-status {
+    margin: 0;
+    font-size: 10px;
+    line-height: 1.2;
+    color: #93c5fd;
 }
 
-.map-airspace-status {
-    margin-top: 0;
-    margin-bottom: 16px;
-    font-size: 12px;
-    color: #94a3b8;
+.airport-weather-layer-icon {
+    background: transparent;
+    border: none;
 }
 
-.map-location-status.active {
-    color: #bbf7d0;
+.airport-weather-layer {
+    min-width: 78px;
+    padding: 6px 8px;
+    border-radius: 12px;
+    background: rgba(2, 6, 23, 0.92);
+    border: 1px solid rgba(56, 189, 248, 0.36);
+    box-shadow: 0 8px 20px rgba(2, 6, 23, 0.4);
+    display: grid;
+    gap: 2px;
+    text-align: center;
 }
 
-.map-location-status.error {
-    color: #fecaca;
+.airport-weather-layer.forecast {
+    border-color: rgba(245, 158, 11, 0.45);
+}
+
+.airport-weather-layer.observed {
+    border-color: rgba(56, 189, 248, 0.45);
+}
+
+.airport-weather-layer.area {
+    background: rgba(15, 23, 42, 0.78);
+    border-style: dashed;
+}
+
+.airport-weather-layer-code {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #f8fafc;
+}
+
+.airport-weather-layer-line {
+    font-size: 10px;
+    color: #cbd5e1;
+    line-height: 1.2;
 }
 
 .current-location-icon {
@@ -298,11 +334,158 @@ body.map-focus-mode .container > .status-banner {
     transform: rotate(-20deg);
 }
 
+.route-summary-section {
+    border-top: 1px solid rgba(71, 85, 105, 0.45);
+    padding-top: 10px;
+    margin-top: 10px;
+}
+
+.route-summary-section:first-of-type {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+}
+
+.route-section-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: #7dd3fc;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: left;
+}
+
+.route-section-toggle:hover {
+    opacity: 1;
+    color: #bae6fd;
+}
+
+.route-section-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: rgba(56, 189, 248, 0.14);
+    color: #bae6fd;
+    font-size: 12px;
+    line-height: 1;
+}
+
+.route-summary-section:not(.collapsed) .route-section-chevron {
+    background: rgba(125, 211, 252, 0.18);
+}
+
+.route-section-content {
+    margin-top: 10px;
+}
+
+.route-summary-section.collapsed .route-section-content {
+    display: none;
+}
+
 .checkpoint-filters {
     display: flex;
     flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.route-weather-list {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.route-weather-item {
+    background: rgba(15, 23, 42, 0.88);
+    border: 1px solid rgba(56, 189, 248, 0.18);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: grid;
+    gap: 4px;
+}
+
+.route-weather-item.loading {
+    border-color: rgba(148, 163, 184, 0.28);
+}
+
+.route-weather-item.error {
+    border-color: rgba(248, 113, 113, 0.35);
+}
+
+.route-weather-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 10px;
-    margin-bottom: 16px;
+}
+
+.route-weather-airport {
+    font-size: 13px;
+    font-weight: 700;
+    color: #f8fafc;
+}
+
+.route-weather-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 3px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: rgba(148, 163, 184, 0.16);
+    color: #cbd5e1;
+}
+
+.route-weather-badge.observed {
+    background: rgba(56, 189, 248, 0.18);
+    color: #bae6fd;
+}
+
+.route-weather-badge.forecast {
+    background: rgba(245, 158, 11, 0.18);
+    color: #fde68a;
+}
+
+.route-weather-badge.error {
+    background: rgba(248, 113, 113, 0.18);
+    color: #fecaca;
+}
+
+.route-weather-role {
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+.route-weather-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.route-weather-values span {
+    border-radius: 999px;
+    padding: 4px 8px;
+    background: rgba(30, 41, 59, 0.92);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    font-size: 11px;
+    color: #e2e8f0;
+}
+
+.route-weather-note {
+    font-size: 11px;
+    color: #cbd5e1;
 }
 
 .checkpoint-filter-grid {
@@ -342,15 +525,15 @@ body.map-focus-mode .container > .status-banner {
 
 .route-list li,
 .checkpoint-list li {
-    margin-bottom: 8px;
-    font-size: 13px;
+    margin-bottom: 6px;
+    font-size: 12px;
 }
 
 .leg-controls {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    margin-bottom: 18px;
+    gap: 8px;
+    margin-bottom: 8px;
 }
 
 .leg-control {
@@ -358,7 +541,7 @@ body.map-focus-mode .container > .status-banner {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    padding: 10px 12px;
+    padding: 8px 10px;
     border: 1px solid var(--map-border-color);
     border-radius: 8px;
     background: rgba(30, 41, 59, 0.8);
@@ -374,7 +557,7 @@ body.map-focus-mode .container > .status-banner {
     align-items: center;
     gap: 10px;
     color: #f1f5f9;
-    font-size: 13px;
+    font-size: 12px;
 }
 
 .leg-swatch {
@@ -401,10 +584,10 @@ body.map-focus-mode .container > .status-banner {
     background: transparent;
     border: 1px solid var(--map-border-color);
     color: #cbd5e1;
-    padding: 6px 10px;
+    padding: 5px 8px;
     border-radius: 6px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 11px;
 }
 
 .map-export-button {

@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getWeatherData } from './src/api/weatherService.js';
+import { getWeatherData, getWeatherStationsInBounds } from './src/api/weatherService.js';
 import {
     getAircraftProfileById,
     getAircraftProfileByName,
@@ -216,6 +216,23 @@ app.post('/api/checkpoints/generate', async (req, res) => {
 });
 
 // API endpoint to get weather data by ICAO (Path Parameter)
+app.get('/api/weather/area', async (req, res) => {
+    try {
+        const payload = await getWeatherStationsInBounds({
+            minLat: req.query.minLat,
+            minLon: req.query.minLon,
+            maxLat: req.query.maxLat,
+            maxLon: req.query.maxLon,
+        }, {
+            datetime: req.query.datetime,
+        });
+        res.json(payload);
+    } catch (error) {
+        const status = error.message?.includes('bounds') ? 400 : 500;
+        res.status(status).json({ error: error.message || 'Failed to load area weather data' });
+    }
+});
+
 app.get('/api/weather/:icao', async (req, res) => {
     const { icao } = req.params;
     try {

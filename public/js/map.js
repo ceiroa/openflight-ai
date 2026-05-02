@@ -3,13 +3,17 @@ import {
     getCheckpointPlanForRoute,
     loadFlightDraft,
     loadAirspaceCache,
+    loadWeatherCache,
     saveAirspaceCache,
+    saveWeatherCache,
 } from "./flightStore.js";
 
 const FAA_VFR_CHARTS_URL = "https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/vfr/index.cfm";
 const FAA_SECTIONAL_INFO_URL = "https://www.faa.gov/air_traffic/flight_info/aeronav/productcatalog/vfrcharts/sectional/";
 const FAA_TAC_INFO_URL = "https://www.faa.gov/air_traffic/flight_info/aeronav/productcatalog/vfrcharts/terminalarea/";
 const AIRSPACE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const WEATHER_FETCH_TIMEOUT_MS = 15000;
+const WEATHER_CACHE_TTL_MS = 15 * 60 * 1000;
 
 const SECTIONAL_CHARTS = [
     { name: "Chicago Sectional", lat: 41.8781, lon: -87.6298, type: "sectional" },
@@ -79,6 +83,9 @@ const state = {
     routeBounds: null,
     routePoints: [],
     legSegments: [],
+    airportMarkers: [],
+    weatherMarkersVisible: false,
+    areaWeatherMarkers: [],
     checkpointMarkers: [],
     checkpointButtons: [],
     referenceCheckpointMarkers: [],
@@ -99,6 +106,7 @@ const state = {
     airspaceLayer: null,
     showAirspace: false,
     routeSignature: "",
+    weatherByIcao: new Map(),
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -141,6 +149,8 @@ function setMenuOpenState(isOpen) {
 }
 
 function renderMapPage(draft) {
+    state.airportMarkers = [];
+    state.weatherByIcao = new Map();
     const routePoints = buildRoutePoints(draft);
     const legSegments = buildLegSegments(routePoints);
     const checkpointPlan = getCheckpointPlanForRoute(draft);
@@ -156,14 +166,16 @@ function renderMapPage(draft) {
                     <button type="button" class="map-mode-button" data-map-mode="${MAP_MODES.terrain}">Terrain</button>
                     <button type="button" class="map-mode-button" data-map-mode="${MAP_MODES.sectional}">FAA Sectional Ref</button>
                     <button type="button" class="map-secondary-button" id="toggle-airspace-btn">Show FAA Airspace</button>
+                    <button type="button" class="map-secondary-button" id="toggle-weather-btn">Show Airport Weather Layer</button>
                     <button type="button" class="map-secondary-button" id="toggle-location-btn">Show Current Location</button>
                     <button type="button" class="map-secondary-button" id="toggle-reference-checkpoints-btn">Show Nearby Reference Checkpoints</button>
                     <span class="map-toolbar-spacer"></span>
                     <button type="button" class="map-export-button" id="export-kml-btn">Export KML</button>
                 </div>
-                <p id="map-status" class="route-summary">Route plotted for ${draft.legs.length} leg${draft.legs.length === 1 ? "" : "s"}.</p>
-                <p id="map-location-status" class="map-location-status">Current location is off.</p>
-                <p id="map-airspace-status" class="map-airspace-status">FAA airspace overlay is off.</p>
+                <div class="map-status-stack">
+                    <p id="map-status" class="route-summary">Route plotted for ${draft.legs.length} leg${draft.legs.length === 1 ? "" : "s"}.</p>
+                    <p id="map-weather-status" class="map-weather-status">Loading airport weather for this route...</p>
+                </div>
                 <div class="route-map-shell">
                     <button type="button" class="map-secondary-button map-overlay-button" id="maximize-map-btn">Maximize Map</button>
                     <button type="button" class="map-secondary-button map-overlay-button map-panel-toggle-button" id="toggle-route-panel-btn">Hide Panel</button>
@@ -172,84 +184,126 @@ function renderMapPage(draft) {
             </section>
             <aside class="route-panel" id="route-panel">
                 <h2>Route Summary</h2>
-                <p class="route-summary"><strong>Departure:</strong> ${escapeHtml(draft.departure.icao)}</p>
-                <ol class="route-list">
-                    ${legSegments.map((segment) => `
-                        <li>Leg ${segment.index + 1}: ${escapeHtml(segment.fromIcao)} to ${escapeHtml(segment.toIcao)}</li>
-                    `).join("")}
-                </ol>
-                <div class="leg-controls">
-                    ${legSegments.map((segment) => `
-                        <div class="leg-control" data-leg-control="${segment.index}">
-                            <div class="leg-control-name">
-                                <span class="leg-swatch leg-swatch-color-${segment.index % LEG_COLORS.length}"></span>
-                                <span>Leg ${segment.index + 1}: ${escapeHtml(segment.fromIcao)} to ${escapeHtml(segment.toIcao)}</span>
-                            </div>
-                            <div class="leg-actions">
-                                <label>
-                                    <input type="checkbox" data-leg-toggle="${segment.index}" checked>
-                                    Show
-                                </label>
-                                <button type="button" class="leg-highlight-button" data-leg-highlight="${segment.index}">Focus</button>
-                            </div>
-                        </div>
-                    `).join("")}
-                </div>
-                <h3>Saved Checkpoints</h3>
-                <div class="checkpoint-filters">
-                    <div class="checkpoint-filter-grid">
-                        <div class="checkpoint-filter-group">
-                            <label for="map-checkpoint-type-filter">Filter By Type</label>
-                            <select id="map-checkpoint-type-filter">
-                                <option value="all">All Types</option>
-                                <option value="visual_checkpoint">Visual Checkpoints</option>
-                                <option value="airport">Airports</option>
-                                <option value="landmark">Landmarks</option>
-                                <option value="manual">Manual</option>
-                                <option value="synthetic">Synthetic</option>
-                            </select>
-                        </div>
-                        <div class="checkpoint-filter-group">
-                            <label for="map-checkpoint-source-filter">Filter By Source</label>
-                            <select id="map-checkpoint-source-filter">
-                                <option value="all">All Sources</option>
-                                <option value="curated_visual_checkpoint">Curated Visual</option>
-                                <option value="chart_candidate">Visual Priority</option>
-                                <option value="airport_reference">Airport Data</option>
-                                <option value="landmark">Landmark Search</option>
-                                <option value="user">User Added</option>
-                                <option value="fallback">Fallback</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                ${checkpointMarkers.length === 0
-                    ? `<div class="empty-state">No saved checkpoints for this route yet.</div>`
-                    : `
-                        <ol class="checkpoint-list">
-                            ${checkpointMarkers.map((checkpoint, index) => `
-                                <li class="checkpoint-list-item" data-checkpoint-item="${index}">
-                                    <button type="button" class="checkpoint-button" data-checkpoint-index="${index}">
-                                        <span>${escapeHtml(checkpoint.name)}</span>
-                                        ${renderCheckpointMeta(checkpoint)}
-                                        <span class="checkpoint-subtitle">${escapeHtml(checkpoint.fromIcao)} to ${escapeHtml(checkpoint.toIcao)} at ${checkpoint.distanceFromLegStartNm.toFixed(1)} NM</span>
-                                        ${checkpoint.notes ? `<span class="checkpoint-subtitle">${escapeHtml(checkpoint.notes)}</span>` : ""}
-                                    </button>
-                                </li>
+                <section class="route-summary-section collapsed" data-accordion-section="overview">
+                    <button type="button" class="route-section-toggle" data-accordion-toggle="overview" aria-expanded="false">
+                        <span>Route Overview</span>
+                        <span class="route-section-chevron" aria-hidden="true">+</span>
+                    </button>
+                    <div class="route-section-content" data-accordion-content="overview">
+                        <p class="route-summary"><strong>Departure:</strong> ${escapeHtml(draft.departure.icao)}</p>
+                        <ol class="route-list">
+                            ${legSegments.map((segment) => `
+                                <li>Leg ${segment.index + 1}: ${escapeHtml(segment.fromIcao)} to ${escapeHtml(segment.toIcao)}</li>
                             `).join("")}
                         </ol>
-                    `}
-                <h3>FAA Chart Reference</h3>
-                <div id="chart-reference-list" class="chart-list">
-                    ${chartReferences.map((chart) => `
-                        <a class="chart-link-button" href="${escapeHtml(chart.url)}" target="_blank" rel="noreferrer">
-                            ${escapeHtml(chart.name)}
-                            <span class="chart-description">${escapeHtml(chart.description)}</span>
-                        </a>
-                    `).join("")}
-                </div>
-                <p id="sectional-note" class="sectional-note">FAA publishes sectional and TAC files as downloads, not ready-made browser tile layers. This mode helps you identify the likely official charts for the plotted route while keeping a free live map underneath.</p>
-                <p class="reference-checkpoint-note">Nearby reference checkpoints come from the curated visual checkpoint dataset and are shown separately from the trip checkpoints.</p>
+                        <div class="leg-controls">
+                            ${legSegments.map((segment) => `
+                                <div class="leg-control" data-leg-control="${segment.index}">
+                                    <div class="leg-control-name">
+                                        <span class="leg-swatch leg-swatch-color-${segment.index % LEG_COLORS.length}"></span>
+                                        <span>Leg ${segment.index + 1}: ${escapeHtml(segment.fromIcao)} to ${escapeHtml(segment.toIcao)}</span>
+                                    </div>
+                                    <div class="leg-actions">
+                                        <label>
+                                            <input type="checkbox" data-leg-toggle="${segment.index}" checked>
+                                            Show
+                                        </label>
+                                        <button type="button" class="leg-highlight-button" data-leg-highlight="${segment.index}">Focus</button>
+                                    </div>
+                                </div>
+                            `).join("")}
+                        </div>
+                    </div>
+                </section>
+                <section class="route-summary-section collapsed" data-accordion-section="weather">
+                    <button type="button" class="route-section-toggle" data-accordion-toggle="weather" aria-expanded="false">
+                        <span>Weather Along Route</span>
+                        <span class="route-section-chevron" aria-hidden="true">+</span>
+                    </button>
+                    <div class="route-section-content" data-accordion-content="weather">
+                        <div id="route-weather-list" class="route-weather-list">
+                            ${routePoints.map((point) => `
+                                <article class="route-weather-item loading" data-weather-row="${escapeHtml(point.icao)}" data-weather-role="${escapeHtml(point.roleLabel)}">
+                                    <div class="route-weather-head">
+                                        <span class="route-weather-airport">${escapeHtml(point.icao)}</span>
+                                        <span class="route-weather-badge">Loading</span>
+                                    </div>
+                                    <div class="route-weather-role">${escapeHtml(point.roleLabel)}</div>
+                                    <div class="route-weather-note">Loading airport weather...</div>
+                                </article>
+                            `).join("")}
+                        </div>
+                    </div>
+                </section>
+                <section class="route-summary-section collapsed" data-accordion-section="checkpoints">
+                    <button type="button" class="route-section-toggle" data-accordion-toggle="checkpoints" aria-expanded="false">
+                        <span>Saved Checkpoints</span>
+                        <span class="route-section-chevron" aria-hidden="true">+</span>
+                    </button>
+                    <div class="route-section-content" data-accordion-content="checkpoints">
+                        <div class="checkpoint-filters">
+                            <div class="checkpoint-filter-grid">
+                                <div class="checkpoint-filter-group">
+                                    <label for="map-checkpoint-type-filter">Filter By Type</label>
+                                    <select id="map-checkpoint-type-filter">
+                                        <option value="all">All Types</option>
+                                        <option value="visual_checkpoint">Visual Checkpoints</option>
+                                        <option value="airport">Airports</option>
+                                        <option value="landmark">Landmarks</option>
+                                        <option value="manual">Manual</option>
+                                        <option value="synthetic">Synthetic</option>
+                                    </select>
+                                </div>
+                                <div class="checkpoint-filter-group">
+                                    <label for="map-checkpoint-source-filter">Filter By Source</label>
+                                    <select id="map-checkpoint-source-filter">
+                                        <option value="all">All Sources</option>
+                                        <option value="curated_visual_checkpoint">Curated Visual</option>
+                                        <option value="chart_candidate">Visual Priority</option>
+                                        <option value="airport_reference">Airport Data</option>
+                                        <option value="landmark">Landmark Search</option>
+                                        <option value="user">User Added</option>
+                                        <option value="fallback">Fallback</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        ${checkpointMarkers.length === 0
+                            ? `<div class="empty-state">No saved checkpoints for this route yet.</div>`
+                            : `
+                                <ol class="checkpoint-list">
+                                    ${checkpointMarkers.map((checkpoint, index) => `
+                                        <li class="checkpoint-list-item" data-checkpoint-item="${index}">
+                                            <button type="button" class="checkpoint-button" data-checkpoint-index="${index}">
+                                                <span>${escapeHtml(checkpoint.name)}</span>
+                                                ${renderCheckpointMeta(checkpoint)}
+                                                <span class="checkpoint-subtitle">${escapeHtml(checkpoint.fromIcao)} to ${escapeHtml(checkpoint.toIcao)} at ${checkpoint.distanceFromLegStartNm.toFixed(1)} NM</span>
+                                                ${checkpoint.notes ? `<span class="checkpoint-subtitle">${escapeHtml(checkpoint.notes)}</span>` : ""}
+                                            </button>
+                                        </li>
+                                    `).join("")}
+                                </ol>
+                            `}
+                    </div>
+                </section>
+                <section class="route-summary-section collapsed" data-accordion-section="charts">
+                    <button type="button" class="route-section-toggle" data-accordion-toggle="charts" aria-expanded="false">
+                        <span>FAA Chart Reference</span>
+                        <span class="route-section-chevron" aria-hidden="true">+</span>
+                    </button>
+                    <div class="route-section-content" data-accordion-content="charts">
+                        <div id="chart-reference-list" class="chart-list">
+                            ${chartReferences.map((chart) => `
+                                <a class="chart-link-button" href="${escapeHtml(chart.url)}" target="_blank" rel="noreferrer">
+                                    ${escapeHtml(chart.name)}
+                                    <span class="chart-description">${escapeHtml(chart.description)}</span>
+                                </a>
+                            `).join("")}
+                        </div>
+                        <p id="sectional-note" class="sectional-note">FAA publishes sectional and TAC files as downloads, not ready-made browser tile layers. This mode helps you identify the likely official charts for the plotted route while keeping a free live map underneath.</p>
+                        <p class="reference-checkpoint-note">Nearby reference checkpoints come from the curated visual checkpoint dataset and are shown separately from the trip checkpoints.</p>
+                    </div>
+                </section>
             </aside>
         </div>
     `;
@@ -265,13 +319,17 @@ function renderMapPage(draft) {
     state.routeSignature = createRouteSignature(draft);
     initializeLeafletMap(routePoints, legSegments, checkpointMarkers);
     attachMapPageHandlers(checkpointMarkers);
+    updateWeatherToggleButton();
     applyMapMode(MAP_MODES.street);
+    void loadRouteWeather(draft, routePoints);
 }
 
 function initializeLeafletMap(routePoints, legSegments, checkpointMarkers) {
     const map = window.L.map("route-map", {
         zoomControl: true,
     });
+
+    state.airportMarkers = [];
 
     const streetLayer = window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 18,
@@ -300,7 +358,8 @@ function initializeLeafletMap(routePoints, legSegments, checkpointMarkers) {
             weight: 2,
         }).addTo(map);
 
-        marker.bindPopup(`<strong>${escapeHtml(point.icao)}</strong><br>${index === 0 ? "Departure" : `Leg ${index}`}`);
+        marker.bindPopup(buildAirportPopup(point));
+        state.airportMarkers.push({ ...point, marker, weatherLayer: null });
     });
 
     checkpointMarkers.forEach((checkpoint, index) => {
@@ -336,6 +395,9 @@ function initializeLeafletMap(routePoints, legSegments, checkpointMarkers) {
         if (state.showAirspace) {
             void refreshAirspaceOverlay();
         }
+        if (state.weatherMarkersVisible) {
+            void refreshAreaWeatherLayer();
+        }
     });
 }
 
@@ -344,6 +406,13 @@ function attachMapPageHandlers(checkpointMarkers) {
         button.addEventListener("click", () => {
             applyMapMode(button.getAttribute("data-map-mode"));
         });
+    });
+
+    document.querySelectorAll("[data-accordion-toggle]").forEach((button) => {
+        button.addEventListener("click", () => {
+            toggleRouteSection(button.getAttribute("data-accordion-toggle"));
+        });
+        syncRouteSectionToggle(button.getAttribute("data-accordion-toggle"));
     });
 
     document.querySelectorAll("[data-leg-toggle]").forEach((input) => {
@@ -367,7 +436,7 @@ function attachMapPageHandlers(checkpointMarkers) {
     });
 
     if (checkpointMarkers.length > 0) {
-        highlightCheckpoint(0, false);
+        highlightCheckpoint(0, false, false);
     }
 
     document.getElementById("map-checkpoint-type-filter")?.addEventListener("change", (event) => {
@@ -383,6 +452,9 @@ function attachMapPageHandlers(checkpointMarkers) {
     document.getElementById("toggle-airspace-btn")?.addEventListener("click", () => {
         void toggleAirspaceOverlay();
     });
+    document.getElementById("toggle-weather-btn")?.addEventListener("click", () => {
+        toggleWeatherLayer();
+    });
     document.getElementById("toggle-location-btn")?.addEventListener("click", () => {
         void toggleCurrentLocation();
     });
@@ -393,6 +465,31 @@ function attachMapPageHandlers(checkpointMarkers) {
     document.getElementById("toggle-route-panel-btn")?.addEventListener("click", toggleRoutePanel);
     applyCheckpointFilters();
     updateRoutePanelState();
+}
+
+function toggleRouteSection(sectionName) {
+    const section = document.querySelector(`[data-accordion-section="${sectionName}"]`);
+    const toggle = document.querySelector(`[data-accordion-toggle="${sectionName}"]`);
+    if (!section || !toggle) {
+        return;
+    }
+
+    const isCollapsed = section.classList.contains("collapsed");
+    section.classList.toggle("collapsed", !isCollapsed);
+    syncRouteSectionToggle(sectionName);
+}
+
+function syncRouteSectionToggle(sectionName) {
+    const section = document.querySelector(`[data-accordion-section="${sectionName}"]`);
+    const toggle = document.querySelector(`[data-accordion-toggle="${sectionName}"]`);
+    const chevron = toggle?.querySelector(".route-section-chevron");
+    if (!section || !toggle || !chevron) {
+        return;
+    }
+
+    const isExpanded = !section.classList.contains("collapsed");
+    toggle.setAttribute("aria-expanded", String(isExpanded));
+    chevron.textContent = isExpanded ? "−" : "+";
 }
 
 function applyMapMode(mode) {
@@ -476,7 +573,7 @@ function focusLeg(legIndex) {
     });
 }
 
-function highlightCheckpoint(index, pan = true) {
+function highlightCheckpoint(index, pan = true, openPopup = true) {
     const checkpoint = state.checkpointMarkers[index];
     if (!checkpoint || !matchesCheckpointFilters(checkpoint)) {
         return;
@@ -508,7 +605,11 @@ function highlightCheckpoint(index, pan = true) {
         return;
     }
 
-    checkpoint.marker.openPopup();
+    if (openPopup) {
+        checkpoint.marker.openPopup();
+    } else {
+        checkpoint.marker.closePopup();
+    }
     if (pan && state.map) {
         state.map.flyTo([checkpoint.lat, checkpoint.lon], Math.max(state.map.getZoom(), 9), {
             animate: true,
@@ -565,13 +666,460 @@ function buildRoutePoints(draft) {
             icao: draft.departure.icao,
             lat: Number(draft.departure.lat),
             lon: Number(draft.departure.lon),
+            roleLabel: "Departure",
         },
-        ...draft.legs.map((leg) => ({
+        ...draft.legs.map((leg, index) => ({
             icao: leg.icao,
             lat: Number(leg.lat),
             lon: Number(leg.lon),
+            roleLabel: `Leg ${index + 1} Destination`,
         })),
     ];
+}
+
+async function loadRouteWeather(draft, routePoints) {
+    clearExpiredSharedWeatherCacheEntries();
+    const uniqueAirports = Array.from(new Set(routePoints.map((point) => point.icao)));
+    if (uniqueAirports.length === 0) {
+        updateWeatherStatus("No route airports are available for weather loading.");
+        return;
+    }
+
+    updateWeatherStatus(`Loading airport weather for ${uniqueAirports.length} route airport${uniqueAirports.length === 1 ? "" : "s"}...`);
+
+    const results = await Promise.all(uniqueAirports.map(async (icao) => {
+        try {
+            const weather = getCachedWeather(icao, draft.date) || await fetchRouteWeather(icao, draft.date);
+            state.weatherByIcao.set(icao, weather);
+            updateWeatherRowsForAirport(icao, weather);
+            refreshAirportMarkerPopup(icao);
+            updateAirportWeatherLayer(icao);
+            return { icao, ok: true, weather };
+        } catch (error) {
+            state.weatherByIcao.set(icao, { error: error.message });
+            updateWeatherRowsForAirport(icao, null, error.message);
+            refreshAirportMarkerPopup(icao);
+            updateAirportWeatherLayer(icao);
+            return { icao, ok: false, error: error.message };
+        }
+    }));
+
+    const successCount = results.filter((result) => result.ok).length;
+    const forecastCount = results.filter((result) => result.ok && result.weather?.forecast?.isForecast).length;
+    const errorCount = results.length - successCount;
+
+    if (successCount === 0) {
+        updateWeatherStatus("No route airport weather could be loaded.");
+        return;
+    }
+
+    const modeLabel = forecastCount > 0 ? "forecast" : "weather";
+    const suffix = errorCount > 0 ? ` ${errorCount} airport${errorCount === 1 ? "" : "s"} could not be loaded.` : "";
+    updateWeatherStatus(`Loaded ${modeLabel} for ${successCount} route airport${successCount === 1 ? "" : "s"}.${suffix}`);
+}
+
+async function fetchRouteWeather(icao, datetimeLocal) {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), WEATHER_FETCH_TIMEOUT_MS);
+
+    try {
+        const response = await fetch(buildWeatherUrl(icao, datetimeLocal), {
+            signal: controller.signal,
+        });
+        if (!response.ok) {
+            const failure = await response.json().catch(() => ({ error: "Weather lookup failed." }));
+            throw new Error(failure.error || `Weather lookup failed for ${icao}.`);
+        }
+
+        const payload = await response.json();
+        validateWeatherData(payload, icao);
+        cacheWeather(icao, datetimeLocal, payload);
+        return payload;
+    } catch (error) {
+        if (error.name === "AbortError") {
+            throw new Error(`Weather lookup timed out for ${icao}.`);
+        }
+        throw error;
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
+}
+
+function buildWeatherUrl(icao, datetimeLocal) {
+    if (!datetimeLocal) {
+        return `/api/weather/${icao}`;
+    }
+
+    const parsed = new Date(datetimeLocal);
+    const datetime = Number.isFinite(parsed.getTime()) ? parsed.toISOString() : datetimeLocal;
+    return `/api/weather/${icao}?datetime=${encodeURIComponent(datetime)}`;
+}
+
+function validateWeatherData(data, icao) {
+    const requiredNumericFields = ["temperature", "altimeter", "windSpeed", "elevation", "lat", "lon"];
+    const missingField = requiredNumericFields.find((field) => !Number.isFinite(Number(data[field])));
+    if (missingField) {
+        throw new Error(`Weather data for ${icao} is missing ${missingField}.`);
+    }
+}
+
+function buildWeatherCacheKey(icao, datetimeValue = "") {
+    return `${String(icao || "").trim().toUpperCase()}|${datetimeValue || "current"}`;
+}
+
+function readWeatherCache() {
+    try {
+        const parsed = loadWeatherCache();
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+        return {};
+    }
+}
+
+function cacheWeather(icao, datetimeValue, data) {
+    const cache = readWeatherCache();
+    cache[buildWeatherCacheKey(icao, datetimeValue)] = {
+        savedAt: Date.now(),
+        payload: data,
+    };
+    saveWeatherCache(cache);
+}
+
+function getCachedWeather(icao, datetimeValue) {
+    const cache = readWeatherCache();
+    const entry = cache[buildWeatherCacheKey(icao, datetimeValue)];
+    if (!entry?.savedAt || Date.now() - Number(entry.savedAt) > WEATHER_CACHE_TTL_MS) {
+        return null;
+    }
+    return entry.payload ?? null;
+}
+
+function clearExpiredSharedWeatherCacheEntries() {
+    const cache = readWeatherCache();
+    let changed = false;
+    for (const [key, entry] of Object.entries(cache)) {
+        if (!entry?.savedAt || Date.now() - Number(entry.savedAt) > WEATHER_CACHE_TTL_MS) {
+            delete cache[key];
+            changed = true;
+        }
+    }
+    if (changed) {
+        saveWeatherCache(cache);
+    }
+}
+
+function updateWeatherRowsForAirport(icao, weather, errorMessage = "") {
+    const rows = Array.from(document.querySelectorAll(`[data-weather-row="${icao}"]`));
+    rows.forEach((row) => {
+        const roleLabel = row.getAttribute("data-weather-role") || "";
+        if (errorMessage) {
+            row.className = "route-weather-item error";
+            row.innerHTML = `
+                <div class="route-weather-head">
+                    <span class="route-weather-airport">${escapeHtml(icao)}</span>
+                    <span class="route-weather-badge error">Unavailable</span>
+                </div>
+                <div class="route-weather-role">${escapeHtml(roleLabel)}</div>
+                <div class="route-weather-note">${escapeHtml(errorMessage)}</div>
+            `;
+            return;
+        }
+
+        const modeLabel = weather?.forecast?.isForecast ? "Forecast" : "Observed";
+        const sourceNote = weather?.forecast?.isForecast
+            ? formatForecastWindow(weather.forecast)
+            : weather?.weatherSourceIcao
+                ? `From nearby station ${weather.weatherSourceIcao}`
+                : "From FAA observation data";
+
+        row.className = "route-weather-item";
+        row.innerHTML = `
+            <div class="route-weather-head">
+                <span class="route-weather-airport">${escapeHtml(icao)}</span>
+                <span class="route-weather-badge ${weather?.forecast?.isForecast ? "forecast" : "observed"}">${escapeHtml(modeLabel)}</span>
+            </div>
+            <div class="route-weather-role">${escapeHtml(roleLabel)}</div>
+            <div class="route-weather-values">
+                <span>${escapeHtml(formatTemperature(weather.temperature))}</span>
+                <span>${escapeHtml(formatWind(weather.windDirection, weather.windSpeed))}</span>
+                <span>${escapeHtml(formatAltimeter(weather.altimeter))}</span>
+            </div>
+            <div class="route-weather-note">${escapeHtml(sourceNote)}</div>
+        `;
+    });
+}
+
+function refreshAirportMarkerPopup(icao) {
+    state.airportMarkers
+        .filter((entry) => entry.icao === icao)
+        .forEach((entry) => {
+            entry.marker.bindPopup(buildAirportPopup(entry));
+        });
+}
+
+function toggleWeatherLayer() {
+    state.weatherMarkersVisible = !state.weatherMarkersVisible;
+    updateWeatherToggleButton();
+    if (!state.weatherMarkersVisible) {
+        state.airportMarkers.forEach((entry) => removeAirportWeatherLayer(entry));
+        clearAreaWeatherMarkers();
+        updateWeatherLayerStatus("Airport weather layer is off.");
+        return;
+    }
+
+    state.airportMarkers.forEach((entry) => ensureAirportWeatherLayer(entry));
+    void refreshAreaWeatherLayer();
+}
+
+function updateWeatherToggleButton() {
+    const button = document.getElementById("toggle-weather-btn");
+    if (!button) {
+        return;
+    }
+    button.textContent = state.weatherMarkersVisible
+        ? "Hide Airport Weather Layer"
+        : "Show Airport Weather Layer";
+    button.classList.toggle("active", state.weatherMarkersVisible);
+}
+
+async function refreshAreaWeatherLayer() {
+    if (!state.map) {
+        return;
+    }
+
+    updateWeatherLayerStatus("Loading airport weather for the current map view...");
+    const bounds = state.map.getBounds();
+    const response = await fetch(buildAreaWeatherUrl(bounds));
+    if (!response.ok) {
+        const failure = await response.json().catch(() => ({ error: "Area weather request failed." }));
+        updateWeatherLayerStatus(failure.error || "Area weather request failed.");
+        return;
+    }
+
+    const payload = await response.json();
+    const routeAirportIds = new Set(state.airportMarkers.map((entry) => entry.icao));
+    const items = Array.isArray(payload.items)
+        ? payload.items.filter((item) => !routeAirportIds.has(String(item.icao || "").toUpperCase()))
+        : [];
+
+    items.forEach((item) => {
+        if (item?.icao && item?.weather) {
+            cacheWeather(item.icao, loadFlightDraft()?.date, item.weather);
+        }
+    });
+
+    renderAreaWeatherMarkers(items);
+    const stationCount = items.length;
+    const truncationNote = payload.truncated ? ` Showing ${stationCount} of ${payload.totalStationsInBounds} stations.` : "";
+    updateWeatherLayerStatus(
+        stationCount === 0
+            ? "No additional visible airport weather stations were found in the current map view."
+            : `Airport weather layer loaded for ${stationCount} nearby station${stationCount === 1 ? "" : "s"}.${truncationNote}`,
+    );
+}
+
+function buildAreaWeatherUrl(bounds) {
+    const draft = loadFlightDraft();
+    const params = new URLSearchParams({
+        minLat: String(bounds.getSouth()),
+        minLon: String(bounds.getWest()),
+        maxLat: String(bounds.getNorth()),
+        maxLon: String(bounds.getEast()),
+    });
+    if (draft?.date) {
+        const parsed = new Date(draft.date);
+        const datetime = Number.isFinite(parsed.getTime()) ? parsed.toISOString() : draft.date;
+        params.set("datetime", datetime);
+    }
+    return `/api/weather/area?${params.toString()}`;
+}
+
+function renderAreaWeatherMarkers(items) {
+    clearAreaWeatherMarkers();
+    if (!state.map) {
+        return;
+    }
+
+    state.areaWeatherMarkers = items.map((item) => {
+        const marker = window.L.marker([Number(item.lat), Number(item.lon)], {
+            icon: window.L.divIcon({
+                className: "airport-weather-layer-icon",
+                html: buildAreaWeatherLayerHtml(item),
+                iconSize: [74, 40],
+                iconAnchor: [37, 46],
+            }),
+        }).addTo(state.map);
+        marker.bindPopup(buildAreaWeatherPopup(item));
+        return { ...item, marker };
+    });
+}
+
+function clearAreaWeatherMarkers() {
+    state.areaWeatherMarkers.forEach((item) => {
+        if (item.marker && state.map?.hasLayer(item.marker)) {
+            state.map.removeLayer(item.marker);
+        }
+    });
+    state.areaWeatherMarkers = [];
+}
+
+function updateAirportWeatherLayer(icao) {
+    state.airportMarkers
+        .filter((entry) => entry.icao === icao)
+        .forEach((entry) => {
+            if (!state.weatherMarkersVisible) {
+                return;
+            }
+            ensureAirportWeatherLayer(entry);
+        });
+}
+
+function ensureAirportWeatherLayer(entry) {
+    removeAirportWeatherLayer(entry);
+    const weather = state.weatherByIcao.get(entry.icao);
+    if (!weather || weather.error || !state.map) {
+        return;
+    }
+
+    const html = `
+        <div class="airport-weather-layer ${weather.forecast?.isForecast ? "forecast" : "observed"}" aria-hidden="true">
+            <div class="airport-weather-layer-code">${escapeHtml(entry.icao)}</div>
+            <div class="airport-weather-layer-line">${escapeHtml(formatWindShort(weather.windDirection, weather.windSpeed))}</div>
+            <div class="airport-weather-layer-line">${escapeHtml(formatTemperatureShort(weather.temperature))}</div>
+        </div>
+    `;
+    entry.weatherLayer = window.L.marker([entry.lat, entry.lon], {
+        icon: window.L.divIcon({
+            className: "airport-weather-layer-icon",
+            html,
+            iconSize: [78, 44],
+            iconAnchor: [39, 52],
+        }),
+        interactive: false,
+        keyboard: false,
+    }).addTo(state.map);
+}
+
+function removeAirportWeatherLayer(entry) {
+    if (entry.weatherLayer && state.map?.hasLayer(entry.weatherLayer)) {
+        state.map.removeLayer(entry.weatherLayer);
+    }
+    entry.weatherLayer = null;
+}
+
+function buildAirportPopup(point) {
+    const weather = state.weatherByIcao.get(point.icao);
+    const lines = [
+        `<strong>${escapeHtml(point.icao)}</strong>`,
+        escapeHtml(point.roleLabel || "Route Airport"),
+    ];
+
+    if (!weather) {
+        lines.push("Loading airport weather...");
+        return lines.join("<br>");
+    }
+
+    if (weather.error) {
+        lines.push(escapeHtml(weather.error));
+        return lines.join("<br>");
+    }
+
+    lines.push(`Temperature: ${escapeHtml(formatTemperature(weather.temperature))}`);
+    lines.push(`Wind: ${escapeHtml(formatWind(weather.windDirection, weather.windSpeed))}`);
+    lines.push(`Altimeter: ${escapeHtml(formatAltimeter(weather.altimeter))}`);
+
+    if (weather.forecast?.isForecast) {
+        lines.push("Source: FAA TAF forecast");
+        const forecastWindow = formatForecastWindow(weather.forecast);
+        if (forecastWindow) {
+            lines.push(escapeHtml(forecastWindow));
+        }
+    } else if (weather.weatherSourceIcao) {
+        lines.push(`Source: Nearby station ${escapeHtml(weather.weatherSourceIcao)}`);
+    } else {
+        lines.push("Source: FAA observation");
+    }
+
+    return lines.join("<br>");
+}
+
+function buildAreaWeatherLayerHtml(item) {
+    return `
+        <div class="airport-weather-layer area ${item.weather?.forecast?.isForecast ? "forecast" : "observed"}" aria-hidden="true">
+            <div class="airport-weather-layer-code">${escapeHtml(item.icao)}</div>
+            <div class="airport-weather-layer-line">${escapeHtml(formatWindShort(item.weather?.windDirection, item.weather?.windSpeed))}</div>
+            <div class="airport-weather-layer-line">${escapeHtml(formatTemperatureShort(item.weather?.temperature))}</div>
+        </div>
+    `;
+}
+
+function buildAreaWeatherPopup(item) {
+    const lines = [
+        `<strong>${escapeHtml(item.icao)}</strong>`,
+        escapeHtml(item.name || "Airport Weather Station"),
+        `Temperature: ${escapeHtml(formatTemperature(item.weather?.temperature))}`,
+        `Wind: ${escapeHtml(formatWind(item.weather?.windDirection, item.weather?.windSpeed))}`,
+        `Altimeter: ${escapeHtml(formatAltimeter(item.weather?.altimeter))}`,
+    ];
+
+    if (item.weather?.forecast?.isForecast) {
+        lines.push("Source: FAA TAF forecast");
+        lines.push(escapeHtml(formatForecastWindow(item.weather.forecast)));
+    } else if (item.weather?.weatherSourceIcao) {
+        lines.push(`Source: Nearby station ${escapeHtml(item.weather.weatherSourceIcao)}`);
+    } else {
+        lines.push("Source: FAA observation");
+    }
+
+    return lines.join("<br>");
+}
+
+function updateWeatherStatus(message) {
+    const statusNode = document.getElementById("map-weather-status");
+    if (statusNode) {
+        statusNode.textContent = message;
+    }
+}
+
+function updateWeatherLayerStatus(message) {
+    const statusNode = document.getElementById("map-weather-layer-status");
+    if (statusNode) {
+        statusNode.textContent = message;
+    }
+}
+
+function formatTemperature(value) {
+    return `${Number(value).toFixed(1)} C`;
+}
+
+function formatWind(direction, speed) {
+    return `${Math.round(Number(direction) || 0)}° @ ${Math.round(Number(speed) || 0)} kt`;
+}
+
+function formatAltimeter(value) {
+    return `${Number(value).toFixed(2)} inHg`;
+}
+
+function formatWindShort(direction, speed) {
+    return `${Math.round(Number(direction) || 0)}°/${Math.round(Number(speed) || 0)}kt`;
+}
+
+function formatTemperatureShort(value) {
+    return `${Math.round(Number(value))} C`;
+}
+
+function formatForecastWindow(forecast) {
+    if (!forecast?.validFrom || !forecast?.validTo) {
+        return "Forecast from FAA TAF data";
+    }
+
+    const validFrom = new Date(forecast.validFrom);
+    const validTo = new Date(forecast.validTo);
+    if (!Number.isFinite(validFrom.getTime()) || !Number.isFinite(validTo.getTime())) {
+        return "Forecast from FAA TAF data";
+    }
+
+    return `Valid ${validFrom.toLocaleString([], { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })} to ${validTo.toLocaleString([], { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}`;
 }
 
 function buildLegSegments(routePoints) {
@@ -691,6 +1239,7 @@ function updateReferenceCheckpointButton() {
     button.textContent = state.showReferenceCheckpoints
         ? "Hide Nearby Reference Checkpoints"
         : "Show Nearby Reference Checkpoints";
+    button.classList.toggle("active", state.showReferenceCheckpoints);
 }
 
 async function toggleAirspaceOverlay() {
@@ -960,6 +1509,7 @@ function updateAirspaceToggleButton() {
     button.textContent = state.showAirspace
         ? "Hide FAA Airspace"
         : "Show FAA Airspace";
+    button.classList.toggle("active", state.showAirspace);
 }
 
 function updateAirspaceStatus(message) {
@@ -1141,6 +1691,7 @@ function updateLocationToggleButton() {
     button.textContent = state.showCurrentLocation
         ? "Hide Current Location"
         : "Show Current Location";
+    button.classList.toggle("active", state.showCurrentLocation);
 }
 
 function updateLocationStatus(message, status = "info") {

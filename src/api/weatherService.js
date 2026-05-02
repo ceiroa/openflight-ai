@@ -10,6 +10,8 @@ const RETRYABLE_STATUS_CODES = new Set([502, 503, 504]);
 const MAX_FETCH_ATTEMPTS = 3;
 
 let stationCachePromise;
+const AREA_WEATHER_CONCURRENCY = 6;
+const MAX_AREA_WEATHER_STATIONS = 24;
 
 export async function getWeatherData(icao, options = {}) {
     const requestedTime = parseRequestedTime(options.datetime);
@@ -18,6 +20,52 @@ export async function getWeatherData(icao, options = {}) {
     }
 
     return getObservedWeatherData(icao);
+}
+
+export async function getWeatherStationsInBounds(bounds, options = {}) {
+    const normalizedBounds = normalizeBounds(bounds);
+    const stations = await loadMetarStations();
+    const stationsInBounds = stations.filter((station) => {
+        const lat = Number(station.lat);
+        const lon = Number(station.lon);
+        return lat >= normalizedBounds.minLat
+            && lat <= normalizedBounds.maxLat
+            && lon >= normalizedBounds.minLon
+            && lon <= normalizedBounds.maxLon;
+    });
+
+    const limitedStations = stationsInBounds
+        .sort((left, right) => {
+            const leftLat = Number(left.lat);
+            const rightLat = Number(right.lat);
+            if (leftLat !== rightLat) {
+                return rightLat - leftLat;
+            }
+            return String(left.icaoId).localeCompare(String(right.icaoId));
+        })
+        .slice(0, MAX_AREA_WEATHER_STATIONS);
+
+    const items = await runWithConcurrency(limitedStations, AREA_WEATHER_CONCURRENCY, async (station) => {
+        try {
+            const weather = await getWeatherData(station.icaoId, { datetime: options.datetime });
+            return {
+                icao: station.icaoId,
+                name: station.name || station.site,
+                lat: Number(station.lat),
+                lon: Number(station.lon),
+                weather,
+            };
+        } catch {
+            return null;
+        }
+    });
+
+    return {
+        items: items.filter(Boolean),
+        totalStationsInBounds: stationsInBounds.length,
+        returnedStations: limitedStations.length,
+        truncated: stationsInBounds.length > limitedStations.length,
+    };
 }
 
 async function getObservedWeatherData(icao) {
@@ -417,6 +465,36 @@ async function loadMetarStations() {
     }
 
     return stationCachePromise;
+}
+
+function normalizeBounds(bounds) {
+    const minLat = Number(bounds?.minLat);
+    const minLon = Number(bounds?.minLon);
+    const maxLat = Number(bounds?.maxLat);
+    const maxLon = Number(bounds?.maxLon);
+
+    if (![minLat, minLon, maxLat, maxLon].every(Number.isFinite)) {
+        throw new Error('Valid bounds are required.');
+    }
+
+    return { minLat, minLon, maxLat, maxLon };
+}
+
+async function runWithConcurrency(items, limit, worker) {
+    const results = new Array(items.length);
+    let nextIndex = 0;
+
+    async function consume() {
+        while (nextIndex < items.length) {
+            const currentIndex = nextIndex;
+            nextIndex += 1;
+            results[currentIndex] = await worker(items[currentIndex], currentIndex);
+        }
+    }
+
+    const consumers = Array.from({ length: Math.min(limit, items.length) }, () => consume());
+    await Promise.all(consumers);
+    return results;
 }
 
 function calculateDistanceNm(lat1, lon1, lat2, lon2) {

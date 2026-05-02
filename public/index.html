@@ -105,14 +105,49 @@
         .loading-progress.inline-progress .loading-progress-track { height: 8px; }
         .loading-progress.inline-progress .loading-progress-note { display: none; }
 
-        #nav-log-container { display: none; background: #fff; color: #000; padding: 40px; border-radius: 4px; margin-top: 20px; }
+        #nav-log-container {
+            display: none;
+            background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+            color: #e2e8f0;
+            padding: 40px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border: 1px solid rgba(71, 85, 105, 0.7);
+            box-shadow: 0 18px 36px rgba(2, 6, 23, 0.45);
+        }
         .nav-log-table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 25px; }
-        .nav-log-table th, .nav-log-table td { border: 1px solid #000; padding: 5px; text-align: center; font-size: 10px; }
-        .nav-log-table th { background-color: #f1f5f9; }
+        .nav-log-table th, .nav-log-table td {
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            padding: 5px;
+            text-align: center;
+            font-size: 10px;
+        }
+        .nav-log-table th {
+            background-color: rgba(51, 65, 85, 0.96);
+            color: #7dd3fc;
+        }
+        .nav-log-table td {
+            background: rgba(30, 41, 59, 0.82);
+            color: #f8fafc;
+        }
 
         @media print {
             .no-print, canvas { display: none !important; }
-            #nav-log-container { display: block !important; padding: 0; }
+            #nav-log-container {
+                display: block !important;
+                padding: 0;
+                background: white;
+                color: black;
+                border: none;
+                box-shadow: none;
+            }
+            .nav-log-table th,
+            .nav-log-table td {
+                border: 1px solid #000;
+                color: #000;
+            }
+            .nav-log-table th { background-color: #f1f5f9; }
+            .nav-log-table td { background: white; }
             body { background: white; margin: 0; }
         }
 
@@ -129,9 +164,18 @@
         .checkpoint-status.success { display: block; color: #86efac; }
         .plan-action-spacer { display: block; visibility: hidden; }
         .plan-actions-row { margin-bottom: 12px; }
-        .nav-log-title { text-align: center; margin: 0; text-transform: uppercase; }
-        .nav-log-header { display: flex; justify-content: space-between; margin-top: 10px; margin-bottom: 20px; font-size: 12px; border-bottom: 1px solid #000; padding-bottom: 5px; }
-        .nav-log-section-title { margin: 0; }
+        .nav-log-title { text-align: center; margin: 0; text-transform: uppercase; color: #7dd3fc; letter-spacing: 0.06em; }
+        .nav-log-header {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            margin-bottom: 20px;
+            font-size: 12px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+            padding-bottom: 5px;
+            color: #cbd5e1;
+        }
+        .nav-log-section-title { margin: 0; color: #bae6fd; }
     </style>
 </head>
 <body>
@@ -301,7 +345,6 @@
                         <th>DIST (REM)</th>
                         <th>GROUNDSPEED</th>
                         <th>ETE</th>
-                        <th>ETA</th>
                         <th>COMMS / FREQ</th>
                     </tr>
                 </thead>

@@ -107,6 +107,8 @@ const state = {
     showAirspace: false,
     routeSignature: "",
     weatherByIcao: new Map(),
+    mobileMapLayout: false,
+    hasInitializedResponsiveLayout: false,
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -476,12 +478,37 @@ function attachMapPageHandlers(checkpointMarkers) {
     document.getElementById("recenter-route-btn")?.addEventListener("click", recenterRouteMap);
     document.getElementById("toggle-route-panel-btn")?.addEventListener("click", toggleRoutePanel);
     applyCheckpointFilters();
+    syncResponsiveMapLayout();
+    window.addEventListener("resize", handleViewportResize);
     updateRoutePanelState();
 }
 
 function recenterRouteMap() {
     if (state.routeBounds) {
         state.map?.fitBounds(state.routeBounds, { padding: [30, 30] });
+    }
+}
+
+function handleViewportResize() {
+    syncResponsiveMapLayout();
+    updateRoutePanelState();
+}
+
+function syncResponsiveMapLayout() {
+    const isMobileLayout = window.matchMedia("(max-width: 1024px)").matches;
+    state.mobileMapLayout = isMobileLayout;
+    container.classList.toggle("mobile-map-layout", isMobileLayout);
+
+    if (!state.hasInitializedResponsiveLayout) {
+        state.routePanelCollapsed = isMobileLayout;
+        state.hasInitializedResponsiveLayout = true;
+        return;
+    }
+
+    if (isMobileLayout && !state.mapMaximized) {
+        state.routePanelCollapsed = true;
+    } else if (!isMobileLayout && !state.mapMaximized) {
+        state.routePanelCollapsed = false;
     }
 }
 
@@ -1720,11 +1747,12 @@ function updateRoutePanelState() {
         return;
     }
 
-    const shouldCollapse = state.mapMaximized && state.routePanelCollapsed;
+    const collapsible = state.mapMaximized || state.mobileMapLayout;
+    const shouldCollapse = collapsible && state.routePanelCollapsed;
     routePanel.classList.toggle("collapsed", shouldCollapse);
     toggleButton.textContent = shouldCollapse ? "Show Panel" : "Hide Panel";
     toggleButton.classList.toggle("active", !shouldCollapse);
-    toggleButton.style.display = state.mapMaximized ? "inline-flex" : "none";
+    toggleButton.style.display = collapsible ? "inline-flex" : "none";
 }
 
 async function toggleCurrentLocation() {

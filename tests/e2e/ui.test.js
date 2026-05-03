@@ -463,6 +463,22 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#toggle-reference-checkpoints-btn')).toBeVisible();
     });
 
+    test('should default to a collapsed route panel on narrower map layouts', async ({ page }) => {
+        await page.setViewportSize({ width: 820, height: 1180 });
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#menu-toggle');
+        await page.click('#open-map-btn');
+
+        await expect(page).toHaveURL(/map\.html$/);
+        await expect(page.locator('#toggle-route-panel-btn')).toBeVisible();
+        await expect(page.locator('#route-panel')).toHaveClass(/collapsed/);
+        await page.click('#toggle-route-panel-btn');
+        await expect(page.locator('#route-panel')).not.toHaveClass(/collapsed/);
+    });
+
     test('should load route airport weather on the map page', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();

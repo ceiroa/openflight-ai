@@ -779,6 +779,24 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('.profile-scroll svg')).toContainText('Leg 1 cruise 4,500 ft');
     });
 
+    test('should let the user show and hide airspace classes on the airspace profile', async ({ page }) => {
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+
+        await page.click('#menu-toggle');
+        await page.click('#open-airspace-profile-btn');
+
+        await expect(page.locator('.profile-summary')).toContainText('Airspace classes shown: B, C, D, E, G.');
+        await page.locator('[data-airspace-class-toggle="B"]').uncheck();
+        await expect(page.locator('.profile-summary')).toContainText('Airspace classes shown: C, D, E, G.');
+        await expect(page.locator('.summary-panel')).toContainText('No selected airspace classes with usable vertical limits are currently shown.');
+        await page.locator('[data-airspace-class-toggle="B"]').check();
+        await expect(page.locator('.profile-summary')).toContainText('Airspace classes shown: B, C, D, E, G.');
+        await expect(page.locator('.summary-panel')).toContainText('Chicago Class B');
+    });
+
     test('should show post-nav-log quick navigation buttons only after nav log generation', async ({ page }) => {
         await expect(page.locator('#post-navlog-actions')).not.toHaveClass(/visible/);
 

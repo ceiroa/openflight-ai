@@ -32,6 +32,15 @@ const profileRoot = document.getElementById("profile-root");
 const loadingProgress = document.getElementById("loading-progress");
 const loadingProgressLabel = document.getElementById("loading-progress-label");
 const loadingProgressBar = document.getElementById("loading-progress-bar");
+const profileState = {
+    routeLengthNm: 0,
+    legSegments: [],
+    projectedSegments: [],
+    unresolvedSegments: [],
+    elevationSamples: [],
+    svgWidth: MIN_SVG_WIDTH,
+    selectedClasses: new Set(["B", "C", "D", "E", "G"]),
+};
 
 document.addEventListener("DOMContentLoaded", () => {
     menuToggleButton.addEventListener("click", () => {
@@ -89,67 +98,16 @@ async function renderAirspaceProfilePage(draft) {
         showLoadingProgress("Projecting FAA airspace onto the route profile...", 64);
 
         const { projectedSegments, unresolvedSegments } = projectAirspaceToRoute(airspaceGeojson.features || [], routePoints, routeLengthNm, elevatedRouteSamples);
-        const classGSegments = deriveClassGSegments(projectedSegments, elevatedRouteSamples);
         const svgWidth = Math.max(MIN_SVG_WIDTH, Math.round(routeLengthNm * PIXELS_PER_NM) + MARGIN.left + MARGIN.right);
-        const svgMarkup = buildProfileSvg(projectedSegments, classGSegments, elevatedRouteSamples, routeLengthNm, svgWidth, legSegments);
-
-        profileRoot.innerHTML = `
-        <div class="profile-layout">
-            <section class="profile-panel">
-                <h2>Altitude Profile</h2>
-                <p class="profile-summary">Route distance: ${routeLengthNm.toFixed(1)} NM. Corridor width: +/-${CORRIDOR_NM} NM. Airspace classes shown: ${AIRSPACE_CLASSES}, G.</p>
-                <div class="route-distance-scale">
-                    <span>0 NM</span>
-                    <span>${routeLengthNm.toFixed(1)} NM</span>
-                </div>
-                <div class="profile-scroll">
-                    ${svgMarkup}
-                </div>
-                <div class="legend">
-                    ${buildLegendMarkup()}
-                </div>
-            </section>
-            <aside class="summary-panel">
-                <h2>Route Summary</h2>
-                <ul class="summary-list">
-                    ${legSegments.map((segment) => `
-                        <li>
-                            <strong>Leg ${segment.index + 1}: ${escapeHtml(segment.fromIcao)} to ${escapeHtml(segment.toIcao)}</strong>
-                            <span class="summary-subtitle">${segment.distanceNm.toFixed(1)} NM</span>
-                        </li>
-                    `).join("")}
-                </ul>
-                <h3>Airspace Hits</h3>
-                ${projectedSegments.length === 0
-                    ? `<div class="empty-state">No airspace with usable vertical limits was available from the current FAA source for this corridor.</div>`
-                    : `
-                        <ul class="summary-list">
-                            ${projectedSegments.map((segment) => `
-                                <li>
-                                    <strong>${escapeHtml(segment.name)}</strong>
-                                    <span class="summary-subtitle">Class ${escapeHtml(segment.classCode)} | ${segment.startNm.toFixed(1)} NM to ${segment.endNm.toFixed(1)} NM</span>
-                                    <span class="summary-subtitle">${escapeHtml(segment.lowerLabel)} to ${escapeHtml(segment.upperLabel)}</span>
-                                </li>
-                            `).join("")}
-                        </ul>
-                    `}
-                <h3>Unresolved Airspace</h3>
-                ${unresolvedSegments.length === 0
-                    ? `<div class="empty-state">All intersecting airspace in this corridor included usable vertical limits.</div>`
-                    : `
-                        <ul class="summary-list">
-                            ${unresolvedSegments.map((segment) => `
-                                <li>
-                                    <strong>${escapeHtml(segment.name)}</strong>
-                                    <span class="summary-subtitle">Class ${escapeHtml(segment.classCode)} | ${segment.startNm.toFixed(1)} NM to ${segment.endNm.toFixed(1)} NM</span>
-                                    <span class="summary-subtitle">Vertical limits unavailable from current FAA Class_Airspace feed.</span>
-                                </li>
-                            `).join("")}
-                        </ul>
-                    `}
-            </aside>
-        </div>
-    `;
+        Object.assign(profileState, {
+            routeLengthNm,
+            legSegments,
+            projectedSegments,
+            unresolvedSegments,
+            elevationSamples: elevatedRouteSamples,
+            svgWidth,
+        });
+        renderProfileView();
 
         if (unresolvedSegments.length > 0) {
             showStatus("Some intersecting airspace still uses AGL or open-ended limits in the FAA feed, so it is listed separately instead of being drawn as an altitude band.", "info");
@@ -161,6 +119,133 @@ async function renderAirspaceProfilePage(draft) {
         showStatus(error.message || "Failed to load the airspace profile.", "error");
         renderEmptyState("FAA airspace could not be loaded for this route right now.");
     }
+}
+
+function renderProfileView() {
+    const selectedClassesLabel = Array.from(profileState.selectedClasses).sort().join(", ") || "None";
+    const visibleProjectedSegments = profileState.projectedSegments.filter((segment) => profileState.selectedClasses.has(segment.classCode));
+    const visibleUnresolvedSegments = profileState.unresolvedSegments.filter((segment) => profileState.selectedClasses.has(segment.classCode));
+    const visibleClassGSegments = profileState.selectedClasses.has("G")
+        ? deriveClassGSegments(profileState.projectedSegments, profileState.elevationSamples)
+        : [];
+    const svgMarkup = buildProfileSvg(
+        visibleProjectedSegments,
+        visibleClassGSegments,
+        profileState.elevationSamples,
+        profileState.routeLengthNm,
+        profileState.svgWidth,
+        profileState.legSegments,
+    );
+
+    profileRoot.innerHTML = `
+        <div class="profile-layout">
+            <section class="profile-panel">
+                <h2>Altitude Profile</h2>
+                <p class="profile-summary">Route distance: ${profileState.routeLengthNm.toFixed(1)} NM. Corridor width: +/-${CORRIDOR_NM} NM. Airspace classes shown: ${escapeHtml(selectedClassesLabel)}.</p>
+                <div class="route-distance-scale">
+                    <span>0 NM</span>
+                    <span>${profileState.routeLengthNm.toFixed(1)} NM</span>
+                </div>
+                <div class="profile-scroll">
+                    ${svgMarkup}
+                </div>
+                <div class="legend legend-controls" aria-label="Airspace class visibility and legend">
+                    ${buildLegendToggleMarkup()}
+                </div>
+            </section>
+            <aside class="summary-panel">
+                <h2>Route Summary</h2>
+                <ul class="summary-list">
+                    ${profileState.legSegments.map((segment) => `
+                        <li>
+                            <strong>Leg ${segment.index + 1}: ${escapeHtml(segment.fromIcao)} to ${escapeHtml(segment.toIcao)}</strong>
+                            <span class="summary-subtitle">${segment.distanceNm.toFixed(1)} NM</span>
+                        </li>
+                    `).join("")}
+                </ul>
+                <h3>Airspace Hits</h3>
+                ${visibleProjectedSegments.length === 0
+                    ? `<div class="empty-state">No selected airspace classes with usable vertical limits are currently shown.</div>`
+                    : `
+                        <ul class="summary-list">
+                            ${visibleProjectedSegments.map((segment) => `
+                                <li>
+                                    <strong>${escapeHtml(segment.name)}</strong>
+                                    <span class="summary-subtitle">Class ${escapeHtml(segment.classCode)} | ${segment.startNm.toFixed(1)} NM to ${segment.endNm.toFixed(1)} NM</span>
+                                    <span class="summary-subtitle">${escapeHtml(segment.lowerLabel)} to ${escapeHtml(segment.upperLabel)}</span>
+                                </li>
+                            `).join("")}
+                        </ul>
+                    `}
+                <h3>Unresolved Airspace</h3>
+                ${visibleUnresolvedSegments.length === 0
+                    ? `<div class="empty-state">All intersecting airspace in this corridor included usable vertical limits.</div>`
+                    : `
+                        <ul class="summary-list">
+                            ${visibleUnresolvedSegments.map((segment) => `
+                                <li>
+                                    <strong>${escapeHtml(segment.name)}</strong>
+                                    <span class="summary-subtitle">Class ${escapeHtml(segment.classCode)} | ${segment.startNm.toFixed(1)} NM to ${segment.endNm.toFixed(1)} NM</span>
+                                    <span class="summary-subtitle">Vertical limits unavailable from current FAA Class_Airspace feed.</span>
+                                </li>
+                            `).join("")}
+                        </ul>
+                    `}
+            </aside>
+        </div>
+    `;
+    attachClassToggleHandlers();
+}
+
+function buildClassToggleMarkup() {
+    return ["B", "C", "D", "E", "G"].map((classCode) => `
+        <label class="class-toggle-pill ${profileState.selectedClasses.has(classCode) ? "active" : ""}">
+            <input type="checkbox" data-airspace-class-toggle="${classCode}" ${profileState.selectedClasses.has(classCode) ? "checked" : ""}>
+            <span>Class ${classCode}</span>
+        </label>
+    `).join("");
+}
+
+function buildLegendToggleMarkup() {
+    return Object.keys(AIRSPACE_COLORS).map((airspaceClass) => {
+        if (airspaceClass === "TERRAIN") {
+            return `
+                <span class="legend-item legend-static-item">
+                    <span class="legend-swatch legend-swatch-terrain"></span>
+                    <span>Terrain</span>
+                </span>
+            `;
+        }
+        return `
+            <label class="legend-item legend-toggle-item ${profileState.selectedClasses.has(airspaceClass) ? "active" : ""}">
+                <input type="checkbox" data-airspace-class-toggle="${airspaceClass}" ${profileState.selectedClasses.has(airspaceClass) ? "checked" : ""}>
+                <span class="legend-swatch legend-swatch-${airspaceClass.toLowerCase()}"></span>
+                <span>Class ${airspaceClass}</span>
+            </label>
+        `;
+    }).join("") + `
+        <span class="legend-item legend-static-item">
+            <span class="legend-swatch legend-swatch-cruise"></span>
+            <span>Planned Cruise</span>
+        </span>
+    `;
+}
+
+function attachClassToggleHandlers() {
+    document.querySelectorAll("[data-airspace-class-toggle]").forEach((input) => {
+        input.addEventListener("change", (event) => {
+            const classCode = event.target.getAttribute("data-airspace-class-toggle");
+            if (!classCode) {
+                return;
+            }
+            if (event.target.checked) {
+                profileState.selectedClasses.add(classCode);
+            } else {
+                profileState.selectedClasses.delete(classCode);
+            }
+            renderProfileView();
+        });
+    });
 }
 
 async function loadAirspaceForBounds(bounds, routeSignature) {
@@ -685,20 +770,6 @@ function buildDistanceTicks(routeLengthNm, xScale) {
         `);
     }
     return ticks.join("");
-}
-
-function buildLegendMarkup() {
-    return Object.keys(AIRSPACE_COLORS).map((airspaceClass) => `
-        <span class="legend-item">
-            <span class="legend-swatch legend-swatch-${airspaceClass.toLowerCase()}"></span>
-            <span>${airspaceClass === "TERRAIN" ? "Terrain" : `Class ${airspaceClass}`}</span>
-        </span>
-    `).join("") + `
-        <span class="legend-item">
-            <span class="legend-swatch legend-swatch-cruise"></span>
-            <span>Planned Cruise</span>
-        </span>
-    `;
 }
 
 function buildAirspaceUrl(bounds) {

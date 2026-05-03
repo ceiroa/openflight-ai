@@ -148,11 +148,37 @@ span {
     margin-top: 14px;
 }
 
+.legend-controls {
+    align-items: center;
+}
+
 .legend-item {
     display: inline-flex;
     align-items: center;
     gap: 8px;
     font-size: 12px;
+}
+
+.legend-toggle-item {
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--profile-border-color);
+    background: rgba(30, 41, 59, 0.72);
+    cursor: pointer;
+    user-select: none;
+}
+
+.legend-toggle-item.active {
+    border-color: rgba(125, 211, 252, 0.48);
+    background: rgba(14, 116, 144, 0.18);
+}
+
+.legend-toggle-item input {
+    margin: 0;
+}
+
+.legend-static-item {
+    padding: 6px 4px;
 }
 
 .legend-swatch {

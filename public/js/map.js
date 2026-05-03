@@ -178,6 +178,7 @@ function renderMapPage(draft) {
                 </div>
                 <div class="route-map-shell">
                     <button type="button" class="map-secondary-button map-overlay-button" id="maximize-map-btn">Maximize Map</button>
+                    <button type="button" class="map-secondary-button map-overlay-button map-recenter-button" id="recenter-route-btn">Recenter Route</button>
                     <button type="button" class="map-secondary-button map-overlay-button map-panel-toggle-button" id="toggle-route-panel-btn">Hide Panel</button>
                     <div id="route-map" role="img" aria-label="Map of the current route"></div>
                 </div>
@@ -462,9 +463,16 @@ function attachMapPageHandlers(checkpointMarkers) {
         void toggleReferenceCheckpoints();
     });
     document.getElementById("maximize-map-btn")?.addEventListener("click", toggleMapMaximized);
+    document.getElementById("recenter-route-btn")?.addEventListener("click", recenterRouteMap);
     document.getElementById("toggle-route-panel-btn")?.addEventListener("click", toggleRoutePanel);
     applyCheckpointFilters();
     updateRoutePanelState();
+}
+
+function recenterRouteMap() {
+    if (state.routeBounds) {
+        state.map?.fitBounds(state.routeBounds, { padding: [30, 30] });
+    }
 }
 
 function toggleRouteSection(sectionName) {

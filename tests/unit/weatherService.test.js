@@ -322,6 +322,7 @@ describe('getWeatherData', () => {
     });
 
     test('returns a clear error when no FAA forecast covers the selected future time', async () => {
+        const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-04-29T12:00:00.000Z'));
         global.fetch = jest.fn()
             .mockResolvedValueOnce({
                 ok: true,
@@ -357,5 +358,6 @@ describe('getWeatherData', () => {
         await expect(getWeatherData('KLOT', {
             datetime: '2026-05-02T19:30:00.000Z',
         })).rejects.toThrow('No FAA forecast data is available for KLOT at the selected date and time');
+        nowSpy.mockRestore();
     });
 });

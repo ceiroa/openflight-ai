@@ -148,12 +148,16 @@ export async function generateClassicCheckpointsForRoute(draft) {
 
             if (namedLandmark) {
                 usedLandmarkNames.add(namedLandmark.name);
+                const nearbyAirportComms = bestAirport ? await getAirportCommsByCode(bestAirport.ident) : null;
                 checkpoints.push({
                     name: namedLandmark.name,
                     distanceFromLegStartNm,
                     fraction,
-                    comms: "VIS",
+                    comms: nearbyAirportComms?.summary && nearbyAirportComms.summary !== 'N/A' ? nearbyAirportComms.summary : 'VIS',
                     featureType: namedLandmark.featureType,
+                    notes: nearbyAirportComms?.summary && nearbyAirportComms.summary !== 'N/A'
+                        ? `Nearby airport communications: ${nearbyAirportComms.summary}.`
+                        : undefined,
                 });
             } else if (bestAirport) {
                 usedAirportIds.add(bestAirport.ident);
@@ -511,6 +515,7 @@ function buildRankedEnhancedCandidates({
         }
 
         const baseScore = (crossTrackNm * 1.5) + distanceToSampleNm;
+        const nearbyAirport = findBestCheckpointAirport(start, end, samplePoint, usableAirports, usedAirportIds);
         candidates.push({
             name: checkpoint.name,
             distanceFromLegStartNm,
@@ -522,6 +527,7 @@ function buildRankedEnhancedCandidates({
             score: scoreEnhancedCandidate(baseScore, 22),
             lat: checkpoint.lat,
             lon: checkpoint.lon,
+            airportCode: nearbyAirport?.ident,
             notes: checkpoint.notes || 'Curated visual checkpoint candidate prioritized for dead-reckoning review.',
         });
     }
@@ -541,6 +547,7 @@ function buildRankedEnhancedCandidates({
         const baseScore = ((crossTrackNm * 2) + distanceToSampleNm) * typeWeight;
         const isVisualCheckpoint = VISUAL_FEATURE_TYPES.has(landmark.featureType);
         const score = scoreEnhancedCandidate(baseScore, isVisualCheckpoint ? 16 : 4);
+        const nearbyAirport = findBestCheckpointAirport(start, end, samplePoint, usableAirports, usedAirportIds);
 
         candidates.push({
             name: landmark.name,
@@ -553,6 +560,7 @@ function buildRankedEnhancedCandidates({
             score,
             lat: landmark.lat,
             lon: landmark.lon,
+            airportCode: nearbyAirport?.ident,
             notes: isVisualCheckpoint
                 ? 'Prominent feature prioritized as a likely visual checkpoint.'
                 : 'Landmark candidate selected from the route corridor.',
@@ -594,16 +602,19 @@ function buildRankedEnhancedCandidates({
 }
 
 async function normalizeEnhancedCheckpointChoice(candidate) {
-    if (candidate.type !== 'airport' || !candidate.airportCode) {
+    if (!candidate.airportCode) {
         return candidate;
     }
 
     const comms = await getAirportCommsByCode(candidate.airportCode);
+    const hasUsefulComms = comms.summary && comms.summary !== 'N/A';
     return {
         ...candidate,
-        comms: comms.summary || candidate.comms,
-        notes: comms.summary && comms.summary !== 'N/A'
-            ? `Airport candidate with available communications: ${comms.summary}.`
+        comms: hasUsefulComms ? comms.summary : candidate.comms,
+        notes: hasUsefulComms
+            ? (candidate.type === 'airport'
+                ? `Airport candidate with available communications: ${comms.summary}.`
+                : `Nearby airport communications: ${comms.summary}.`)
             : candidate.notes,
     };
 }

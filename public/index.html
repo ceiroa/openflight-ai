@@ -118,9 +118,9 @@
         .nav-log-table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 25px; }
         .nav-log-table th, .nav-log-table td {
             border: 1px solid rgba(148, 163, 184, 0.35);
-            padding: 5px;
+            padding: 7px 6px;
             text-align: center;
-            font-size: 10px;
+            font-size: 12px;
         }
         .nav-log-table th {
             background-color: rgba(51, 65, 85, 0.96);
@@ -158,6 +158,19 @@
         .flight-form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 10px; }
         .departure-header { margin-top: 10px; }
         .generate-row { display: flex; gap: 12px; justify-content: flex-end; align-items: center; }
+        .post-navlog-actions {
+            display: none;
+            gap: 8px;
+            margin-right: auto;
+            flex-wrap: wrap;
+        }
+        .post-navlog-actions.visible {
+            display: flex;
+        }
+        .post-navlog-actions .button-secondary {
+            padding: 9px 12px;
+            font-size: 12px;
+        }
         .checkpoint-status { min-height: 18px; font-size: 12px; color: #93c5fd; display: none; margin-right: auto; }
         .checkpoint-status.loading { display: block; }
         .checkpoint-status.error { display: block; color: #fca5a5; }
@@ -280,6 +293,11 @@
                             <div id="loading-progress-bar" class="loading-progress-bar"></div>
                         </div>
                         <p id="loading-progress-note" class="loading-progress-note">Checkpoint generation may take a few seconds while the route is being reviewed.</p>
+                    </div>
+                    <div id="post-navlog-actions" class="post-navlog-actions">
+                        <button type="button" id="post-open-checkpoints-btn" class="button-secondary">Checkpoints Planner</button>
+                        <button type="button" id="post-open-map-btn" class="button-secondary">Route Map</button>
+                        <button type="button" id="post-open-airspace-profile-btn" class="button-secondary">Airspace Profile</button>
                     </div>
                     <button type="button" id="generate-btn" class="button-success">GENERATE NAV LOG</button>
                     <button type="button" id="print-btn" class="button-secondary">PRINT PDF</button>

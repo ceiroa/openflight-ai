@@ -50,6 +50,10 @@ const openCheckpointsButton = document.getElementById("open-checkpoints-btn");
 const openMapButton = document.getElementById("open-map-btn");
 const openAirspaceProfileButton = document.getElementById("open-airspace-profile-btn");
 const openAircraftButton = document.getElementById("open-aircraft-btn");
+const postNavlogActions = document.getElementById("post-navlog-actions");
+const postOpenCheckpointsButton = document.getElementById("post-open-checkpoints-btn");
+const postOpenMapButton = document.getElementById("post-open-map-btn");
+const postOpenAirspaceProfileButton = document.getElementById("post-open-airspace-profile-btn");
 const testFillButton = document.getElementById("test-fill-btn");
 const savePlanButton = document.getElementById("save-plan-btn");
 const loadPlanButton = document.getElementById("load-plan-btn");
@@ -106,6 +110,9 @@ function registerEventHandlers() {
     openMapButton.addEventListener("click", openRouteMap);
     openAirspaceProfileButton.addEventListener("click", openAirspaceProfilePage);
     openAircraftButton.addEventListener("click", openAircraftProfiles);
+    postOpenCheckpointsButton.addEventListener("click", openCheckpointPlanner);
+    postOpenMapButton.addEventListener("click", openRouteMap);
+    postOpenAirspaceProfileButton.addEventListener("click", openAirspaceProfilePage);
     testFillButton.addEventListener("click", populateTestRoute);
     savePlanButton.addEventListener("click", savePlanToFile);
     loadPlanButton.addEventListener("click", () => loadPlanInput.click());
@@ -130,6 +137,7 @@ function registerEventHandlers() {
         document.querySelectorAll(".leg-planned-alt").forEach((input) => {
             input.value = value;
         });
+        saveCurrentFlightDraft();
     });
 
     flightForm.addEventListener("focusout", async (event) => {
@@ -156,12 +164,18 @@ function registerEventHandlers() {
 
         invalidateNavLogState();
 
+        if (target.classList.contains("leg-planned-alt")) {
+            saveCurrentFlightDraft();
+        }
+
         if (target.id === "departure-icao") {
+            clearWeatherData(target, "dep");
             setWeatherStatus(target, "dep");
             return;
         }
 
         if (target.classList.contains("destination-icao")) {
+            clearWeatherData(target, "dest");
             setWeatherStatus(target, "dest");
         }
     });
@@ -208,6 +222,7 @@ function clearStatus() {
 function updateGenerateButtonState() {
     const hasNavLog = hasMatchingNavLogSnapshot();
     const navLogVisible = isNavLogVisible();
+    updatePostNavLogActions(hasNavLog);
 
     if (!hasNavLog) {
         generateButton.dataset.mode = "generate";
@@ -217,6 +232,13 @@ function updateGenerateButtonState() {
 
     generateButton.dataset.mode = navLogVisible ? "close" : "open";
     generateButton.textContent = navLogVisible ? "CLOSE NAV LOG" : "OPEN NAV LOG";
+}
+
+function updatePostNavLogActions(isVisible) {
+    if (!postNavlogActions) {
+        return;
+    }
+    postNavlogActions.classList.toggle("visible", isVisible);
 }
 
 function invalidateNavLogState() {
@@ -809,7 +831,7 @@ async function populateTestRoute() {
     document.getElementById("departure-icao").value = "KLOT";
     document.getElementById("cruise-alt").value = "3000";
 
-    for (const icao of ["KARR", "KSQI", "KLOT"]) {
+    for (const icao of ["KARR", "KORD", "KLOT"]) {
         addLeg();
         destinationsContainer.lastElementChild.querySelector(".destination-icao").value = icao;
     }
@@ -841,27 +863,27 @@ function getBearing(lat1, lon1, lat2, lon2) {
 function collectFlightInputs() {
     const departure = {
         icao: normalizeAirportCode(document.getElementById("departure-icao").value),
-        airportAlt: Number(document.getElementById("dep-airport-alt").value),
-        temp: Number(document.getElementById("dep-temp").value),
-        altimeter: Number(document.getElementById("dep-altim").value),
-        windSpeed: Number(document.getElementById("dep-wind-speed").value),
-        windDirection: Number(document.getElementById("dep-wind-dir").value),
-        lat: Number(document.getElementById("dep-lat").value),
-        lon: Number(document.getElementById("dep-lon").value),
-        variation: Number(document.getElementById("dep-var").value || 0),
+        airportAlt: readNumericFieldValue(document.getElementById("dep-airport-alt"), 0),
+        temp: readNumericFieldValue(document.getElementById("dep-temp")),
+        altimeter: readNumericFieldValue(document.getElementById("dep-altim")),
+        windSpeed: readNumericFieldValue(document.getElementById("dep-wind-speed")),
+        windDirection: readNumericFieldValue(document.getElementById("dep-wind-dir")),
+        lat: readNumericFieldValue(document.getElementById("dep-lat")),
+        lon: readNumericFieldValue(document.getElementById("dep-lon")),
+        variation: readNumericFieldValue(document.getElementById("dep-var"), 0),
     };
 
     const legs = Array.from(document.querySelectorAll(".dest-leg.destination")).map((leg) => ({
         icao: normalizeAirportCode(leg.querySelector(".destination-icao").value),
-        plannedAlt: Number(leg.querySelector(".leg-planned-alt").value),
-        temp: Number(leg.querySelector(".leg-temp").value),
-        altimeter: Number(leg.querySelector(".leg-altim").value),
-        airportElevation: Number(leg.querySelector(".leg-elevation").value),
-        lat: Number(leg.querySelector(".leg-lat").value),
-        lon: Number(leg.querySelector(".leg-lon").value),
-        windDirection: Number(leg.querySelector(".leg-wind-dir").value),
-        windSpeed: Number(leg.querySelector(".leg-wind-speed").value),
-        variation: Number(leg.querySelector(".leg-var").value || 0),
+        plannedAlt: readNumericFieldValue(leg.querySelector(".leg-planned-alt")),
+        temp: readNumericFieldValue(leg.querySelector(".leg-temp")),
+        altimeter: readNumericFieldValue(leg.querySelector(".leg-altim")),
+        airportElevation: readNumericFieldValue(leg.querySelector(".leg-elevation"), 0),
+        lat: readNumericFieldValue(leg.querySelector(".leg-lat")),
+        lon: readNumericFieldValue(leg.querySelector(".leg-lon")),
+        windDirection: readNumericFieldValue(leg.querySelector(".leg-wind-dir")),
+        windSpeed: readNumericFieldValue(leg.querySelector(".leg-wind-speed")),
+        variation: readNumericFieldValue(leg.querySelector(".leg-var"), 0),
     }));
 
     return {
@@ -870,6 +892,16 @@ function collectFlightInputs() {
         departure,
         legs,
     };
+}
+
+function readNumericFieldValue(input, fallback = Number.NaN) {
+    const raw = input?.value ?? "";
+    if (raw === "") {
+        return fallback;
+    }
+
+    const numeric = Number(raw);
+    return Number.isFinite(numeric) ? numeric : fallback;
 }
 
 function validateFlightInputs(inputs) {
@@ -886,6 +918,12 @@ function validateFlightInputs(inputs) {
     if (!Number.isFinite(inputs.departure.lat) || !Number.isFinite(inputs.departure.lon)) {
         errors.push("Departure weather and coordinates must be loaded before generating the nav log.");
     }
+    if (!Number.isFinite(inputs.departure.temp)) {
+        errors.push("Departure weather must be loaded before generating the nav log.");
+    }
+    if (!Number.isFinite(inputs.departure.altimeter) || !Number.isFinite(inputs.departure.windSpeed) || !Number.isFinite(inputs.departure.windDirection)) {
+        errors.push("Departure weather is incomplete. Reload it before generating the nav log.");
+    }
 
     inputs.legs.forEach((leg, index) => {
         const legNumber = index + 1;
@@ -894,6 +932,9 @@ function validateFlightInputs(inputs) {
         }
         if (!Number.isFinite(leg.lat) || !Number.isFinite(leg.lon)) {
             errors.push(`Leg ${legNumber} weather and coordinates must be loaded before generating the nav log.`);
+        }
+        if (!Number.isFinite(leg.temp) || !Number.isFinite(leg.altimeter) || !Number.isFinite(leg.windSpeed) || !Number.isFinite(leg.windDirection)) {
+            errors.push(`Leg ${legNumber} weather is incomplete. Reload it before generating the nav log.`);
         }
         if (!Number.isFinite(leg.plannedAlt) || leg.plannedAlt < 0) {
             errors.push(`Leg ${legNumber} planned altitude is invalid.`);

@@ -48,7 +48,27 @@
         select { padding: 8px; background: var(--field-bg); border: 1px solid var(--border-color); border-radius: 6px; color: white; }
         .empty-state { border: 1px dashed var(--border-color); border-radius: 10px; padding: 24px; text-align: center; color: #cbd5e1; }
         .hint { font-size: 12px; color: #94a3b8; margin-top: 0; }
-        .mode-group { display: flex; flex-direction: column; gap: 4px; min-width: 240px; }
+        .mode-group { display: flex; flex-direction: column; gap: 6px; min-width: 240px; }
+        .mode-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .mode-label {
+            display: inline-flex;
+            align-items: center;
+            width: fit-content;
+            border-radius: 999px;
+            padding: 6px 10px;
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            color: #bae6fd;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
         .filter-group { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }
         .planner-filters { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
         .mode-help { font-size: 12px; color: #94a3b8; margin: 0; }
@@ -66,6 +86,43 @@
             background: rgba(56, 189, 248, 0.12);
             border: 1px solid rgba(56, 189, 248, 0.35);
             color: #bae6fd;
+        }
+        .checkpoint-badge.visual {
+            background: rgba(239, 68, 68, 0.14);
+            border-color: rgba(239, 68, 68, 0.4);
+            color: #fecaca;
+        }
+        .checkpoint-badge.airport {
+            background: rgba(16, 185, 129, 0.14);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #bbf7d0;
+        }
+        .checkpoint-badge.manual {
+            background: rgba(245, 158, 11, 0.14);
+            border-color: rgba(245, 158, 11, 0.4);
+            color: #fde68a;
+        }
+        .checkpoint-distance-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .checkpoint-distance-primary,
+        .checkpoint-distance-secondary {
+            font-weight: 700;
+            color: #f8fafc;
+        }
+        .checkpoint-distance-secondary {
+            color: #cbd5e1;
+            font-weight: 600;
+        }
+        .checkpoint-distance-cell span {
+            margin-left: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
         }
         .checkpoint-note { margin-top: 6px; font-size: 12px; color: #94a3b8; line-height: 1.4; }
         .menu-nav-link.is-disabled {
@@ -110,10 +167,10 @@
 
             <div class="planner-toolbar">
                 <div class="mode-group">
-                    <label for="planner-mode">Checkpoint Mode</label>
-                    <select id="planner-mode">
-                        <option value="enhanced">Enhanced</option>
-                    </select>
+                    <div class="mode-header">
+                        <label>Checkpoint Mode</label>
+                        <div class="mode-label">Enhanced</div>
+                    </div>
                     <p class="mode-help">Enhanced uses curated visual checkpoints, landmark ranking, and airport reference data. Classic remains available only as a backend fallback.</p>
                 </div>
                 <div class="actions">

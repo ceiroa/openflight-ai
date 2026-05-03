@@ -359,10 +359,40 @@ test.describe('CieloRumbo - UI Tests', () => {
 
         await expect(page.locator('#departure-icao')).toHaveValue('KLOT');
         await expect(page.locator('.destination-icao').nth(0)).toHaveValue('KARR');
-        await expect(page.locator('.destination-icao').nth(1)).toHaveValue('KSQI');
+        await expect(page.locator('.destination-icao').nth(1)).toHaveValue('KORD');
         await expect(page.locator('.destination-icao').nth(2)).toHaveValue('KLOT');
         await expect(page.locator('#dep-lat')).toHaveValue('41.6031');
         expect(klotRequests).toBe(1);
+    });
+
+    test('should not generate the nav log when a destination weather lookup fails', async ({ page }) => {
+        await page.unroute('**/api/weather/*');
+        await page.route('**/api/weather/*', async (route) => {
+            const url = new URL(route.request().url());
+            const icao = url.pathname.split('/').pop().toUpperCase();
+            if (icao === 'KORD') {
+                await route.fulfill({
+                    status: 503,
+                    contentType: 'application/json',
+                    body: JSON.stringify({ error: 'Weather service unavailable for KORD.' }),
+                });
+                return;
+            }
+            await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(weatherFixtures[icao]) });
+        });
+
+        await page.fill('#departure-icao', 'KLOT');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#add-leg-btn');
+        await page.locator('.destination-icao').nth(1).fill('KORD');
+        await page.locator('.destination-icao').nth(1).blur();
+
+        await expect(page.locator('.leg-weather-status').nth(1)).toContainText('Weather service unavailable for KORD.');
+        await page.click('#generate-btn');
+        await expect(page.locator('#status-banner')).toContainText('Leg 2 weather and coordinates must be loaded before generating the nav log.');
+        await expect(page.locator('#nav-log-container')).toBeHidden();
     });
 
     test('should add and remove destination legs', async ({ page }) => {
@@ -400,7 +430,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await page.click('#menu-toggle');
         await expect(page.locator('#side-menu')).toHaveClass(/open/);
 
-        await page.locator('#planner-mode').click();
+        await page.locator('#checkpoint-type-filter').click();
         await expect(page.locator('#side-menu')).not.toHaveClass(/open/);
     });
 
@@ -720,6 +750,35 @@ test.describe('CieloRumbo - UI Tests', () => {
         expect(airspaceCalls).toBe(1);
     });
 
+    test('should reflect updated cruise altitude on the airspace profile page', async ({ page }) => {
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.fill('#cruise-alt', '4500');
+
+        await page.click('#menu-toggle');
+        await page.click('#open-airspace-profile-btn');
+
+        await expect(page).toHaveURL(/airspace-profile\.html$/);
+        await expect(page.locator('.profile-scroll svg')).toContainText('Leg 1 cruise 4,500 ft');
+    });
+
+    test('should show post-nav-log quick navigation buttons only after nav log generation', async ({ page }) => {
+        await expect(page.locator('#post-navlog-actions')).not.toHaveClass(/visible/);
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#generate-btn');
+
+        await expect(page.locator('#post-navlog-actions')).toHaveClass(/visible/);
+        await expect(page.locator('#post-open-checkpoints-btn')).toBeVisible();
+        await expect(page.locator('#post-open-map-btn')).toBeVisible();
+        await expect(page.locator('#post-open-airspace-profile-btn')).toBeVisible();
+    });
+
     test('should toggle current location on the route map', async ({ page }) => {
         await page.addInitScript(() => {
             let nextWatchId = 1;
@@ -867,7 +926,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await page.click('#open-checkpoints-btn');
         await expect(page.locator('[data-field="name"]').first()).toHaveValue('KARR VISUAL CHECKPOINT');
         await expect(page.locator('.checkpoint-badge')).toContainText(['Visual Checkpoint', 'Visual Priority']);
-        await expect(page.locator('#planner-mode option')).toHaveCount(1);
+        await expect(page.locator('.mode-label')).toHaveText('Enhanced');
         expect(requestedModes[0]).toBe('enhanced');
     });
 
@@ -1274,6 +1333,28 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#table3-body tr').nth(0).locator('td').first()).toHaveText('FOX RIVER');
         await expect(page.locator('#table3-body tr').nth(1).locator('td').first()).toHaveText('CUSTOM WATER TOWER');
         await expect(page.locator('#table3-body tr').nth(1).locator('td').nth(6)).toHaveText('AWOS 118.525 | CTAF 120.1');
+    });
+
+    test('should show colored planner checkpoint badges and calculated distance summaries', async ({ page }) => {
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+
+        await page.click('#menu-toggle');
+        await page.click('#open-checkpoints-btn');
+
+        const firstTypeBadge = page.locator('[data-checkpoint-row="0:0"] .checkpoint-badge.visual').first();
+        await expect(firstTypeBadge).toHaveText('Visual Checkpoint');
+        await expect(page.locator('[data-checkpoint-row="0:0"] [data-field="distance"]')).toHaveCount(0);
+        await expect(page.locator('[data-checkpoint-row="0:0"] .checkpoint-distance-primary')).toContainText('7.0 NM');
+        await expect(page.locator('[data-checkpoint-row="0:0"] .checkpoint-distance-secondary')).toContainText('7.0 NM');
+
+        await page.locator('.add-checkpoint-btn').first().click();
+        await expect(page.locator('[data-checkpoint-row="0:1"] [data-field="distance"]')).toHaveCount(0);
+        await expect(page.locator('[data-checkpoint-row="0:1"] .checkpoint-badge.manual')).toHaveText('Manual');
+        await expect(page.locator('[data-checkpoint-row="0:1"] .checkpoint-distance-primary')).toContainText('13.7 NM');
+        await expect(page.locator('[data-checkpoint-row="0:1"] .checkpoint-distance-secondary')).toContainText('6.7 NM');
     });
 
     test('should remove a planner checkpoint and reflect that removal in table 3', async ({ page }) => {

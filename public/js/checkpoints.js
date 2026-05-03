@@ -20,7 +20,6 @@ const regenerateButton = document.getElementById("regenerate-btn");
 const saveButton = document.getElementById("save-btn");
 const openMapButton = document.getElementById("open-map-btn");
 const clearButton = document.getElementById("clear-btn");
-const plannerModeSelect = document.getElementById("planner-mode");
 const checkpointTypeFilter = document.getElementById("checkpoint-type-filter");
 const checkpointSourceFilter = document.getElementById("checkpoint-source-filter");
 const menuToggleButton = document.getElementById("menu-toggle");
@@ -57,10 +56,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     regenerateButton.addEventListener("click", () => {
         regeneratePlan();
-    });
-
-    plannerModeSelect.addEventListener("change", () => {
-        plannerMode = plannerModeSelect.value;
     });
     checkpointTypeFilter.addEventListener("change", () => {
         activeTypeFilter = checkpointTypeFilter.value;
@@ -131,13 +126,11 @@ async function hydratePlan() {
     if (savedPlan) {
         currentPlan = savedPlan;
         plannerMode = savedPlan.mode === "classic" ? "enhanced" : (savedPlan.mode || "enhanced");
-        plannerModeSelect.value = plannerMode;
         return;
     }
 
     currentPlan = await fetchGeneratedCheckpointPlan();
     plannerMode = currentPlan.mode || plannerMode;
-    plannerModeSelect.value = plannerMode;
 }
 
 function renderPlanner() {
@@ -146,6 +139,16 @@ function renderPlanner() {
     currentPlan.legs.forEach((legPlan, index) => {
         const legCard = document.createElement("section");
         legCard.className = "leg-card";
+        const distanceDetailsByIndex = legPlan.checkpoints.map((checkpoint, checkpointIndex) => {
+            const fromStartNm = Number(checkpoint.distanceFromLegStartNm) || 0;
+            const previousDistance = checkpointIndex > 0
+                ? Number(legPlan.checkpoints[checkpointIndex - 1].distanceFromLegStartNm) || 0
+                : 0;
+            return {
+                fromStartNm,
+                fromPreviousNm: Math.max(0, fromStartNm - previousDistance),
+            };
+        });
         const visibleCheckpoints = legPlan.checkpoints
             .map((checkpoint, checkpointIndex) => ({ checkpoint, checkpointIndex }))
             .filter(({ checkpoint }) => matchesCheckpointFilters(checkpoint));
@@ -159,7 +162,7 @@ function renderPlanner() {
                     <thead>
                         <tr>
                             <th>Checkpoint Name</th>
-                            <th>Distance From Start (NM)</th>
+                            <th>Distance</th>
                             <th>Comms / Notes</th>
                             <th>Action</th>
                         </tr>
@@ -173,7 +176,12 @@ function renderPlanner() {
                                         ${renderCheckpointMeta(checkpoint)}
                                     </div>
                                 </td>
-                                <td><input type="number" step="0.1" min="0" max="${legPlan.legDistanceNm.toFixed(1)}" value="${checkpoint.distanceFromLegStartNm.toFixed(1)}" data-field="distance"></td>
+                                <td>
+                                    <div class="checkpoint-distance-cell">
+                                        <div class="checkpoint-distance-primary">${escapeHtml(formatDistanceValue(distanceDetailsByIndex[checkpointIndex].fromStartNm))} <span>from start</span></div>
+                                        <div class="checkpoint-distance-secondary">${escapeHtml(formatDistanceValue(distanceDetailsByIndex[checkpointIndex].fromPreviousNm))} <span>from previous</span></div>
+                                    </div>
+                                </td>
                                 <td>
                                     <input type="text" value="${escapeHtml(checkpoint.comms || "VIS")}" data-field="comms">
                                     ${checkpoint.notes ? `<div class="checkpoint-note">${escapeHtml(checkpoint.notes)}</div>` : ""}
@@ -282,12 +290,6 @@ function clearPlan() {
 function updateCheckpointFromRow(legIndex, checkpointIndex, row) {
     const checkpoint = currentPlan.legs[legIndex].checkpoints[checkpointIndex];
     checkpoint.name = row.querySelector('[data-field="name"]').value.trim() || checkpoint.name;
-    checkpoint.distanceFromLegStartNm = clampNumber(
-        row.querySelector('[data-field="distance"]').value,
-        0,
-        currentPlan.legs[legIndex].legDistanceNm,
-        checkpoint.distanceFromLegStartNm,
-    );
     checkpoint.comms = row.querySelector('[data-field="comms"]').value.trim() || "VIS";
 }
 
@@ -397,7 +399,6 @@ function setPlannerBusy(isBusy, message = "") {
     saveButton.disabled = isBusy;
     openMapButton.disabled = isBusy;
     clearButton.disabled = isBusy;
-    plannerModeSelect.disabled = isBusy;
     checkpointTypeFilter.disabled = isBusy;
     checkpointSourceFilter.disabled = isBusy;
     menuNavLinks.forEach((link) => {
@@ -413,14 +414,6 @@ function setPlannerBusy(isBusy, message = "") {
     }
 }
 
-function clampNumber(value, min, max, fallback) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) {
-        return fallback;
-    }
-    return Math.min(max, Math.max(min, numeric));
-}
-
 function escapeHtml(value) {
     return String(value ?? "")
         .replaceAll("&", "&amp;")
@@ -431,9 +424,10 @@ function escapeHtml(value) {
 
 function renderCheckpointMeta(checkpoint) {
     const badges = [];
+    const typeClass = getCheckpointBadgeClass(checkpoint.type);
 
     if (checkpoint.type) {
-        badges.push(`<span class="checkpoint-badge">${escapeHtml(formatCheckpointType(checkpoint.type))}</span>`);
+        badges.push(`<span class="checkpoint-badge ${typeClass}">${escapeHtml(formatCheckpointType(checkpoint.type))}</span>`);
     }
     if (checkpoint.source) {
         badges.push(`<span class="checkpoint-badge">${escapeHtml(formatCheckpointSource(checkpoint.source))}</span>`);
@@ -447,6 +441,19 @@ function renderCheckpointMeta(checkpoint) {
     }
 
     return `<div class="checkpoint-meta">${badges.join("")}</div>`;
+}
+
+function getCheckpointBadgeClass(type) {
+    if (type === "visual_checkpoint") {
+        return "visual";
+    }
+    if (type === "airport") {
+        return "airport";
+    }
+    if (type === "manual") {
+        return "manual";
+    }
+    return "";
 }
 
 function formatCheckpointType(type) {
@@ -467,6 +474,10 @@ function formatCheckpointSource(source) {
         return "Airport Data";
     }
     return normalized.replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function formatDistanceValue(distanceNm) {
+    return `${Number(distanceNm || 0).toFixed(1)} NM`;
 }
 
 function startLoadingProgress(initialMessage) {

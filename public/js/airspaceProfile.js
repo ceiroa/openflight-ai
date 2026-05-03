@@ -76,7 +76,7 @@ async function renderAirspaceProfilePage(draft) {
     try {
         const routeSignature = createRouteSignature(draft);
         const routePoints = buildRoutePoints(draft);
-        const legSegments = buildLegSegments(routePoints);
+        const legSegments = buildLegSegments(routePoints, draft);
         const routeLengthNm = legSegments.reduce((total, leg) => total + leg.distanceNm, 0);
         const fetchBounds = expandBounds(buildRouteBounds(routePoints), CORRIDOR_NM);
         const elevationSamples = buildRouteElevationSamples(routePoints, routeLengthNm, GROUND_SAMPLE_SPACING_NM);
@@ -91,7 +91,7 @@ async function renderAirspaceProfilePage(draft) {
         const { projectedSegments, unresolvedSegments } = projectAirspaceToRoute(airspaceGeojson.features || [], routePoints, routeLengthNm, elevatedRouteSamples);
         const classGSegments = deriveClassGSegments(projectedSegments, elevatedRouteSamples);
         const svgWidth = Math.max(MIN_SVG_WIDTH, Math.round(routeLengthNm * PIXELS_PER_NM) + MARGIN.left + MARGIN.right);
-        const svgMarkup = buildProfileSvg(projectedSegments, classGSegments, elevatedRouteSamples, routeLengthNm, svgWidth, draft);
+        const svgMarkup = buildProfileSvg(projectedSegments, classGSegments, elevatedRouteSamples, routeLengthNm, svgWidth, legSegments);
 
         profileRoot.innerHTML = `
         <div class="profile-layout">
@@ -224,7 +224,7 @@ function buildRoutePoints(draft) {
     ];
 }
 
-function buildLegSegments(routePoints) {
+function buildLegSegments(routePoints, draft) {
     return routePoints.slice(1).map((point, index) => {
         const from = routePoints[index];
         const distanceNm = calculateDistanceNm(from.lat, from.lon, point.lat, point.lon);
@@ -233,6 +233,7 @@ function buildLegSegments(routePoints) {
             fromIcao: from.icao,
             toIcao: point.icao,
             distanceNm,
+            plannedAlt: Number(draft?.legs?.[index]?.plannedAlt || draft?.legs?.[0]?.plannedAlt || draft?.cruiseAlt || draft?.cruise_alt || 3000),
         };
     });
 }
@@ -577,7 +578,7 @@ function buildAirspaceDisplayName(properties) {
     return sector ? `${name} ${sector}` : name;
 }
 
-function buildProfileSvg(segments, classGSegments, elevationSamples, routeLengthNm, svgWidth, draft) {
+function buildProfileSvg(segments, classGSegments, elevationSamples, routeLengthNm, svgWidth, legSegments) {
     const plotWidth = svgWidth - MARGIN.left - MARGIN.right;
     const plotHeight = SVG_HEIGHT - MARGIN.top - MARGIN.bottom;
     const xScale = (value) => MARGIN.left + (value / Math.max(routeLengthNm, 1)) * plotWidth;
@@ -616,8 +617,7 @@ function buildProfileSvg(segments, classGSegments, elevationSamples, routeLength
         `;
     }).join("");
 
-    const cruiseAltitude = Number(draft.cruiseAlt || draft.cruise_alt || 3000);
-    const cruiseY = yScale(Math.min(Math.max(cruiseAltitude, 0), ALTITUDE_TOP_FT));
+    const cruiseProfile = buildCruiseProfileMarkup(legSegments, xScale, yScale);
 
     return `
         <svg class="profile-svg" width="${svgWidth}" height="${SVG_HEIGHT}" viewBox="0 0 ${svgWidth} ${SVG_HEIGHT}" role="img" aria-label="Airspace altitude profile for the current route">
@@ -630,14 +630,46 @@ function buildProfileSvg(segments, classGSegments, elevationSamples, routeLength
             `).join("")}
             ${classGPaths}
             ${terrainPath}
-            <line x1="${MARGIN.left}" y1="${cruiseY.toFixed(1)}" x2="${svgWidth - MARGIN.right}" y2="${cruiseY.toFixed(1)}" stroke="#f43f5e" stroke-width="3" stroke-dasharray="10 6"/>
-            <text x="${svgWidth - MARGIN.right - 6}" y="${(cruiseY - 8).toFixed(1)}" fill="#fda4af" font-size="12" text-anchor="end">Planned cruise ${cruiseAltitude.toLocaleString()} ft</text>
+            ${cruiseProfile}
             ${airspaceRects}
             <line x1="${MARGIN.left}" y1="${SVG_HEIGHT - MARGIN.bottom}" x2="${svgWidth - MARGIN.right}" y2="${SVG_HEIGHT - MARGIN.bottom}" stroke="#e2e8f0" stroke-width="1.5"/>
             <line x1="${MARGIN.left}" y1="${MARGIN.top}" x2="${MARGIN.left}" y2="${SVG_HEIGHT - MARGIN.bottom}" stroke="#e2e8f0" stroke-width="1.5"/>
             ${buildDistanceTicks(routeLengthNm, xScale)}
         </svg>
     `;
+}
+
+function buildCruiseProfileMarkup(legSegments, xScale, yScale) {
+    if (!Array.isArray(legSegments) || legSegments.length === 0) {
+        return "";
+    }
+
+    const lineSegments = [];
+    const labels = [];
+    let startNm = 0;
+    let previousY = null;
+
+    legSegments.forEach((segment) => {
+        const endNm = startNm + segment.distanceNm;
+        const cruiseAltitude = Math.min(Math.max(Number(segment.plannedAlt) || 3000, 0), ALTITUDE_TOP_FT);
+        const y = yScale(cruiseAltitude);
+        const startX = xScale(startNm);
+        const endX = xScale(endNm);
+
+        if (previousY !== null && Math.abs(previousY - y) > 0.5) {
+            lineSegments.push(`<line x1="${startX.toFixed(1)}" y1="${previousY.toFixed(1)}" x2="${startX.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#f43f5e" stroke-width="2.2" stroke-dasharray="8 5"/>`);
+        }
+
+        lineSegments.push(`<line x1="${startX.toFixed(1)}" y1="${y.toFixed(1)}" x2="${endX.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#f43f5e" stroke-width="3" stroke-dasharray="10 6"/>`);
+
+        const labelX = Math.min(endX - 6, Math.max(startX + 6, (startX + endX) / 2));
+        labels.push(`<text x="${labelX.toFixed(1)}" y="${(y - 8).toFixed(1)}" fill="#fda4af" font-size="12" text-anchor="middle">Leg ${segment.index + 1} cruise ${cruiseAltitude.toLocaleString()} ft</text>`);
+
+        startNm = endNm;
+        previousY = y;
+    });
+
+    return `${lineSegments.join("")}${labels.join("")}`;
 }
 
 function buildDistanceTicks(routeLengthNm, xScale) {

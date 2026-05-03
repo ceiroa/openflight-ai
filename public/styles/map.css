@@ -238,14 +238,16 @@ body.map-focus-mode .container > .status-banner {
 }
 
 #maximize-map-btn,
-#toggle-route-panel-btn {
+#toggle-route-panel-btn,
+#recenter-route-btn {
     background: rgba(248, 250, 252, 0.92) !important;
     color: #0f172a !important;
     border: 1px solid rgba(15, 23, 42, 0.2) !important;
 }
 
 #maximize-map-btn:hover,
-#toggle-route-panel-btn:hover {
+#toggle-route-panel-btn:hover,
+#recenter-route-btn:hover {
     background: rgba(248, 250, 252, 0.98) !important;
     color: #020617 !important;
     border-color: rgba(15, 23, 42, 0.28) !important;
@@ -254,6 +256,12 @@ body.map-focus-mode .container > .status-banner {
 .map-panel-toggle-button {
     right: 154px;
     display: none;
+}
+
+.map-recenter-button {
+    top: auto;
+    bottom: 34px;
+    right: 12px;
 }
 
 .route-summary {

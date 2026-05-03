@@ -18,7 +18,7 @@ const MARGIN = { top: 28, right: 28, bottom: 46, left: 72 };
 
 const AIRSPACE_COLORS = {
     B: { stroke: "#1d4ed8", fill: "rgba(37, 99, 235, 0.18)" },
-    C: { stroke: "#7c3aed", fill: "rgba(139, 92, 246, 0.17)" },
+    C: { stroke: "#c026d3", fill: "rgba(217, 70, 239, 0.18)" },
     D: { stroke: "#0f766e", fill: "rgba(20, 184, 166, 0.16)" },
     E: { stroke: "#b45309", fill: "rgba(245, 158, 11, 0.12)" },
     G: { stroke: "#eab308", fill: "rgba(234, 179, 8, 0.24)" },

@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
 
 const weatherFixtures = {
-    KORD: { temperature: 21.1, altimeter: 29.7, windSpeed: 10, windDirection: 270, elevation: 663, lat: 41.9602, lon: -87.9316, variation: -3.96 },
-    KLOT: { temperature: 20, altimeter: 29.73, windSpeed: 12, windDirection: 250, elevation: 673, lat: 41.6031, lon: -88.1017, variation: -3.79 },
-    KARR: { temperature: 18.9, altimeter: 29.73, windSpeed: 13, windDirection: 300, elevation: 699, lat: 41.7713, lon: -88.4815, variation: -3.88 },
-    KSQI: { temperature: 17.4, altimeter: 29.78, windSpeed: 9, windDirection: 280, elevation: 654, lat: 41.7428, lon: -89.6762, variation: -2.94 },
-    KVYS: { temperature: 18, altimeter: 29.76, windSpeed: 10, windDirection: 270, elevation: 650, lat: 41.3519, lon: -89.1531, variation: -2.71 },
-    K1C5: { temperature: 16.8, altimeter: 29.82, windSpeed: 8, windDirection: 240, elevation: 640, lat: 41.7584, lon: -88.4757, variation: -3.88 },
+    KORD: { temperature: 21.1, altimeter: 29.7, windSpeed: 10, windDirection: 270, elevation: 663, lat: 41.9602, lon: -87.9316, variation: -3.96, visibilitySm: 10, ceilingFt: 4500, cloudSummary: 'SCT 3,000 ft, BKN 4,500 ft', cloudLayers: [{ cover: 'SCT', baseFt: 3000 }, { cover: 'BKN', baseFt: 4500 }], presentWeather: ['-RA'], hazards: { precipitation: true, thunderstorm: false }, flightCategory: 'VFR' },
+    KLOT: { temperature: 20, altimeter: 29.73, windSpeed: 12, windDirection: 250, elevation: 673, lat: 41.6031, lon: -88.1017, variation: -3.79, visibilitySm: 5, ceilingFt: 2800, cloudSummary: 'BKN 2,800 ft', cloudLayers: [{ cover: 'BKN', baseFt: 2800 }], presentWeather: ['BR'], hazards: { precipitation: false, thunderstorm: false }, flightCategory: 'MVFR' },
+    KARR: { temperature: 18.9, altimeter: 29.73, windSpeed: 13, windDirection: 300, elevation: 699, lat: 41.7713, lon: -88.4815, variation: -3.88, visibilitySm: 2.5, ceilingFt: 900, cloudSummary: 'OVC 900 ft', cloudLayers: [{ cover: 'OVC', baseFt: 900 }], presentWeather: ['TSRA'], hazards: { precipitation: true, thunderstorm: true }, flightCategory: 'IFR' },
+    KSQI: { temperature: 17.4, altimeter: 29.78, windSpeed: 9, windDirection: 280, elevation: 654, lat: 41.7428, lon: -89.6762, variation: -2.94, visibilitySm: 6, ceilingFt: 3500, cloudSummary: 'BKN 3,500 ft', cloudLayers: [{ cover: 'BKN', baseFt: 3500 }], presentWeather: [], hazards: { precipitation: false, thunderstorm: false }, flightCategory: 'VFR' },
+    KVYS: { temperature: 18, altimeter: 29.76, windSpeed: 10, windDirection: 270, elevation: 650, lat: 41.3519, lon: -89.1531, variation: -2.71, visibilitySm: 7, ceilingFt: null, cloudSummary: 'Clear', cloudLayers: [], presentWeather: [], hazards: { precipitation: false, thunderstorm: false }, flightCategory: 'VFR' },
+    K1C5: { temperature: 16.8, altimeter: 29.82, windSpeed: 8, windDirection: 240, elevation: 640, lat: 41.7584, lon: -88.4757, variation: -3.88, visibilitySm: 6, ceilingFt: 3200, cloudSummary: 'BKN 3,200 ft', cloudLayers: [{ cover: 'BKN', baseFt: 3200 }], presentWeather: [], hazards: { precipitation: false, thunderstorm: false }, flightCategory: 'VFR' },
 };
 
 const routeSignature = JSON.stringify({
@@ -44,6 +44,13 @@ test.describe('CieloRumbo - UI Tests', () => {
                                 lat: 41.9078,
                                 lon: -88.2486,
                                 variation: -3.8,
+                                visibilitySm: 1.5,
+                                ceilingFt: 700,
+                                cloudSummary: 'OVC 700 ft',
+                                cloudLayers: [{ cover: 'OVC', baseFt: 700 }],
+                                presentWeather: ['RA'],
+                                hazards: { precipitation: true, thunderstorm: false },
+                                flightCategory: 'IFR',
                             },
                         },
                     ],
@@ -468,9 +475,15 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('.route-weather-item')).toHaveCount(2);
         await expect(page.locator('.route-weather-item').first()).toContainText('KORD');
         await expect(page.locator('.route-weather-item').first()).toContainText('Observed');
+        await expect(page.locator('.route-weather-item').first()).toContainText('VFR');
         await expect(page.locator('.route-weather-item').first()).toContainText('21.1 C');
+        await expect(page.locator('.route-weather-item').first()).toContainText('Vis 10.0 sm');
+        await expect(page.locator('.route-weather-item').first()).toContainText('Ceiling 4,500 ft');
+        await expect(page.locator('.route-weather-item').first()).toContainText('-RA');
         await expect(page.locator('.route-weather-item').nth(1)).toContainText('KARR');
+        await expect(page.locator('.route-weather-item').nth(1)).toContainText('IFR');
         await expect(page.locator('.route-weather-item').nth(1)).toContainText('300° @ 13 kt');
+        await expect(page.locator('.route-weather-item').nth(1)).toContainText('TS');
     });
 
     test('should reuse home-page weather on the map page without refetching', async ({ page }) => {
@@ -512,16 +525,18 @@ test.describe('CieloRumbo - UI Tests', () => {
         await page.click('#open-map-btn');
 
         await expect(page.locator('#toggle-weather-btn')).toHaveText('Show Airport Weather Layer');
-        await expect(page.locator('.airport-weather-layer')).toHaveCount(0);
+        await expect(page.locator('.airport-weather-icon')).toHaveCount(0);
 
         await page.click('#toggle-weather-btn');
         await expect(page.locator('#toggle-weather-btn')).toHaveText('Hide Airport Weather Layer');
-        await expect(page.locator('.airport-weather-layer')).toHaveCount(3);
-        await expect(page.locator('.airport-weather-layer').first()).toContainText('KORD');
+        await expect(page.locator('.airport-weather-icon')).toHaveCount(3);
+        await expect(page.locator('.airport-weather-icon').first()).toContainText('ORD');
+        await expect(page.locator('#weather-legend-bar')).toBeVisible();
 
         await page.click('#toggle-weather-btn');
         await expect(page.locator('#toggle-weather-btn')).toHaveText('Show Airport Weather Layer');
-        await expect(page.locator('.airport-weather-layer')).toHaveCount(0);
+        await expect(page.locator('.airport-weather-icon')).toHaveCount(0);
+        await expect(page.locator('#weather-legend-bar')).toBeHidden();
     });
 
     test('should show forecast weather on the map page for future flights', async ({ page }) => {

@@ -19,6 +19,12 @@ describe('getWeatherData', () => {
                         altim: 1006.9,
                         wspd: 12,
                         wdir: 250,
+                        visib: 4,
+                        wxString: '-RA BR',
+                        clouds: [
+                            { cover: 'SCT', base: 1800 },
+                            { cover: 'BKN', base: 2600 },
+                        ],
                     }],
                 }),
             })
@@ -45,6 +51,15 @@ describe('getWeatherData', () => {
             lat: 41.60308,
             lon: -88.10167,
             elevation: 673,
+            visibilitySm: 4,
+            ceilingFt: 2600,
+            cloudSummary: 'SCT 1,800 ft, BKN 2,600 ft',
+            presentWeather: ['-RA', 'BR'],
+            hazards: {
+                precipitation: true,
+                thunderstorm: false,
+            },
+            flightCategory: 'MVFR',
         });
         expect(result.variation).toBeCloseTo(-3.8, 1);
         expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -103,9 +118,11 @@ describe('getWeatherData', () => {
                         altim: 1006.9,
                         wspd: 16,
                         wdir: 250,
+                        visib: '10+',
                         lat: 41.6031,
                         lon: -88.1017,
                         elev: 205,
+                        fltCat: 'VFR',
                     }],
                     Count: 1,
                 }),
@@ -121,6 +138,8 @@ describe('getWeatherData', () => {
             lat: 41.6031,
             lon: -88.1017,
             elevation: 673,
+            visibilitySm: 10,
+            flightCategory: 'VFR',
         });
         expect(result.variation).toBeCloseTo(-3.79, 2);
     });
@@ -279,6 +298,11 @@ describe('getWeatherData', () => {
                                 temp: 19,
                                 wspd: 14,
                                 wdir: 230,
+                                visibility: '2SM',
+                                wxString: 'TSRA',
+                                clouds: [
+                                    { cover: 'OVC', base: 900 },
+                                ],
                             },
                         ],
                     }],
@@ -311,6 +335,15 @@ describe('getWeatherData', () => {
             lat: 41.6031,
             lon: -88.1017,
             elevation: 673,
+            visibilitySm: 2,
+            ceilingFt: 900,
+            cloudSummary: 'OVC 900 ft',
+            presentWeather: ['TSRA'],
+            hazards: {
+                precipitation: true,
+                thunderstorm: true,
+            },
+            flightCategory: 'IFR',
             forecast: expect.objectContaining({
                 isForecast: true,
                 source: 'TAF',

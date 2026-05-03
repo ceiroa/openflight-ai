@@ -175,6 +175,16 @@ function renderMapPage(draft) {
                 <div class="map-status-stack">
                     <p id="map-status" class="route-summary">Route plotted for ${draft.legs.length} leg${draft.legs.length === 1 ? "" : "s"}.</p>
                     <p id="map-weather-status" class="map-weather-status">Loading airport weather for this route...</p>
+                    <div id="weather-legend-bar" class="weather-legend-bar hidden" aria-label="Weather legend">
+                        <span class="weather-legend-label">Weather Legend</span>
+                        <div class="weather-legend" aria-label="Weather legend">
+                            <span class="weather-legend-item"><span class="weather-legend-dot vfr"></span>VFR</span>
+                            <span class="weather-legend-item"><span class="weather-legend-dot mvfr"></span>MVFR</span>
+                            <span class="weather-legend-item"><span class="weather-legend-dot ifr"></span>IFR</span>
+                            <span class="weather-legend-item"><span class="weather-legend-dot lifr"></span>LIFR</span>
+                        </div>
+                    </div>
+                    <p id="map-weather-layer-status" class="map-weather-status"></p>
                 </div>
                 <div class="route-map-shell">
                     <button type="button" class="map-secondary-button map-overlay-button" id="maximize-map-btn">Maximize Map</button>
@@ -796,7 +806,9 @@ function cacheWeather(icao, datetimeValue, data) {
 function getCachedWeather(icao, datetimeValue) {
     const cache = readWeatherCache();
     const entry = cache[buildWeatherCacheKey(icao, datetimeValue)];
-    if (!entry?.savedAt || Date.now() - Number(entry.savedAt) > WEATHER_CACHE_TTL_MS) {
+    if (!entry?.savedAt
+        || Date.now() - Number(entry.savedAt) > WEATHER_CACHE_TTL_MS
+        || !isWeatherPayloadDisplayReady(entry.payload)) {
         return null;
     }
     return entry.payload ?? null;
@@ -806,7 +818,9 @@ function clearExpiredSharedWeatherCacheEntries() {
     const cache = readWeatherCache();
     let changed = false;
     for (const [key, entry] of Object.entries(cache)) {
-        if (!entry?.savedAt || Date.now() - Number(entry.savedAt) > WEATHER_CACHE_TTL_MS) {
+        if (!entry?.savedAt
+            || Date.now() - Number(entry.savedAt) > WEATHER_CACHE_TTL_MS
+            || !isWeatherPayloadDisplayReady(entry.payload)) {
             delete cache[key];
             changed = true;
         }
@@ -814,6 +828,29 @@ function clearExpiredSharedWeatherCacheEntries() {
     if (changed) {
         saveWeatherCache(cache);
     }
+}
+
+function isWeatherPayloadDisplayReady(payload) {
+    if (!payload || typeof payload !== "object") {
+        return false;
+    }
+
+    const requiredNumericFields = ["temperature", "altimeter", "windSpeed", "elevation", "lat", "lon"];
+    if (requiredNumericFields.some((field) => !Number.isFinite(Number(payload[field])))) {
+        return false;
+    }
+
+    if (!("flightCategory" in payload)) {
+        return false;
+    }
+    if (!("visibilitySm" in payload) || !("ceilingFt" in payload)) {
+        return false;
+    }
+    if (!("cloudSummary" in payload) || !("presentWeather" in payload) || !("hazards" in payload)) {
+        return false;
+    }
+
+    return true;
 }
 
 function updateWeatherRowsForAirport(icao, weather, errorMessage = "") {
@@ -844,14 +881,20 @@ function updateWeatherRowsForAirport(icao, weather, errorMessage = "") {
         row.innerHTML = `
             <div class="route-weather-head">
                 <span class="route-weather-airport">${escapeHtml(icao)}</span>
-                <span class="route-weather-badge ${weather?.forecast?.isForecast ? "forecast" : "observed"}">${escapeHtml(modeLabel)}</span>
+                <div class="route-weather-badges">
+                    <span class="route-weather-badge route-weather-badge-category ${getFlightCategoryClass(weather?.flightCategory)}">${escapeHtml(weather?.flightCategory || "UNKNOWN")}</span>
+                    <span class="route-weather-badge ${weather?.forecast?.isForecast ? "forecast" : "observed"}">${escapeHtml(modeLabel)}</span>
+                </div>
             </div>
             <div class="route-weather-role">${escapeHtml(roleLabel)}</div>
             <div class="route-weather-values">
                 <span>${escapeHtml(formatTemperature(weather.temperature))}</span>
                 <span>${escapeHtml(formatWind(weather.windDirection, weather.windSpeed))}</span>
                 <span>${escapeHtml(formatAltimeter(weather.altimeter))}</span>
+                <span>${escapeHtml(formatVisibility(weather.visibilitySm))}</span>
+                <span>${escapeHtml(formatCeiling(weather.ceilingFt))}</span>
             </div>
+            <div class="route-weather-flags">${buildWeatherFlagsMarkup(weather)}</div>
             <div class="route-weather-note">${escapeHtml(sourceNote)}</div>
         `;
     });
@@ -881,6 +924,7 @@ function toggleWeatherLayer() {
 
 function updateWeatherToggleButton() {
     const button = document.getElementById("toggle-weather-btn");
+    const legendBar = document.getElementById("weather-legend-bar");
     if (!button) {
         return;
     }
@@ -888,6 +932,7 @@ function updateWeatherToggleButton() {
         ? "Hide Airport Weather Layer"
         : "Show Airport Weather Layer";
     button.classList.toggle("active", state.weatherMarkersVisible);
+    legendBar?.classList.toggle("hidden", !state.weatherMarkersVisible);
 }
 
 async function refreshAreaWeatherLayer() {
@@ -948,17 +993,29 @@ function renderAreaWeatherMarkers(items) {
         return;
     }
 
-    state.areaWeatherMarkers = items.map((item) => {
+    state.areaWeatherMarkers = items.map((item) => ({
+        icao: item.icao,
+        name: item.name,
+        lat: Number(item.lat),
+        lon: Number(item.lon),
+        weather: item.weather,
+        marker: null,
+    }));
+
+    items.forEach((item) => {
         const marker = window.L.marker([Number(item.lat), Number(item.lon)], {
             icon: window.L.divIcon({
                 className: "airport-weather-layer-icon",
                 html: buildAreaWeatherLayerHtml(item),
-                iconSize: [74, 40],
-                iconAnchor: [37, 46],
+                iconSize: [44, 44],
+                iconAnchor: [22, 40],
             }),
         }).addTo(state.map);
         marker.bindPopup(buildAreaWeatherPopup(item));
-        return { ...item, marker };
+        const entry = state.areaWeatherMarkers.find((candidate) => candidate.icao === item.icao);
+        if (entry) {
+            entry.marker = marker;
+        }
     });
 }
 
@@ -989,23 +1046,18 @@ function ensureAirportWeatherLayer(entry) {
         return;
     }
 
-    const html = `
-        <div class="airport-weather-layer ${weather.forecast?.isForecast ? "forecast" : "observed"}" aria-hidden="true">
-            <div class="airport-weather-layer-code">${escapeHtml(entry.icao)}</div>
-            <div class="airport-weather-layer-line">${escapeHtml(formatWindShort(weather.windDirection, weather.windSpeed))}</div>
-            <div class="airport-weather-layer-line">${escapeHtml(formatTemperatureShort(weather.temperature))}</div>
-        </div>
-    `;
+    const html = buildWeatherMarkerHtml(entry.icao, weather, false);
     entry.weatherLayer = window.L.marker([entry.lat, entry.lon], {
         icon: window.L.divIcon({
             className: "airport-weather-layer-icon",
             html,
-            iconSize: [78, 44],
-            iconAnchor: [39, 52],
+            iconSize: [44, 44],
+            iconAnchor: [22, 40],
         }),
-        interactive: false,
-        keyboard: false,
+        interactive: true,
+        keyboard: true,
     }).addTo(state.map);
+    entry.weatherLayer.bindPopup(buildAirportPopup(entry));
 }
 
 function removeAirportWeatherLayer(entry) {
@@ -1035,6 +1087,13 @@ function buildAirportPopup(point) {
     lines.push(`Temperature: ${escapeHtml(formatTemperature(weather.temperature))}`);
     lines.push(`Wind: ${escapeHtml(formatWind(weather.windDirection, weather.windSpeed))}`);
     lines.push(`Altimeter: ${escapeHtml(formatAltimeter(weather.altimeter))}`);
+    lines.push(`Category: ${escapeHtml(weather.flightCategory || "UNKNOWN")}`);
+    lines.push(`Visibility: ${escapeHtml(formatVisibilityValue(weather.visibilitySm))}`);
+    lines.push(`Ceiling: ${escapeHtml(formatCeilingValue(weather.ceilingFt))}`);
+    lines.push(`Clouds: ${escapeHtml(formatCloudSummary(weather.cloudSummary))}`);
+    if (weather.presentWeather?.length) {
+        lines.push(`Weather: ${escapeHtml(formatPresentWeather(weather.presentWeather))}`);
+    }
 
     if (weather.forecast?.isForecast) {
         lines.push("Source: FAA TAF forecast");
@@ -1052,13 +1111,7 @@ function buildAirportPopup(point) {
 }
 
 function buildAreaWeatherLayerHtml(item) {
-    return `
-        <div class="airport-weather-layer area ${item.weather?.forecast?.isForecast ? "forecast" : "observed"}" aria-hidden="true">
-            <div class="airport-weather-layer-code">${escapeHtml(item.icao)}</div>
-            <div class="airport-weather-layer-line">${escapeHtml(formatWindShort(item.weather?.windDirection, item.weather?.windSpeed))}</div>
-            <div class="airport-weather-layer-line">${escapeHtml(formatTemperatureShort(item.weather?.temperature))}</div>
-        </div>
-    `;
+    return buildWeatherMarkerHtml(item.icao, item.weather, true);
 }
 
 function buildAreaWeatherPopup(item) {
@@ -1068,7 +1121,15 @@ function buildAreaWeatherPopup(item) {
         `Temperature: ${escapeHtml(formatTemperature(item.weather?.temperature))}`,
         `Wind: ${escapeHtml(formatWind(item.weather?.windDirection, item.weather?.windSpeed))}`,
         `Altimeter: ${escapeHtml(formatAltimeter(item.weather?.altimeter))}`,
+        `Category: ${escapeHtml(item.weather?.flightCategory || "UNKNOWN")}`,
+        `Visibility: ${escapeHtml(formatVisibilityValue(item.weather?.visibilitySm))}`,
+        `Ceiling: ${escapeHtml(formatCeilingValue(item.weather?.ceilingFt))}`,
+        `Clouds: ${escapeHtml(formatCloudSummary(item.weather?.cloudSummary))}`,
     ];
+
+    if (item.weather?.presentWeather?.length) {
+        lines.push(`Weather: ${escapeHtml(formatPresentWeather(item.weather.presentWeather))}`);
+    }
 
     if (item.weather?.forecast?.isForecast) {
         lines.push("Source: FAA TAF forecast");
@@ -1114,6 +1175,95 @@ function formatWindShort(direction, speed) {
 
 function formatTemperatureShort(value) {
     return `${Math.round(Number(value))} C`;
+}
+
+function formatVisibility(value) {
+    return `Vis ${formatVisibilityValue(value)}`;
+}
+
+function formatCeiling(value) {
+    return `Ceiling ${formatCeilingValue(value)}`;
+}
+
+function formatVisibilityValue(value) {
+    if (value === null || value === undefined || value === "") {
+        return "unavailable";
+    }
+    if (!Number.isFinite(Number(value))) {
+        return "unavailable";
+    }
+    return `${Number(value).toFixed(1)} sm`;
+}
+
+function formatCeilingValue(value) {
+    if (value === null || value === undefined || value === "") {
+        return "open";
+    }
+    if (!Number.isFinite(Number(value))) {
+        return "open";
+    }
+    return `${Math.round(Number(value)).toLocaleString()} ft`;
+}
+
+function formatCloudSummary(value) {
+    return value || "Clear";
+}
+
+function formatPresentWeather(tokens) {
+    return Array.isArray(tokens) && tokens.length > 0 ? tokens.join(" ") : "None";
+}
+
+function getFlightCategoryClass(category) {
+    switch (String(category || "").toUpperCase()) {
+    case "UNKNOWN":
+        return "unknown";
+    case "LIFR":
+        return "lifr";
+    case "IFR":
+        return "ifr";
+    case "MVFR":
+        return "mvfr";
+    default:
+        return "vfr";
+    }
+}
+
+function buildWeatherFlagsMarkup(weather) {
+    const chips = [
+        `<span>${escapeHtml(formatCloudSummary(weather?.cloudSummary))}</span>`,
+    ];
+    if (weather?.hazards?.precipitation) {
+        chips.push('<span class="weather-flag precip">Precip</span>');
+    }
+    if (weather?.hazards?.thunderstorm) {
+        chips.push('<span class="weather-flag thunder">TS</span>');
+    }
+    if (weather?.presentWeather?.length) {
+        chips.push(`<span>${escapeHtml(formatPresentWeather(weather.presentWeather))}</span>`);
+    }
+    return chips.join("");
+}
+
+function buildWeatherMarkerHtml(icao, weather, isAreaMarker) {
+    const areaClass = isAreaMarker ? " area" : "";
+    const sourceClass = weather?.forecast?.isForecast ? "forecast" : "observed";
+    const categoryClass = getFlightCategoryClass(weather?.flightCategory);
+    const flags = [];
+    if (weather?.hazards?.precipitation) {
+        flags.push("P");
+    }
+    if (weather?.hazards?.thunderstorm) {
+        flags.push("TS");
+    }
+    const shortCode = String(icao || "").slice(-3);
+    return `
+        <div class="airport-weather-icon ${sourceClass} ${categoryClass}${areaClass}" aria-hidden="true">
+            <div class="airport-weather-icon-dot">
+                <span class="airport-weather-icon-code">${escapeHtml(shortCode)}</span>
+            </div>
+            ${flags.length > 0 ? `<div class="airport-weather-icon-flags">${escapeHtml(flags.join("/"))}</div>` : ""}
+        </div>
+    `;
 }
 
 function formatForecastWindow(forecast) {

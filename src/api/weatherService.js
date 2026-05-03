@@ -87,6 +87,7 @@ async function getObservedWeatherData(icao) {
 
     const location = await resolveLocationData(icao, metar);
     const variation = calculateMagneticVariation(location.lat, location.lon, location.elevation);
+    const details = extractWeatherDetails(metar);
 
     return {
         temperature: metar.temp,
@@ -97,6 +98,7 @@ async function getObservedWeatherData(icao) {
         lat: location.lat,
         lon: location.lon,
         variation,
+        ...details,
         forecast: null,
     };
 }
@@ -143,6 +145,7 @@ async function getForecastWeatherData(icao, requestedTime) {
     }
 
     const variation = calculateMagneticVariation(location.lat, location.lon, location.elevation);
+    const details = extractWeatherDetails(forecastSegment);
 
     return {
         temperature,
@@ -153,6 +156,7 @@ async function getForecastWeatherData(icao, requestedTime) {
         lat: location.lat,
         lon: location.lon,
         variation,
+        ...details,
         forecast: {
             isForecast: true,
             source: 'TAF',
@@ -190,6 +194,7 @@ async function getNearestStationWeather(icao) {
     }
 
     const variation = calculateMagneticVariation(airportLocation.lat, airportLocation.lon, airportLocation.elevation);
+    const details = extractWeatherDetails(nearestMetar);
 
     return {
         temperature: nearestMetar.temp,
@@ -200,6 +205,7 @@ async function getNearestStationWeather(icao) {
         lat: airportLocation.lat,
         lon: airportLocation.lon,
         variation,
+        ...details,
         forecast: null,
         weatherSourceIcao: nearestStation.icaoId,
     };
@@ -276,6 +282,237 @@ function extractFirstFiniteNumber(record, keys, fallback = null) {
     }
 
     return fallback;
+}
+
+function extractWeatherDetails(record) {
+    const visibilitySm = extractVisibilitySm(record);
+    const cloudLayers = extractCloudLayers(record);
+    const ceilingFt = extractCeilingFt(record, cloudLayers);
+    const presentWeather = extractPresentWeather(record);
+    const cloudSummary = summarizeCloudLayers(cloudLayers);
+    const explicitFlightCategory = extractFlightCategory(record);
+    const hazards = {
+        precipitation: presentWeather.some((token) => isPrecipitationToken(token)),
+        thunderstorm: presentWeather.some((token) => isThunderstormToken(token)),
+    };
+
+    return {
+        visibilitySm,
+        ceilingFt,
+        cloudLayers,
+        cloudSummary,
+        presentWeather,
+        hazards,
+        flightCategory: explicitFlightCategory || computeFlightCategory(visibilitySm, ceilingFt),
+    };
+}
+
+function extractVisibilitySm(record) {
+    for (const key of ['visib', 'visibility', 'visibilitySm', 'visibilitySM', 'vis']) {
+        const normalized = normalizeVisibilityValue(record?.[key]);
+        if (Number.isFinite(normalized)) {
+            return normalized;
+        }
+    }
+    return null;
+}
+
+function normalizeVisibilityValue(value) {
+    if (value === '' || value === null || value === undefined) {
+        return null;
+    }
+
+    if (Number.isFinite(Number(value))) {
+        return Number(value);
+    }
+
+    if (typeof value !== 'string') {
+        return null;
+    }
+
+    const normalized = value.trim().toUpperCase();
+    if (!normalized) {
+        return null;
+    }
+    if (normalized === 'P6SM') {
+        return 6;
+    }
+
+    const mixedFractionMatch = normalized.match(/^(\d+)\s+(\d+)\/(\d+)SM?$/);
+    if (mixedFractionMatch) {
+        return Number(mixedFractionMatch[1]) + (Number(mixedFractionMatch[2]) / Number(mixedFractionMatch[3]));
+    }
+
+    const fractionMatch = normalized.match(/^(\d+)\/(\d+)SM?$/);
+    if (fractionMatch) {
+        return Number(fractionMatch[1]) / Number(fractionMatch[2]);
+    }
+
+    const numericMatch = normalized.match(/^(\d+(?:\.\d+)?)SM?$/);
+    if (numericMatch) {
+        return Number(numericMatch[1]);
+    }
+
+    const plusMatch = normalized.match(/^(\d+(?:\.\d+)?)\+$/);
+    if (plusMatch) {
+        return Number(plusMatch[1]);
+    }
+
+    return null;
+}
+
+function extractFlightCategory(record) {
+    for (const key of ['fltCat', 'flightCategory', 'flight_category']) {
+        const value = String(record?.[key] || '').trim().toUpperCase();
+        if (['VFR', 'MVFR', 'IFR', 'LIFR'].includes(value)) {
+            return value;
+        }
+    }
+    return null;
+}
+
+function extractCloudLayers(record) {
+    const candidateKeys = ['clouds', 'cloudLayers', 'skyCover', 'sky_condition', 'skyCondition'];
+    for (const key of candidateKeys) {
+        const value = record?.[key];
+        const normalized = normalizeCloudLayers(value);
+        if (normalized.length > 0) {
+            return normalized;
+        }
+    }
+    return [];
+}
+
+function normalizeCloudLayers(value) {
+    const list = Array.isArray(value) ? value : value ? [value] : [];
+    return list
+        .map(normalizeCloudLayer)
+        .filter(Boolean);
+}
+
+function normalizeCloudLayer(layer) {
+    if (!layer) {
+        return null;
+    }
+
+    if (typeof layer === 'string') {
+        const match = layer.trim().toUpperCase().match(/^(FEW|SCT|BKN|OVC|VV|CLR|SKC|NSC)(\d{3})?$/);
+        if (!match) {
+            return null;
+        }
+        return {
+            cover: match[1],
+            baseFt: match[2] ? Number(match[2]) * 100 : null,
+        };
+    }
+
+    const cover = String(
+        layer.cover
+        ?? layer.sky_cover
+        ?? layer.skyCover
+        ?? layer.amount
+        ?? layer.type
+        ?? ''
+    ).trim().toUpperCase();
+    if (!cover) {
+        return null;
+    }
+
+    const baseRaw = layer.base
+        ?? layer.baseFt
+        ?? layer.cloud_base_ft_agl
+        ?? layer.height
+        ?? layer.altitude
+        ?? layer.vert_vis_ft
+        ?? layer.verticalVisibility;
+    const baseFt = baseRaw === '' || baseRaw === null || baseRaw === undefined
+        ? null
+        : (Number.isFinite(Number(baseRaw)) ? Number(baseRaw) : null);
+
+    return { cover, baseFt };
+}
+
+function extractCeilingFt(record, cloudLayers) {
+    const explicit = extractFirstFiniteNumber(record, ['ceiling', 'ceilingFt', 'cig', 'vertVisFt', 'vert_vis_ft']);
+    if (Number.isFinite(explicit)) {
+        return explicit;
+    }
+
+    const ceilingLayer = cloudLayers.find((layer) => ['BKN', 'OVC', 'VV'].includes(layer.cover) && Number.isFinite(layer.baseFt));
+    return ceilingLayer?.baseFt ?? null;
+}
+
+function extractPresentWeather(record) {
+    const tokens = [];
+    const arrayKeys = ['wx', 'weather', 'presentWeather', 'wxStringParts'];
+    for (const key of arrayKeys) {
+        const value = record?.[key];
+        const normalized = normalizePresentWeatherTokens(value);
+        if (normalized.length > 0) {
+            tokens.push(...normalized);
+        }
+    }
+
+    for (const key of ['wxString', 'wx_string', 'rawWx', 'rawwx']) {
+        const value = record?.[key];
+        if (typeof value === 'string' && value.trim()) {
+            tokens.push(...value.trim().split(/\s+/));
+        }
+    }
+
+    return Array.from(new Set(tokens
+        .map((token) => String(token || '').trim().toUpperCase())
+        .filter(Boolean)));
+}
+
+function normalizePresentWeatherTokens(value) {
+    const list = Array.isArray(value) ? value : value ? [value] : [];
+    return list
+        .map((item) => {
+            if (typeof item === 'string') {
+                return item;
+            }
+            return item?.value ?? item?.weather ?? item?.wx ?? item?.code ?? '';
+        })
+        .filter(Boolean);
+}
+
+function summarizeCloudLayers(cloudLayers) {
+    if (!Array.isArray(cloudLayers) || cloudLayers.length === 0) {
+        return 'Clear';
+    }
+
+    return cloudLayers
+        .map((layer) => Number.isFinite(layer.baseFt) ? `${layer.cover} ${layer.baseFt.toLocaleString()} ft` : layer.cover)
+        .join(', ');
+}
+
+function isPrecipitationToken(token) {
+    return /(RA|SN|DZ|SG|PL|GR|GS|UP|SHRA|SHSN|SH|FZRA|FZDZ)/.test(token);
+}
+
+function isThunderstormToken(token) {
+    return /TS/.test(token);
+}
+
+function computeFlightCategory(visibilitySm, ceilingFt) {
+    const visibility = Number.isFinite(visibilitySm) ? visibilitySm : null;
+    const ceiling = Number.isFinite(ceilingFt) ? ceilingFt : null;
+
+    if (visibility === null && ceiling === null) {
+        return 'UNKNOWN';
+    }
+
+    if ((visibility !== null && visibility < 1) || (ceiling !== null && ceiling < 500)) {
+        return 'LIFR';
+    }
+    if ((visibility !== null && visibility < 3) || (ceiling !== null && ceiling < 1000)) {
+        return 'IFR';
+    }
+    if ((visibility !== null && visibility <= 5) || (ceiling !== null && ceiling <= 3000)) {
+        return 'MVFR';
+    }
+    return 'VFR';
 }
 
 async function resolveLocationData(icao, metar) {

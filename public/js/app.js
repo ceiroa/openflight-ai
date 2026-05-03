@@ -703,7 +703,9 @@ function clearExpiredSharedWeatherCacheEntries() {
     const cache = readSharedWeatherCache();
     let changed = false;
     for (const [key, entry] of Object.entries(cache)) {
-        if (!entry?.savedAt || Date.now() - Number(entry.savedAt) > WEATHER_CACHE_TTL_MS) {
+        if (!entry?.savedAt
+            || Date.now() - Number(entry.savedAt) > WEATHER_CACHE_TTL_MS
+            || !isWeatherPayloadDisplayReady(entry.payload)) {
             delete cache[key];
             changed = true;
         }
@@ -711,6 +713,29 @@ function clearExpiredSharedWeatherCacheEntries() {
     if (changed) {
         saveWeatherCache(cache);
     }
+}
+
+function isWeatherPayloadDisplayReady(payload) {
+    if (!payload || typeof payload !== "object") {
+        return false;
+    }
+
+    const requiredNumericFields = ["temperature", "altimeter", "windSpeed", "elevation", "lat", "lon"];
+    if (requiredNumericFields.some((field) => !Number.isFinite(Number(payload[field])))) {
+        return false;
+    }
+
+    if (!("flightCategory" in payload)) {
+        return false;
+    }
+    if (!("visibilitySm" in payload) || !("ceilingFt" in payload)) {
+        return false;
+    }
+    if (!("cloudSummary" in payload) || !("presentWeather" in payload) || !("hazards" in payload)) {
+        return false;
+    }
+
+    return true;
 }
 
 function buildWeatherLoadingMessage(icao) {

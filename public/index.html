@@ -96,6 +96,11 @@
         .button-secondary { background-color: #64748b; color: white; }
 
         .btn-remove { background-color: var(--danger-color); color: white; padding: 10px; width: 40px; }
+        .dest-leg-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 12px;
+        }
         .btn-add { background-color: transparent; border: 2px dashed var(--border-color); color: #94a3b8; width: 100%; margin-bottom: 24px; }
         .btn-add:hover { border-color: var(--accent-color); color: var(--accent-color); background: rgba(56, 189, 248, 0.05); }
 
@@ -265,6 +270,9 @@
             }
             .leg-row {
                 grid-template-columns: 1fr;
+            }
+            .dest-leg-actions .btn-remove {
+                width: 100%;
             }
             .debug-toggle-wrap {
                 justify-content: stretch;

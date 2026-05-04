@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "piper-warrior-iii-pa-28-161",
+  "aircraft": "Piper Warrior III",
+  "manufacturer": "Piper",
+  "model": "PA-28-161 Warrior III",
+  "engine": "Lycoming O-320-D3G",
+  "source_notes": "Seed profile based on the Piper PA-28-161 Warrior III POH mirrored on ManualsLib for basic climb and operating speeds, with representative cruise and fuel figures aligned to widely used Warrior III training references. Verify against the exact aircraft POH before operational use.",
+  "profiles": {
+    "climb": {
+      "speed_kts": 79,
+      "rpm": 2700,
+      "fuel_burn_gph": 9.5,
+      "rate_of_climb_fpm": 667,
+      "climbTable": [
+        { "altitude_ft": 0, "speed_kts": 79, "rate_of_climb_fpm": 667 }
+      ]
+    },
+    "cruise65": {
+      "speed_kts": 111,
+      "rpm": 2450,
+      "fuel_burn_gph": 8.8
+    }
+  },
+  "limits": {
+    "vne_kts": 149,
+    "vs_kts": 50,
+    "max_rpm": 2700
+  }
+}

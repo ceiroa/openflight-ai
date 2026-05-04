@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "piper-archer-iii-pa-28-181",
+  "aircraft": "Piper Archer III",
+  "manufacturer": "Piper",
+  "model": "PA-28-181 Archer III",
+  "engine": "Lycoming O-360-A4M",
+  "source_notes": "Seed profile based on the Piper PA-28-181 Archer III POH mirrored on ManualsLib for basic operating speeds and climb guidance, with representative cruise and fuel figures drawn from common Archer III POH planning rows and operator references. Verify against the exact airplane POH before operational use.",
+  "profiles": {
+    "climb": {
+      "speed_kts": 76,
+      "rpm": 2700,
+      "fuel_burn_gph": 10.5,
+      "rate_of_climb_fpm": 667,
+      "climbTable": [
+        { "altitude_ft": 0, "speed_kts": 76, "rate_of_climb_fpm": 667 }
+      ]
+    },
+    "cruise65": {
+      "speed_kts": 123,
+      "rpm": 2450,
+      "fuel_burn_gph": 10.1
+    }
+  },
+  "limits": {
+    "vne_kts": 154,
+    "vs_kts": 50,
+    "max_rpm": 2700
+  }
+}

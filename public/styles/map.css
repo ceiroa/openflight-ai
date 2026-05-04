@@ -994,16 +994,36 @@ body.map-focus-mode .container > .status-banner {
     .map-overlay-button {
         top: 8px;
         right: 8px;
-        font-size: 11px;
-        padding: 0 10px;
+        min-height: 30px;
+        padding: 0 9px;
+        font-size: 10px;
+        line-height: 1;
+        white-space: nowrap;
+        border-radius: 999px;
+    }
+
+    #maximize-map-btn {
+        top: 8px;
+        right: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .map-panel-toggle-button {
-        right: 128px;
+        top: 44px;
+        right: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .map-recenter-button {
+        top: auto;
         right: 8px;
-        bottom: 28px;
+        bottom: 40px;
+        min-height: 28px;
+        padding: 0 8px;
+        font-size: 9px;
     }
 }

@@ -90,7 +90,7 @@ function renderProfileList() {
                 <strong class="profile-card-title">${escapeHtml(formatProfileCardTitle(profile))}</strong>
                 <span class="badge ${profile.complete ? 'complete' : 'incomplete'}">${profile.complete ? 'Complete' : 'Needs Work'}</span>
             </div>
-            <div class="profile-card-meta">${escapeHtml(formatProfileCardMeta(profile))}</div>
+            ${formatProfileCardMeta(profile) ? `<div class="profile-card-meta">${escapeHtml(formatProfileCardMeta(profile))}</div>` : ""}
         </button>
     `).join("");
 
@@ -254,6 +254,5 @@ function formatProfileCardTitle(profile) {
 }
 
 function formatProfileCardMeta(profile) {
-    const details = [profile.manufacturer, profile.model].filter(Boolean);
-    return details.join(" | ") || profile.id;
+    return "";
 }

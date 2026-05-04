@@ -1260,12 +1260,32 @@ test.describe('CieloRumbo - UI Tests', () => {
 
         await expect(page).toHaveURL(/aircraft\.html$/);
         await expect(page.locator('h1')).toHaveText('Aircraft Profiles');
-        await expect(page.locator('.profile-card')).toHaveCount(3);
+        await expect(page.locator('.profile-card')).toHaveCount(6);
         await expect(page.locator('.profile-card')).toContainText([
             'Cessna 152 / Lycoming O-235-L2C',
             'Cessna 172S Skyhawk / Lycoming IO-360-L2A',
+            'Cessna 182S Skylane / Lycoming IO-540-AB1A5',
             'Evektor Harmony LSA / Rotax 912 ULS',
+            'Piper Archer III / Lycoming O-360-A4M',
+            'Piper Warrior III / Lycoming O-320-D3G',
         ]);
+    });
+
+    test('should keep the aircraft profiles page usable on narrower layouts', async ({ page }) => {
+        await page.setViewportSize({ width: 430, height: 932 });
+        await page.reload();
+
+        await page.click('#menu-toggle');
+        await page.click('#open-aircraft-btn');
+
+        await expect(page).toHaveURL(/aircraft\.html$/);
+        await expect(page.locator('#save-profile-btn')).toBeVisible();
+
+        const gridColumns = await page.locator('.grid').evaluate((element) =>
+            getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length
+        );
+        expect(gridColumns).toBe(1);
+        await expect(page.locator('.profile-card').first()).toBeVisible();
     });
 
     test('should preserve nav-log draft data when returning from the checkpoints planner', async ({ page }) => {

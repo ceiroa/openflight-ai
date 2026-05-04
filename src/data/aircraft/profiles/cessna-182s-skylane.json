@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "id": "cessna-182s-skylane",
+  "aircraft": "Cessna 182S Skylane",
+  "manufacturer": "Cessna",
+  "model": "182S Skylane",
+  "engine": "Lycoming IO-540-AB1A5",
+  "source_notes": "Seed profile based on Textron Aviation Skylane specifications for climb rate, VNE, and stall speed, with representative climb and cruise values aligned to commonly cited 182S POH performance rows mirrored online. Treat as a practical planning seed and verify against the exact aircraft POH.",
+  "profiles": {
+    "climb": {
+      "speed_kts": 84,
+      "rpm": 2400,
+      "fuel_burn_gph": 13.8,
+      "rate_of_climb_fpm": 924,
+      "climbTable": [
+        { "altitude_ft": 0, "speed_kts": 84, "rate_of_climb_fpm": 924 }
+      ]
+    },
+    "cruise65": {
+      "speed_kts": 145,
+      "rpm": 2300,
+      "fuel_burn_gph": 13.2
+    }
+  },
+  "limits": {
+    "vne_kts": 175,
+    "vs_kts": 49,
+    "max_rpm": 2400
+  }
+}

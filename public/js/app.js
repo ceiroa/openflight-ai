@@ -512,7 +512,6 @@ function addLeg() {
                 <label>Leg Alt</label>
                 <input type="number" class="leg-planned-alt" value="${document.getElementById("cruise-alt").value}" required min="0">
             </div>
-            <button type="button" class="btn-remove" aria-label="Remove leg">X</button>
         </div>
         <div class="leg-row">
             <div class="form-group"><label>Temp (C)</label><input type="number" class="leg-temp weather-field"></div>
@@ -521,6 +520,9 @@ function addLeg() {
             <div class="form-group"><label>Wind Dir (deg)</label><input type="number" class="leg-wind-dir weather-field"></div>
         </div>
         <div class="leg-weather-status weather-status" aria-live="polite"></div>
+        <div class="dest-leg-actions">
+            <button type="button" class="btn-remove" aria-label="Remove leg">X</button>
+        </div>
         <input type="hidden" class="leg-lat">
         <input type="hidden" class="leg-lon">
         <input type="hidden" class="leg-var" value="0">

@@ -7,7 +7,13 @@
     "start": "node index.js",
     "test": "npm run test:unit && npm run test:ui",
     "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js --no-transform tests/unit --runInBand",
-    "test:ui": "npx playwright test"
+    "test:ui": "npx playwright test",
+    "test:smoke": "npm run test:unit && npm run test:ui:smoke",
+    "test:ui:smoke": "npx playwright test --grep \"@smoke\"",
+    "test:ui:home": "npx playwright test --grep \"@home\"",
+    "test:ui:map": "npx playwright test --grep \"@map\"",
+    "test:ui:planner": "npx playwright test --grep \"@planner\"",
+    "test:ui:airspace": "npx playwright test --grep \"@airspace\""
   },
   "repository": {
     "type": "git",

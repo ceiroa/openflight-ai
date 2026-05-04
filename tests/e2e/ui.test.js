@@ -191,7 +191,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('.home-disclaimer')).toContainText('Do not rely on it as your sole source');
     });
 
-    test('should populate departure weather when ICAO is entered', async ({ page }) => {
+    test('@smoke @home should populate departure weather when ICAO is entered', async ({ page }) => {
         const depInput = page.locator('#departure-icao');
         await depInput.fill('KORD');
         await depInput.blur();
@@ -202,7 +202,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#dep-var')).toHaveValue('-3.96');
     });
 
-    test('should use FAA forecast data for future date and time selections', async ({ page }) => {
+    test('@home should use FAA forecast data for future date and time selections', async ({ page }) => {
         await page.unroute('**/api/weather/*');
         await page.route('**/api/weather/*', async (route) => {
             const url = new URL(route.request().url());
@@ -372,7 +372,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         expect(klotRequests).toBe(1);
     });
 
-    test('should not generate the nav log when a destination weather lookup fails', async ({ page }) => {
+    test('@home should not generate the nav log when a destination weather lookup fails', async ({ page }) => {
         await page.unroute('**/api/weather/*');
         await page.route('**/api/weather/*', async (route) => {
             const url = new URL(route.request().url());
@@ -402,7 +402,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#nav-log-container')).toBeHidden();
     });
 
-    test('should add and remove destination legs', async ({ page }) => {
+    test('@home should add and remove destination legs', async ({ page }) => {
         await expect(page.locator('.dest-leg.destination')).toHaveCount(1);
 
         await page.click('text=+ ADD DESTINATION LEG');
@@ -412,7 +412,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('.dest-leg.destination')).toHaveCount(1);
     });
 
-    test('should open the checkpoints planner from the main page', async ({ page }) => {
+    test('@smoke @planner should open the checkpoints planner from the main page', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
         await page.fill('.destination-icao', 'KARR');
@@ -441,7 +441,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#side-menu')).not.toHaveClass(/open/);
     });
 
-    test('should open the route map from the main page', async ({ page }) => {
+    test('@smoke @map should open the route map from the main page', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
         await expect(page.locator('#dep-lat')).toHaveValue('41.9602');
@@ -463,7 +463,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#toggle-reference-checkpoints-btn')).toBeVisible();
     });
 
-    test('should default to a collapsed route panel on narrower map layouts', async ({ page }) => {
+    test('@map should default to a collapsed route panel on narrower map layouts', async ({ page }) => {
         await page.setViewportSize({ width: 820, height: 1180 });
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
@@ -479,7 +479,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#route-panel')).not.toHaveClass(/collapsed/);
     });
 
-    test('should load route airport weather on the map page', async ({ page }) => {
+    test('@map should load route airport weather on the map page', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
         await page.fill('.destination-icao', 'KARR');
@@ -502,7 +502,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('.route-weather-item').nth(1)).toContainText('TS');
     });
 
-    test('should reuse home-page weather on the map page without refetching', async ({ page }) => {
+    test('@map should reuse home-page weather on the map page without refetching', async ({ page }) => {
         let weatherCalls = 0;
         let kordCalls = 0;
         await page.unroute('**/api/weather/*');
@@ -532,7 +532,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         expect(weatherCalls).toBeLessThanOrEqual(totalCallsBeforeMapOpen + 1);
     });
 
-    test('should toggle airport weather layer on the map', async ({ page }) => {
+    test('@map should toggle airport weather layer on the map', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
         await page.fill('.destination-icao', 'KARR');
@@ -590,7 +590,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('.route-weather-item').first()).toContainText('Valid 05/01');
     });
 
-    test('should prefetch FAA airspace after generating the nav log', async ({ page }) => {
+    test('@airspace should prefetch FAA airspace after generating the nav log', async ({ page }) => {
         let airspaceCalls = 0;
         await page.unroute('**/api/airspace*');
         await page.route('**/api/airspace*', async (route) => {
@@ -614,7 +614,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect.poll(() => airspaceCalls).toBe(1);
     });
 
-    test('should maximize the map and toggle nearby reference checkpoints', async ({ page }) => {
+    test('@map should maximize the map and toggle nearby reference checkpoints', async ({ page }) => {
         await page.route('**/api/checkpoints/reference*', async (route) => {
             await route.fulfill({
                 status: 200,
@@ -654,7 +654,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#toggle-reference-checkpoints-btn')).toHaveText('Hide Nearby Reference Checkpoints');
     });
 
-    test('should toggle FAA airspace on the route map', async ({ page }) => {
+    test('@map @airspace should toggle FAA airspace on the route map', async ({ page }) => {
         let airspaceCalls = 0;
         await page.unroute('**/api/airspace*');
         await page.route('**/api/airspace*', async (route) => {
@@ -721,7 +721,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         expect(airspaceCalls).toBeLessThanOrEqual(1);
     });
 
-    test('should load the airspace profile page and share cached FAA airspace with the map page', async ({ page }) => {
+    test('@smoke @airspace should load the airspace profile page and share cached FAA airspace with the map page', async ({ page }) => {
         let airspaceCalls = 0;
         await page.unroute('**/api/airspace*');
         await page.route('**/api/airspace*', async (route) => {
@@ -781,7 +781,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         expect(airspaceCalls).toBe(1);
     });
 
-    test('should reflect updated cruise altitude on the airspace profile page', async ({ page }) => {
+    test('@airspace should reflect updated cruise altitude on the airspace profile page', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
         await page.fill('.destination-icao', 'KARR');
@@ -795,7 +795,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('.profile-scroll svg')).toContainText('Leg 1 cruise 4,500 ft');
     });
 
-    test('should let the user show and hide airspace classes on the airspace profile', async ({ page }) => {
+    test('@airspace should let the user show and hide airspace classes on the airspace profile', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
         await page.fill('.destination-icao', 'KARR');
@@ -813,7 +813,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('.summary-panel')).toContainText('Chicago Class B');
     });
 
-    test('should show post-nav-log quick navigation buttons only after nav log generation', async ({ page }) => {
+    test('@smoke @home should show post-nav-log quick navigation buttons only after nav log generation', async ({ page }) => {
         await expect(page.locator('#post-navlog-actions')).not.toHaveClass(/visible/);
 
         await page.fill('#departure-icao', 'KORD');
@@ -828,7 +828,27 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#post-open-airspace-profile-btn')).toBeVisible();
     });
 
-    test('should toggle current location on the route map', async ({ page }) => {
+    test('@home should keep the flight setup workflow usable on narrower layouts', async ({ page }) => {
+        await page.setViewportSize({ width: 430, height: 932 });
+        await page.reload();
+
+        const flightGridColumns = await page.locator('.flight-form-grid').evaluate((element) =>
+            getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length
+        );
+        expect(flightGridColumns).toBe(1);
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#generate-btn');
+
+        await expect(page.locator('#nav-log-container')).toBeVisible();
+        await expect(page.locator('#post-navlog-actions')).toHaveClass(/visible/);
+        await expect(page.locator('#post-open-map-btn')).toBeVisible();
+    });
+
+    test('@map should toggle current location on the route map', async ({ page }) => {
         await page.addInitScript(() => {
             let nextWatchId = 1;
             Object.defineProperty(navigator, 'geolocation', {
@@ -890,7 +910,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#map-status')).toContainText('terrain');
     });
 
-    test('should open the route map from the checkpoints planner without regenerating checkpoints', async ({ page }) => {
+    test('@planner @map should open the route map from the checkpoints planner without regenerating checkpoints', async ({ page }) => {
         let generateCalls = 0;
         await page.unroute('**/api/checkpoints/generate*');
         await page.route('**/api/checkpoints/generate*', async (route) => {
@@ -934,7 +954,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         expect(generateCalls).toBe(1);
     });
 
-    test('should default to enhanced checkpoint generation in the planner', async ({ page }) => {
+    test('@planner should default to enhanced checkpoint generation in the planner', async ({ page }) => {
         let requestedModes = [];
         await page.unroute('**/api/checkpoints/generate*');
         await page.route('**/api/checkpoints/generate*', async (route) => {
@@ -979,7 +999,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         expect(requestedModes[0]).toBe('enhanced');
     });
 
-    test('should show enhanced checkpoints on the map after regenerating from the planner menu path', async ({ page }) => {
+    test('@planner @map should show enhanced checkpoints on the map after regenerating from the planner menu path', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
         await page.fill('.destination-icao', 'KARR');
@@ -997,7 +1017,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('.checkpoint-button')).toContainText(['KARR VISUAL CHECKPOINT']);
     });
 
-    test('should keep enhanced regeneration working after visiting map and aircraft profiles first', async ({ page }) => {
+    test('@planner should keep enhanced regeneration working after visiting map and aircraft profiles first', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
         await page.fill('.destination-icao', 'KARR');
@@ -1021,7 +1041,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('[data-field="name"]').first()).toHaveValue('KARR VISUAL CHECKPOINT');
     });
 
-    test('should show a loading progress bar while regenerating checkpoints', async ({ page }) => {
+    test('@planner should show a loading progress bar while regenerating checkpoints', async ({ page }) => {
         await page.unroute('**/api/checkpoints/generate*');
         await page.route('**/api/checkpoints/generate*', async (route) => {
             const url = new URL(route.request().url());
@@ -1106,7 +1126,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#loading-progress')).toBeHidden();
     });
 
-    test('should show enhanced checkpoint metadata on the route map', async ({ page }) => {
+    test('@planner @map should show enhanced checkpoint metadata on the route map', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
         await page.fill('.destination-icao', 'KARR');
@@ -1124,7 +1144,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('.checkpoint-button .checkpoint-badge')).toContainText(['Visual Checkpoint', 'Visual Priority']);
     });
 
-    test('should filter enhanced checkpoints in the planner and route map', async ({ page }) => {
+    test('@planner @map should filter enhanced checkpoints in the planner and route map', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
         await page.fill('.destination-icao', 'KARR');
@@ -1357,7 +1377,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('.checkpoint-button')).toContainText(['AURORA CHECKPOINT', 'DIXON CHECKPOINT']);
     });
 
-    test('should save edited and added planner checkpoints back into table 3', async ({ page }) => {
+    test('@planner @home should save edited and added planner checkpoints back into table 3', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
         await page.fill('.destination-icao', 'KARR');
@@ -1384,7 +1404,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#table3-body tr').nth(1).locator('td').nth(6)).toHaveText('AWOS 118.525 | CTAF 120.1');
     });
 
-    test('should show colored planner checkpoint badges and calculated distance summaries', async ({ page }) => {
+    test('@planner should show colored planner checkpoint badges and calculated distance summaries', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
         await page.fill('.destination-icao', 'KARR');
@@ -1406,7 +1426,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('[data-checkpoint-row="0:1"] .checkpoint-distance-secondary')).toContainText('6.7 NM');
     });
 
-    test('should remove a planner checkpoint and reflect that removal in table 3', async ({ page }) => {
+    test('@planner @home should remove a planner checkpoint and reflect that removal in table 3', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();
         await page.fill('.destination-icao', 'KARR');
@@ -1431,7 +1451,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#table3-body')).not.toContainText('REMOVE ME');
     });
 
-    test('should reuse checkpoints generated on the home page when opening the planner', async ({ page }) => {
+    test('@planner @home should reuse checkpoints generated on the home page when opening the planner', async ({ page }) => {
         let generateCalls = 0;
         await page.unroute('**/api/checkpoints/generate*');
         await page.route('**/api/checkpoints/generate*', async (route) => {

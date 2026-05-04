@@ -158,7 +158,7 @@ function renderPlanner() {
             : visibleCheckpoints.length === 0
                 ? `<div class="empty-state">No checkpoints match the current filters for this leg.</div>`
             : `
-                <table>
+                <table class="planner-table">
                     <thead>
                         <tr>
                             <th>Checkpoint Name</th>
@@ -170,23 +170,23 @@ function renderPlanner() {
                     <tbody>
                         ${visibleCheckpoints.map(({ checkpoint, checkpointIndex }) => `
                             <tr data-checkpoint-row="${index}:${checkpointIndex}">
-                                <td>
+                                <td data-label="Checkpoint Name">
                                     <div class="checkpoint-name-cell">
                                         <input type="text" value="${escapeHtml(checkpoint.name)}" data-field="name">
                                         ${renderCheckpointMeta(checkpoint)}
                                     </div>
                                 </td>
-                                <td>
+                                <td data-label="Distance">
                                     <div class="checkpoint-distance-cell">
                                         <div class="checkpoint-distance-primary">${escapeHtml(formatDistanceValue(distanceDetailsByIndex[checkpointIndex].fromStartNm))} <span>from start</span></div>
                                         <div class="checkpoint-distance-secondary">${escapeHtml(formatDistanceValue(distanceDetailsByIndex[checkpointIndex].fromPreviousNm))} <span>from previous</span></div>
                                     </div>
                                 </td>
-                                <td>
+                                <td data-label="Comms / Notes">
                                     <input type="text" value="${escapeHtml(checkpoint.comms || "VIS")}" data-field="comms">
                                     ${checkpoint.notes ? `<div class="checkpoint-note">${escapeHtml(checkpoint.notes)}</div>` : ""}
                                 </td>
-                                <td><button type="button" class="ghost remove-checkpoint-btn">Remove</button></td>
+                                <td data-label="Action"><button type="button" class="ghost remove-checkpoint-btn">Remove</button></td>
                             </tr>
                         `).join("")}
                     </tbody>

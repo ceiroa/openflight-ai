@@ -80,4 +80,6 @@ After that, GitHub will publish the site automatically from the contents of `doc
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+
+The public repository is intended to remain the open core of CieloRumbo. A separate private iPhone/iPad app repository may build on top of this public project for native packaging, premium features, and Apple-specific commercial work.

@@ -191,6 +191,12 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('.home-disclaimer')).toContainText('Do not rely on it as your sole source');
     });
 
+    test('@home should expose PWA install metadata on the home page', async ({ page }) => {
+        await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest.webmanifest');
+        await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#0f172a');
+        await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/icons/app-icon.svg');
+    });
+
     test('@smoke @home should populate departure weather when ICAO is entered', async ({ page }) => {
         const depInput = page.locator('#departure-icao');
         await depInput.fill('KORD');
@@ -813,6 +819,28 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('.summary-panel')).toContainText('Chicago Class B');
     });
 
+    test('@airspace should keep the airspace profile usable on narrower layouts', async ({ page }) => {
+        await page.setViewportSize({ width: 430, height: 932 });
+        await page.reload();
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+
+        await page.click('#menu-toggle');
+        await page.click('#open-airspace-profile-btn');
+
+        await expect(page).toHaveURL(/airspace-profile\.html$/);
+        await expect(page.locator('.summary-panel')).toBeVisible();
+        await expect(page.locator('.profile-scroll')).toBeVisible();
+
+        const summaryOrder = await page.locator('.summary-panel').evaluate((element) =>
+            getComputedStyle(element).order
+        );
+        expect(summaryOrder).toBe('-1');
+    });
+
     test('@smoke @home should show post-nav-log quick navigation buttons only after nav log generation', async ({ page }) => {
         await expect(page.locator('#post-navlog-actions')).not.toHaveClass(/visible/);
 
@@ -1424,6 +1452,28 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('[data-checkpoint-row="0:1"] .checkpoint-badge.manual')).toHaveText('Manual');
         await expect(page.locator('[data-checkpoint-row="0:1"] .checkpoint-distance-primary')).toContainText('13.7 NM');
         await expect(page.locator('[data-checkpoint-row="0:1"] .checkpoint-distance-secondary')).toContainText('6.7 NM');
+    });
+
+    test('@planner should keep the planner usable on narrower layouts', async ({ page }) => {
+        await page.setViewportSize({ width: 430, height: 932 });
+        await page.reload();
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#menu-toggle');
+        await page.click('#open-checkpoints-btn');
+
+        await expect(page).toHaveURL(/checkpoints\.html$/);
+        await expect(page.locator('.actions')).toBeVisible();
+        await expect(page.locator('#save-btn')).toBeVisible();
+
+        const rowDisplay = await page.locator('[data-checkpoint-row="0:0"]').evaluate((element) =>
+            getComputedStyle(element).display
+        );
+        expect(rowDisplay).toBe('block');
+        await expect(page.locator('[data-checkpoint-row="0:0"] td[data-label="Distance"]')).toContainText('from previous');
     });
 
     test('@planner @home should remove a planner checkpoint and reflect that removal in table 3', async ({ page }) => {

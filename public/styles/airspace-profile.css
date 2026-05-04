@@ -6,6 +6,7 @@
 }
 
 .container {
+    width: min(100%, 1360px);
     max-width: 1360px;
     margin: 0 auto;
     background: var(--profile-container-bg);
@@ -258,5 +259,57 @@ span {
 @media (max-width: 1080px) {
     .profile-layout {
         grid-template-columns: 1fr;
+    }
+
+    .summary-panel {
+        order: -1;
+    }
+}
+
+@media (max-width: 720px) {
+    .container {
+        padding: 16px;
+    }
+
+    .profile-panel,
+    .summary-panel {
+        padding: 14px;
+    }
+
+    .profile-summary {
+        margin-bottom: 12px;
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .route-distance-scale {
+        margin-bottom: 6px;
+        font-size: 11px;
+    }
+
+    .profile-scroll {
+        padding: 8px;
+        border-radius: 8px;
+    }
+
+    .legend {
+        gap: 8px;
+        margin-top: 12px;
+    }
+
+    .legend-toggle-item,
+    .legend-static-item {
+        width: 100%;
+        box-sizing: border-box;
+        justify-content: flex-start;
+    }
+
+    .summary-list li {
+        padding: 9px 10px;
+        font-size: 12px;
+    }
+
+    .summary-subtitle {
+        font-size: 11px;
     }
 }

@@ -1,0 +1,22 @@
+{
+  "name": "CieloRumbo",
+  "short_name": "CieloRumbo",
+  "description": "Experimental VFR route planning, weather review, checkpoint planning, and airspace profiling.",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

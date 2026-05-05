@@ -1,4 +1,4 @@
 window.CIELORUMBO_SITE_CONFIG = {
-    interestFormUrl: "",
+    interestFormUrl: "https://formspree.io/f/mlgznedd",
     interestEmail: "",
 };

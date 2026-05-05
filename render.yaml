@@ -1,0 +1,12 @@
+services:
+  - name: cielorumbo-app
+    type: web
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0

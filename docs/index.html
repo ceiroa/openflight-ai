@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CieloRumbo | Technical Overview</title>
-    <meta name="description" content="Technical overview of CieloRumbo architecture, data flow, testing strategy, and roadmap.">
+    <title>CieloRumbo | VFR Planning for Pilots and Students</title>
+    <meta name="description" content="CieloRumbo is a browser-first VFR flight planning tool with nav-log generation, weather, checkpoints, route maps, airspace overlays, and altitude profiles.">
     <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -12,7 +12,9 @@
         <div class="top-nav-inner">
             <a class="top-nav-brand" href="./index.html">CieloRumbo</a>
             <div class="top-nav-links">
-                <a href="./index.html">Overview</a>
+                <a href="#features">Features</a>
+                <a href="#beta">Beta</a>
+                <a href="#technical">Technical</a>
                 <a href="./data-sources.html">Data Sources</a>
                 <a href="https://github.com/ceiroa/cielorumbo" target="_blank" rel="noreferrer">GitHub</a>
             </div>
@@ -28,16 +30,17 @@
         </div>
         <div class="hero-copy-shell">
             <div class="hero-copy">
-                <p class="eyebrow">CieloRumbo</p>
-                <h1>VFR Flight Planning, Weather Ingestion, and Nav-Log Generation</h1>
+                <p class="eyebrow">Browser-First VFR Planning</p>
+                <h1>Plan cross-country flights with weather, checkpoints, route maps, and airspace in one workflow.</h1>
                 <p class="hero-text">
-                    CieloRumbo is a browser-first cross-country planning tool for educational use.
-                    It combines weather retrieval, aircraft performance profiles, checkpoint planning,
-                    route review, airspace overlays, and altitude profiling into a single local workflow.
+                    CieloRumbo is an educational VFR planning tool for pilots and students. It combines
+                    airport weather, aircraft performance, dead-reckoning checkpoints, route review, FAA
+                    airspace overlays, and altitude profiling into one browser-based workflow.
                 </p>
                 <div class="hero-actions">
-                    <a class="button primary" href="https://github.com/ceiroa/cielorumbo" target="_blank" rel="noreferrer">View Repository</a>
-                    <a class="button secondary" href="#architecture">Explore Architecture</a>
+                    <a class="button primary" href="#beta">Follow Public Beta</a>
+                    <a class="button secondary" href="#updates">Get Updates</a>
+                    <a class="button secondary" href="#features">See What It Does</a>
                 </div>
             </div>
         </div>
@@ -46,89 +49,177 @@
     <main class="page">
         <section class="notice">
             <p>
-                <strong>Disclaimer:</strong> This project is for educational purposes only. It should not be relied on as the sole source for real-world navigation planning, weather interpretation, or operational decision-making.
+                <strong>Disclaimer:</strong> CieloRumbo is for educational purposes only. It should not be relied on as the sole source for real-world navigation planning, weather interpretation, or operational decision-making.
             </p>
         </section>
 
-        <section class="section" id="quick-summary">
+        <section class="section" id="beta">
             <div class="section-heading">
-                <p class="eyebrow">Summary</p>
-                <h2>At a glance</h2>
+                <p class="eyebrow">Public Beta</p>
+                <h2>Early-stage planning tool, openly built</h2>
+                <p>
+                    The public web version is being prepared for broader access. The best current place to follow progress,
+                    evaluate interest, and see active development is the GitHub project.
+                </p>
             </div>
             <div class="grid two">
                 <article class="card">
-                    <h3>Platform</h3>
-                    <ul class="stat-list">
-                        <li><strong>Frontend:</strong> Static HTML/CSS/JS</li>
-                        <li><strong>Backend:</strong> Node.js + Express</li>
-                        <li><strong>Testing:</strong> Jest + Playwright</li>
+                    <h3>What to expect</h3>
+                    <ul class="bullet-list">
+                        <li>Browser-based VFR planning workflow</li>
+                        <li>Weather-aware nav-log generation</li>
+                        <li>Route map, FAA airspace, and altitude profile tools</li>
+                        <li>Ongoing improvements driven by real pilot workflows</li>
                     </ul>
                 </article>
-                <article class="card">
-                    <h3>Data</h3>
-                    <ul class="stat-list">
-                        <li><strong>Weather:</strong> aviationweather.gov</li>
-                        <li><strong>Variation:</strong> offline WMM via <code>magvar</code></li>
-                        <li><strong>Terrain:</strong> USGS elevation sampling</li>
-                        <li><strong>Profiles:</strong> file-based aircraft JSON</li>
-                    </ul>
+                <article class="card accent-card">
+                    <h3>Follow the beta</h3>
+                    <p>
+                        The hosted public app is the next step. For now, the repo and documentation are the public face of the project.
+                    </p>
+                    <div class="hero-actions compact">
+                        <a class="button primary" href="https://github.com/ceiroa/cielorumbo" target="_blank" rel="noreferrer">Follow On GitHub</a>
+                        <a class="button secondary" href="./data-sources.html">Review Data Sources</a>
+                    </div>
                 </article>
             </div>
         </section>
 
-        <section class="section" id="overview">
+        <section class="section" id="updates">
             <div class="section-heading">
-                <p class="eyebrow">Overview</p>
-                <h2>What the app does</h2>
+                <p class="eyebrow">Updates</p>
+                <h2>Join the beta interest list</h2>
+                <p>
+                    If you want to know when the hosted public app is available, leave your email and a little context.
+                    This form is intentionally vendor-agnostic so the final delivery destination can be configured later.
+                </p>
             </div>
             <div class="grid two">
+                <article class="card accent-card">
+                    <h3>What this is for</h3>
+                    <ul class="bullet-list">
+                        <li>Public beta launch updates</li>
+                        <li>New hosted web-app availability</li>
+                        <li>Future iPad/iPhone app progress</li>
+                        <li>Requests from pilots, students, and instructors</li>
+                    </ul>
+                </article>
+                <article class="card">
+                    <form id="beta-interest-form" class="beta-form">
+                        <label class="form-field">
+                            <span>Name</span>
+                            <input type="text" name="name" autocomplete="name" placeholder="Optional">
+                        </label>
+                        <label class="form-field">
+                            <span>Email</span>
+                            <input type="email" name="email" autocomplete="email" placeholder="you@example.com" required>
+                        </label>
+                        <label class="form-field">
+                            <span>How would you use CieloRumbo?</span>
+                            <select name="role">
+                                <option value="">Select one</option>
+                                <option value="student-pilot">Student pilot</option>
+                                <option value="private-pilot">Private pilot</option>
+                                <option value="instructor">Instructor / flight school</option>
+                                <option value="builder-developer">Builder / developer</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </label>
+                        <label class="form-field">
+                            <span>Notes</span>
+                            <textarea name="notes" rows="4" placeholder="What feature matters most to you?"></textarea>
+                        </label>
+                        <div class="beta-form-actions">
+                            <button type="submit" class="button primary">Request Updates</button>
+                            <a class="button secondary" href="https://github.com/ceiroa/cielorumbo" target="_blank" rel="noreferrer">Follow On GitHub</a>
+                        </div>
+                        <p id="beta-interest-status" class="beta-form-status" aria-live="polite">
+                            Signup delivery is not configured yet. Until it is, follow the GitHub repo for updates.
+                        </p>
+                    </form>
+                </article>
+            </div>
+        </section>
+
+        <section class="section" id="features">
+            <div class="section-heading">
+                <p class="eyebrow">Features</p>
+                <h2>What CieloRumbo already covers</h2>
+            </div>
+            <div class="grid three">
                 <article class="card">
                     <h3>Flight Setup</h3>
                     <p>
-                        The home page collects departure, destination legs, cruise altitude, and
-                        aircraft selection. Weather loads per airport and populates the data needed
-                        for the navigation tables and printable nav log.
+                        Build multi-leg routes, select aircraft profiles, pick planned altitudes, and generate
+                        a navigation log from a browser workflow.
+                    </p>
+                </article>
+                <article class="card">
+                    <h3>Weather-Aware Planning</h3>
+                    <p>
+                        Pull FAA weather and forecast data, populate route airports, and surface route-relevant
+                        weather directly in planning and map views.
                     </p>
                 </article>
                 <article class="card">
                     <h3>Checkpoint Planning</h3>
                     <p>
-                        A separate planner generates and stores intermediate dead-reckoning checkpoints.
-                        Users can edit, add, remove, and save checkpoints before they are reflected
-                        back into Table 3 and the PDF workflow.
+                        Generate and refine route checkpoints, review them visually, and push approved checkpoints
+                        back into the nav log.
                     </p>
                 </article>
                 <article class="card">
                     <h3>Route Map</h3>
                     <p>
-                        The map page renders the active route on a free OpenStreetMap base layer,
-                        supports per-leg focus and visibility toggles, highlights saved checkpoints,
-                        shows FAA airspace overlays, supports current-location display, and exports
-                        the route to KML for Google Earth review.
+                        Review the route on street, terrain, and FAA sectional-reference views with weather,
+                        current location, and FAA airspace overlays.
                     </p>
                 </article>
                 <article class="card">
                     <h3>Airspace Profile</h3>
                     <p>
-                        A dedicated airspace profile page projects the route against FAA airspace,
-                        samples terrain, derives Class G below the first controlled floor, and shows
-                        altitude structure from the surface up to the Class A floor.
+                        Project the route against terrain and FAA airspace to understand altitude constraints
+                        and controlled-airspace structure along the flight.
                     </p>
                 </article>
                 <article class="card">
                     <h3>Aircraft Profiles</h3>
                     <p>
-                        Aircraft performance data lives in separate profile files so contributors can
-                        add new aircraft without changing calculation code. The browser UI can list,
-                        edit, and save profiles through the local backend.
+                        Use editable aircraft performance profiles so cruise, climb, and planning assumptions
+                        reflect the selected aircraft configuration.
                     </p>
                 </article>
             </div>
         </section>
 
-        <section class="section" id="architecture">
+        <section class="section" id="audience">
             <div class="section-heading">
-                <p class="eyebrow">Architecture</p>
+                <p class="eyebrow">Audience</p>
+                <h2>Built for training-minded VFR pilots</h2>
+            </div>
+            <div class="grid two">
+                <article class="card">
+                    <h3>Who it is for</h3>
+                    <ul class="bullet-list">
+                        <li>Student pilots learning cross-country planning</li>
+                        <li>Private pilots who want a browser-based planning workflow</li>
+                        <li>People who want weather, route, and airspace context in one place</li>
+                    </ul>
+                </article>
+                <article class="card">
+                    <h3>What it is not</h3>
+                    <ul class="bullet-list">
+                        <li>Not a certified EFB</li>
+                        <li>Not a replacement for official weather and chart products</li>
+                        <li>Not a substitute for pilot judgment or flight instruction</li>
+                    </ul>
+                </article>
+            </div>
+        </section>
+
+        <section class="section" id="technical">
+            <div class="section-heading">
+                <p class="eyebrow">Technical Overview</p>
                 <h2>How the system is organized</h2>
             </div>
             <div class="stack">
@@ -149,89 +240,48 @@
                         <h3>Frontend</h3>
                         <p><code>public/js/app.js</code> orchestrates the main nav-log workflow.</p>
                         <p><code>public/js/checkpoints.js</code> manages checkpoint review and editing.</p>
-                        <p><code>public/js/map.js</code> handles route plotting, leg controls, and KML export.</p>
+                        <p><code>public/js/map.js</code> handles route plotting, weather overlays, and export behavior.</p>
                     </article>
                     <article class="card">
                         <h3>Shared State</h3>
                         <p>
-                            <code>public/js/flightStore.js</code> is the browser-side cache and contract
-                            between pages. It keeps flight drafts, checkpoint plans, and nav-log state
-                            synchronized across page transitions, and also shares FAA airspace cache
-                            data between the home page, route map, and altitude-profile workflow.
+                            <code>public/js/flightStore.js</code> keeps flight drafts, checkpoints, nav-log state,
+                            and shared caches synchronized across page transitions.
                         </p>
                     </article>
                     <article class="card">
                         <h3>Backend</h3>
                         <p>
-                            <code>index.js</code> exposes local endpoints for weather lookup, airport comms,
-                            checkpoint generation, airspace lookup, elevation sampling, chart metadata,
-                            and aircraft profile CRUD. Server-side normalization keeps third-party API quirks
-                            away from the UI.
+                            <code>index.js</code> exposes local endpoints for weather, checkpoint generation,
+                            airspace lookup, elevation sampling, chart metadata, and aircraft profile CRUD.
                         </p>
                     </article>
                 </div>
             </div>
         </section>
 
-        <section class="section" id="data-sources">
+        <section class="section" id="platform">
             <div class="section-heading">
-                <p class="eyebrow">Data Sources</p>
-                <h2>What is local and what is external</h2>
+                <p class="eyebrow">Platform</p>
+                <h2>Current stack</h2>
             </div>
             <div class="grid two">
                 <article class="card">
-                    <h3>External Services</h3>
-                    <ul class="bullet-list">
-                        <li><strong>AviationWeather:</strong> METAR, TAF, station data, airport lookup, and fallback weather resolution.</li>
-                        <li><strong>FAA:</strong> class-airspace geometry and vertical shelf values, plus sectional chart metadata.</li>
-                        <li><strong>USGS:</strong> route elevation samples used for terrain and Class E/G altitude derivation.</li>
-                        <li><strong>OpenStreetMap / OpenTopoMap:</strong> route and terrain map tiles on the route map page.</li>
+                    <h3>Application</h3>
+                    <ul class="stat-list">
+                        <li><strong>Frontend:</strong> Static HTML/CSS/JS</li>
+                        <li><strong>Backend:</strong> Node.js + Express</li>
+                        <li><strong>Testing:</strong> Jest + Playwright</li>
                     </ul>
                 </article>
                 <article class="card">
-                    <h3>Local / Offline Components</h3>
-                    <ul class="bullet-list">
-                        <li><strong><code>magvar</code>:</strong> computes magnetic variation locally from the World Magnetic Model.</li>
-                        <li><strong>Aircraft profile JSON files:</strong> contributor-managed data files under the aircraft profile directory.</li>
-                        <li><strong>Checkpoint and nav-log cache:</strong> browser storage reused between home, planner, and map.</li>
-                        <li><strong>Airspace cache:</strong> shared browser-side FAA airspace cache reused by the route map and altitude profile.</li>
+                    <h3>Core inputs</h3>
+                    <ul class="stat-list">
+                        <li><strong>Weather:</strong> AviationWeather.gov</li>
+                        <li><strong>Variation:</strong> offline WMM via <code>magvar</code></li>
+                        <li><strong>Terrain:</strong> USGS elevation sampling</li>
+                        <li><strong>Airspace:</strong> FAA airspace geometry and shelf values</li>
                     </ul>
-                </article>
-            </div>
-            <div class="section-actions">
-                <a class="button secondary" href="./data-sources.html">Open Detailed Data Source Guide</a>
-            </div>
-        </section>
-
-        <section class="section" id="reliability">
-            <div class="section-heading">
-                <p class="eyebrow">Reliability</p>
-                <h2>How the app avoids brittle behavior</h2>
-            </div>
-            <div class="grid three">
-                <article class="card">
-                    <h3>Weather Robustness</h3>
-                    <p>
-                        Weather lookups show per-airport loading states, retry transient upstream failures,
-                        and surface incomplete-data errors inline next to the field that triggered them.
-                        Future-dated planning switches to FAA forecast handling when observation-only
-                        data is no longer appropriate.
-                    </p>
-                </article>
-                <article class="card">
-                    <h3>Single Sources of Truth</h3>
-                    <p>
-                        Navigation logic, weather normalization, and aircraft profiles are separated so
-                        changes happen in one place instead of drifting across duplicated code paths.
-                    </p>
-                </article>
-                <article class="card">
-                    <h3>Cross-Page Reuse</h3>
-                    <p>
-                        Once checkpoints or a nav log are generated, the stored plan is reused across
-                        pages instead of being recalculated every time the user navigates. The same pattern
-                        now applies to FAA airspace, which is prefetched and cached for later map/profile use.
-                    </p>
                 </article>
             </div>
         </section>
@@ -246,15 +296,14 @@
                     <h3>Unit Tests</h3>
                     <p>
                         Jest covers weather normalization, fallback behavior, magnetic variation, and
-                        supporting services. These tests verify pure logic and API adaptation behavior.
+                        supporting services.
                     </p>
                 </article>
                 <article class="card">
                     <h3>End-to-End Tests</h3>
                     <p>
-                        Playwright validates the real user workflows: weather entry, checkpoint planning,
-                        nav-log generation, cross-page state reuse, route map behavior, airspace caching,
-                        and the altitude-profile workflow.
+                        Playwright validates route generation, planner behavior, route map behavior,
+                        airspace workflows, and shared state across pages.
                     </p>
                 </article>
             </div>
@@ -265,95 +314,29 @@ npm run test:ui</code></pre>
             </div>
         </section>
 
-        <section class="section" id="ai-workflow">
-            <div class="section-heading">
-                <p class="eyebrow">AI Workflow</p>
-                <h2>How AI tools were used</h2>
-            </div>
-            <div class="grid two">
-                <article class="card">
-                    <h3>Where AI helped</h3>
-                    <p>
-                        AI tools were used as implementation accelerators for UI changes, refactors,
-                        integration glue, test scaffolding, and exploratory feature work. That was
-                        especially useful while the app was expanding from a single nav-log screen into
-                        weather, checkpoints, mapping, and aircraft-profile workflows.
-                    </p>
-                </article>
-                <article class="card">
-                    <h3>What made it reliable</h3>
-                    <p>
-                        The project became more stable only after the code was reorganized around clearer
-                        boundaries, shared browser state, standardized data files, and repeatable tests.
-                        In other words, the useful pattern was not just "ask an AI to change code," but
-                        "constrain the change, verify it locally, and keep one source of truth per area."
-                    </p>
-                </article>
-            </div>
-            <div class="code-block">
-<pre><code>Typical AI-assisted workflow:
-1. make one bounded change
-2. update or add tests in the same change
-3. run npm test locally
-4. push only after the workflow passes</code></pre>
-            </div>
-        </section>
-
-        <section class="section" id="repo-layout">
-            <div class="section-heading">
-                <p class="eyebrow">Repository Layout</p>
-                <h2>Key directories</h2>
-            </div>
-            <div class="code-block">
-<pre><code>public/
-  index.html
-  checkpoints.html
-  map.html
-  airspace-profile.html
-  aircraft.html
-  js/
-  styles/
-
-src/
-  api/
-  data/
-  logic/
-
-tests/
-  unit/
-  e2e/
-
-docs/
-  index.html
-  styles.css</code></pre>
-            </div>
-        </section>
-
         <section class="section" id="roadmap">
             <div class="section-heading">
                 <p class="eyebrow">Roadmap</p>
-                <h2>Logical next steps</h2>
+                <h2>Near-term direction</h2>
             </div>
             <div class="grid three">
                 <article class="card">
-                    <h3>Richer Checkpoints</h3>
-                    <p>Add more real-world landmark sources and improve checkpoint ranking beyond airport-based fallbacks.</p>
+                    <h3>Public Beta Hosting</h3>
+                    <p>Deploy the public web app so pilots can try it without cloning the repo.</p>
                 </article>
                 <article class="card">
-                    <h3>Chart Overlays</h3>
-                    <p>Improve FAA sectional rendering and reduce the remaining friction around browser-side raster chart overlays.</p>
+                    <h3>Mobile Path</h3>
+                    <p>Continue improving the public mobile/PWA workflow as the shared foundation for the future iOS app.</p>
                 </article>
                 <article class="card">
-                    <h3>Weather On Map</h3>
-                    <p>Add weather-aware map overlays and route-centric weather presentation for the selected flight date and time.</p>
-                </article>
-                <article class="card">
-                    <h3>Profile Expansion</h3>
-                    <p>Grow the aircraft profile library and formalize validation for incomplete or inconsistent data.</p>
+                    <h3>AI Advisory Later</h3>
+                    <p>Explore deterministic trip-risk analysis first, then layer AI explanation and suggestions on top in the paid app.</p>
                 </article>
             </div>
         </section>
     </main>
+    <script src="./site-config.js"></script>
+    <script src="./beta-interest.js"></script>
     <script src="./hero-graphic.js"></script>
 </body>
 </html>

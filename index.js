@@ -27,6 +27,13 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.get('/healthz', (req, res) => {
+    res.status(200).json({
+        ok: true,
+        service: 'cielorumbo',
+    });
+});
+
 // Serve static files from the 'public' directory
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/docs', express.static(path.join(__dirname, 'docs')));

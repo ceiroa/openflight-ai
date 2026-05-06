@@ -284,11 +284,12 @@ function startLoadingProgress(initialMessage, note = "Checkpoint generation may 
         { until: 28, label: "Loading route data..." },
         { until: 56, label: "Calculating checkpoints..." },
         { until: 82, label: "Preparing nav log tables..." },
-        { until: 92, label: "Finishing up..." },
+        { until: 98, label: "Finishing up..." },
     ];
 
     progressTimer = window.setInterval(() => {
-        progressValue = Math.min(progressValue + 7, 92);
+        const increment = progressValue < 56 ? 7 : progressValue < 82 ? 5 : 2;
+        progressValue = Math.min(progressValue + increment, 98);
         loadingProgressBar.style.width = `${progressValue}%`;
         const currentPhase = phases.find((phase) => progressValue <= phase.until) ?? phases[phases.length - 1];
         loadingProgressLabel.textContent = currentPhase.label;

@@ -932,28 +932,52 @@ body.map-focus-mode .container > .status-banner {
     }
 
     .container.mobile-map-layout .map-panel h2,
-    .container.mobile-map-layout .map-panel .map-toolbar,
     .container.mobile-map-layout .map-panel #map-status,
     .container.mobile-map-layout .map-panel #map-weather-status,
     .container.mobile-map-layout .map-panel #map-weather-layer-status {
         display: none;
     }
 
+    .container.mobile-map-layout .map-panel .map-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        width: 100%;
+        max-width: 100%;
+        gap: 8px;
+        margin: 0 0 10px;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    .container.mobile-map-layout .map-panel .map-toolbar button {
+        flex: 1 1 calc(50% - 8px);
+        min-height: 34px;
+        padding: 0 10px;
+        font-size: 10px;
+        white-space: normal;
+    }
+
     .container.mobile-map-layout .route-map-shell {
         margin: -2px;
+        width: 100%;
+        min-width: 0;
+        overflow: hidden;
     }
 
     .container.mobile-map-layout #route-map {
+        width: 100%;
         height: calc(100vh - 210px);
         min-height: 460px;
         max-height: none;
         border-radius: 12px;
+        min-width: 0;
     }
 
     .container.mobile-map-layout .map-panel {
         padding: 0;
         border: none;
         background: transparent;
+        min-width: 0;
     }
 
     .container.mobile-map-layout .route-panel {

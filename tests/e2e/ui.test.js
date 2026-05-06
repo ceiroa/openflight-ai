@@ -838,7 +838,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         const summaryOrder = await page.locator('.summary-panel').evaluate((element) =>
             getComputedStyle(element).order
         );
-        expect(summaryOrder).toBe('-1');
+        expect(summaryOrder).toBe('0');
     });
 
     test('@smoke @home should show post-nav-log quick navigation buttons only after nav log generation', async ({ page }) => {

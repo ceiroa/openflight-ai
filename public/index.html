@@ -44,6 +44,7 @@
         .form-group.flex-fill { flex: 1; }
         .form-group.width-airport-alt { width: 100px; }
         .form-group.width-leg-field { width: 80px; }
+        .flight-form-grid > .form-group { min-width: 0; }
         label { font-weight: 600; margin-bottom: 4px; color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
         .section-label { color: var(--accent-color); font-size: 13px; }
 
@@ -58,6 +59,10 @@
             font-size: 13px;
         }
         input:focus { border-color: var(--accent-color); outline: none; }
+        input[type="datetime-local"] {
+            min-width: 0;
+            max-width: 100%;
+        }
 
         #flightGraph {
             width: 100%;

@@ -42,6 +42,26 @@ app.use('/vendor/georaster', express.static(path.join(__dirname, 'node_modules',
 app.use('/vendor/georaster-layer-for-leaflet', express.static(path.join(__dirname, 'node_modules', 'georaster-layer-for-leaflet', 'dist')));
 app.use(express.json());
 
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/checkpoints.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'checkpoints.html'));
+});
+
+app.get('/map.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'map.html'));
+});
+
+app.get('/airspace-profile.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'airspace-profile.html'));
+});
+
+app.get('/aircraft.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'aircraft.html'));
+});
+
 app.get('/docs', (req, res) => {
     res.sendFile(path.join(__dirname, 'docs', 'index.html'));
 });

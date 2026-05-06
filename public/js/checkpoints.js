@@ -48,7 +48,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     currentDraft = loadFlightDraft();
     if (!isUsableDraft(currentDraft)) {
-        renderEmptyState("Load the flight on the main page first, then open the checkpoints planner.");
+        renderSetupRequiredState(
+            "Enter a departure and at least one destination in Flight Setup before opening the checkpoints planner.",
+        );
         return;
     }
 
@@ -320,6 +322,21 @@ function isUsableDraft(draft) {
 
 function renderEmptyState(message) {
     plannerRoot.innerHTML = `<div class="empty-state">${message}</div>`;
+    regenerateButton.disabled = true;
+    saveButton.disabled = true;
+    clearButton.disabled = true;
+}
+
+function renderSetupRequiredState(message) {
+    plannerRoot.innerHTML = `
+        <div class="empty-state setup-required-state">
+            <h2>Set Up a Flight First</h2>
+            <p>${escapeHtml(message)}</p>
+            <div class="empty-state-actions">
+                <a class="link-button" href="/index.html">Go to Flight Setup</a>
+            </div>
+        </div>
+    `;
     regenerateButton.disabled = true;
     saveButton.disabled = true;
     clearButton.disabled = true;

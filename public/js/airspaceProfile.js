@@ -51,7 +51,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const draft = loadFlightDraft();
     if (!isUsableDraft(draft)) {
-        renderEmptyState("Load the flight on the main page first, then open the airspace profile.");
+        renderSetupRequiredState(
+            "Enter a departure and at least one destination in Flight Setup before opening the airspace profile.",
+        );
         return;
     }
 
@@ -1094,6 +1096,18 @@ function isUsableDraft(draft) {
 
 function renderEmptyState(message) {
     profileRoot.innerHTML = `<div class="empty-state">${escapeHtml(message)}</div>`;
+}
+
+function renderSetupRequiredState(message) {
+    profileRoot.innerHTML = `
+        <div class="empty-state setup-required-state">
+            <h2>Set Up a Flight First</h2>
+            <p>${escapeHtml(message)}</p>
+            <div class="empty-state-actions">
+                <a class="link-button" href="/index.html">Go to Flight Setup</a>
+            </div>
+        </div>
+    `;
 }
 
 function showStatus(message, type = "info") {

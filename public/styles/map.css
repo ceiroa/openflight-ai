@@ -869,6 +869,31 @@ body.map-focus-mode .container > .status-banner {
     color: #cbd5e1;
 }
 
+.setup-required-state {
+    max-width: 620px;
+    margin: 28px auto;
+    background: rgba(15, 23, 42, 0.78);
+}
+
+.setup-required-state h2 {
+    margin: 0 0 8px;
+    color: #7dd3fc;
+    font-size: 24px;
+}
+
+.setup-required-state p {
+    margin: 0;
+    color: #cbd5e1;
+}
+
+.empty-state-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+}
+
 .checkpoint-list-item.is-hidden {
     display: none;
 }

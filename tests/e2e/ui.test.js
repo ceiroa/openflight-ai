@@ -197,6 +197,22 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', '/icons/app-icon.svg');
     });
 
+    test('@smoke @map @planner @airspace should guide first-time users back to Flight Setup when no route exists', async ({ page }) => {
+        await page.evaluate(() => {
+            localStorage.clear();
+            sessionStorage.clear();
+        });
+
+        for (const path of ['/map.html', '/checkpoints.html', '/airspace-profile.html']) {
+            await page.goto(path);
+            await expect(page.locator('.setup-required-state')).toBeVisible();
+            await expect(page.locator('.setup-required-state h2')).toHaveText('Set Up a Flight First');
+            await expect(page.locator('.setup-required-state .link-button')).toHaveAttribute('href', '/index.html');
+            await expect(page.locator('.setup-required-state')).toContainText('departure');
+            await expect(page.locator('.setup-required-state')).toContainText('destination');
+        }
+    });
+
     test('@smoke @home should populate departure weather when ICAO is entered', async ({ page }) => {
         const depInput = page.locator('#departure-icao');
         await depInput.fill('KORD');

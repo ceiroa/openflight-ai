@@ -53,6 +53,58 @@
         .status-banner.error { display: block; background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.4); color: #fecaca; }
         .status-banner.info { display: block; background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.4); color: #bae6fd; }
         .issues { margin-top: 8px; font-size: 12px; color: #fcd34d; }
+        .table-section {
+            margin-top: 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.45);
+            padding: 14px;
+        }
+        .table-section-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .table-section-copy {
+            margin: 4px 0 0;
+            color: #cbd5e1;
+            font-size: 12px;
+        }
+        .climb-table-wrap {
+            overflow-x: auto;
+        }
+        .climb-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 560px;
+        }
+        .climb-table th,
+        .climb-table td {
+            border-bottom: 1px solid var(--border-color);
+            padding: 10px 8px;
+            text-align: left;
+            vertical-align: middle;
+        }
+        .climb-table th {
+            color: #94a3b8;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .climb-table td input {
+            margin: 0;
+        }
+        .climb-table tr:last-child td {
+            border-bottom: none;
+        }
+        .table-delete-button {
+            background-color: rgba(239, 68, 68, 0.14);
+            color: #fecaca;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            padding: 8px 10px;
+        }
         @media (max-width: 960px) {
             .layout { grid-template-columns: 1fr; }
         }
@@ -78,8 +130,9 @@
                 flex-direction: column;
                 align-items: flex-start;
             }
-            textarea {
-                min-height: 220px;
+            .table-section-header {
+                flex-direction: column;
+                align-items: flex-start;
             }
         }
     </style>
@@ -131,7 +184,6 @@
                         <div class="form-group"><label for="climb-speed">Climb Speed (kt)</label><input id="climb-speed" type="number"></div>
                         <div class="form-group"><label for="climb-rpm">Climb RPM</label><input id="climb-rpm" type="number"></div>
                         <div class="form-group"><label for="climb-fuel">Climb Fuel Burn (gph)</label><input id="climb-fuel" type="number" step="0.1"></div>
-                        <div class="form-group"><label for="climb-rate">Rate Of Climb (fpm)</label><input id="climb-rate" type="number"></div>
                         <div class="form-group"><label for="cruise-speed">Cruise Speed (kt)</label><input id="cruise-speed" type="number"></div>
                         <div class="form-group"><label for="cruise-rpm">Cruise RPM</label><input id="cruise-rpm" type="number"></div>
                         <div class="form-group"><label for="cruise-fuel">Cruise Fuel Burn (gph)</label><input id="cruise-fuel" type="number" step="0.1"></div>
@@ -139,10 +191,28 @@
                         <div class="form-group"><label for="limit-vs">VS (kt)</label><input id="limit-vs" type="number"></div>
                         <div class="form-group"><label for="limit-max-rpm">Max RPM</label><input id="limit-max-rpm" type="number"></div>
                     </div>
-                    <div class="form-group">
-                        <label for="climb-table-json">Climb Table JSON</label>
-                        <textarea id="climb-table-json"></textarea>
-                    </div>
+                    <section class="table-section" aria-labelledby="climb-table-heading">
+                        <div class="table-section-header">
+                            <div>
+                                <h2 id="climb-table-heading">Climb Performance Table</h2>
+                                <p class="table-section-copy">This table drives nav-log climb calculations. The app selects the rate of climb by interpolating the row that matches the calculated density altitude.</p>
+                            </div>
+                            <button type="button" id="add-climb-row-btn" class="secondary">Add Climb Row</button>
+                        </div>
+                        <div class="climb-table-wrap">
+                            <table class="climb-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Density Altitude (ft)</th>
+                                        <th scope="col">Climb Speed (kt)</th>
+                                        <th scope="col">Rate Of Climb (fpm)</th>
+                                        <th scope="col">Row</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="climb-table-body"></tbody>
+                            </table>
+                        </div>
+                    </section>
                     <div id="validation-issues" class="issues"></div>
                 </section>
             </div>

@@ -6,6 +6,8 @@ const newProfileButton = document.getElementById("new-profile-btn");
 const refreshProfilesButton = document.getElementById("refresh-profiles-btn");
 const saveProfileButton = document.getElementById("save-profile-btn");
 const validationIssues = document.getElementById("validation-issues");
+const addClimbRowButton = document.getElementById("add-climb-row-btn");
+const climbTableBody = document.getElementById("climb-table-body");
 
 let profiles = [];
 let activeProfileId = null;
@@ -19,6 +21,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     newProfileButton.addEventListener("click", () => selectProfile(createEmptyProfile()));
     refreshProfilesButton.addEventListener("click", loadProfiles);
     saveProfileButton.addEventListener("click", saveProfile);
+    addClimbRowButton.addEventListener("click", () => {
+        addClimbTableRow();
+        syncClimbTableEmptyState();
+    });
 
     await loadProfiles();
 });
@@ -112,26 +118,19 @@ function selectProfile(profile) {
     document.getElementById("climb-speed").value = profile.profiles?.climb?.speed_kts ?? "";
     document.getElementById("climb-rpm").value = profile.profiles?.climb?.rpm ?? "";
     document.getElementById("climb-fuel").value = profile.profiles?.climb?.fuel_burn_gph ?? "";
-    document.getElementById("climb-rate").value = profile.profiles?.climb?.rate_of_climb_fpm ?? "";
     document.getElementById("cruise-speed").value = (profile.profiles?.cruise65 ?? profile.profiles?.cruise)?.speed_kts ?? "";
     document.getElementById("cruise-rpm").value = (profile.profiles?.cruise65 ?? profile.profiles?.cruise)?.rpm ?? "";
     document.getElementById("cruise-fuel").value = (profile.profiles?.cruise65 ?? profile.profiles?.cruise)?.fuel_burn_gph ?? "";
     document.getElementById("limit-vne").value = profile.limits?.vne_kts ?? "";
     document.getElementById("limit-vs").value = profile.limits?.vs_kts ?? "";
     document.getElementById("limit-max-rpm").value = profile.limits?.max_rpm ?? "";
-    document.getElementById("climb-table-json").value = JSON.stringify(profile.profiles?.climb?.climbTable ?? [], null, 2);
+    renderClimbTable(profile.profiles?.climb?.climbTable ?? []);
     validationIssues.textContent = "";
     renderProfileList();
 }
 
 async function saveProfile() {
-    let climbTable;
-    try {
-        climbTable = JSON.parse(document.getElementById("climb-table-json").value || "[]");
-    } catch {
-        showStatus("Climb table JSON is invalid.", "error");
-        return;
-    }
+    const climbTable = collectClimbTableRows();
 
     const profile = {
         id: document.getElementById("profile-id").value.trim(),
@@ -145,7 +144,6 @@ async function saveProfile() {
                 speed_kts: numberOrNull(document.getElementById("climb-speed").value),
                 rpm: numberOrNull(document.getElementById("climb-rpm").value),
                 fuel_burn_gph: numberOrNull(document.getElementById("climb-fuel").value),
-                rate_of_climb_fpm: numberOrNull(document.getElementById("climb-rate").value),
                 climbTable,
             },
             cruise65: {
@@ -203,7 +201,6 @@ function createEmptyProfile() {
                 speed_kts: null,
                 rpm: null,
                 fuel_burn_gph: null,
-                rate_of_climb_fpm: null,
                 climbTable: [],
             },
             cruise65: {
@@ -255,4 +252,58 @@ function formatProfileCardTitle(profile) {
 
 function formatProfileCardMeta(profile) {
     return "";
+}
+
+function renderClimbTable(rows) {
+    climbTableBody.innerHTML = "";
+
+    if (Array.isArray(rows) && rows.length > 0) {
+        rows.forEach((row) => addClimbTableRow(row));
+    } else {
+        addClimbTableRow();
+    }
+
+    syncClimbTableEmptyState();
+}
+
+function addClimbTableRow(row = {}) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+        <td><input type="number" data-climb-cell="altitude" value="${escapeAttribute(row.altitude_ft)}"></td>
+        <td><input type="number" data-climb-cell="speed" value="${escapeAttribute(row.speed_kts)}"></td>
+        <td><input type="number" data-climb-cell="rate" value="${escapeAttribute(row.rate_of_climb_fpm)}"></td>
+        <td><button type="button" class="table-delete-button" data-climb-row-delete>Remove</button></td>
+    `;
+
+    tr.querySelector("[data-climb-row-delete]").addEventListener("click", () => {
+        tr.remove();
+        syncClimbTableEmptyState();
+    });
+
+    climbTableBody.appendChild(tr);
+}
+
+function syncClimbTableEmptyState() {
+    if (climbTableBody.children.length === 0) {
+        addClimbTableRow();
+    }
+}
+
+function collectClimbTableRows() {
+    return Array.from(climbTableBody.querySelectorAll("tr"))
+        .map((row) => ({
+            altitude_ft: numberOrNull(row.querySelector('[data-climb-cell="altitude"]').value),
+            speed_kts: numberOrNull(row.querySelector('[data-climb-cell="speed"]').value),
+            rate_of_climb_fpm: numberOrNull(row.querySelector('[data-climb-cell="rate"]').value),
+        }))
+        .filter((row) => Object.values(row).every((value) => Number.isFinite(value)))
+        .sort((left, right) => left.altitude_ft - right.altitude_ft);
+}
+
+function escapeAttribute(value) {
+    if (value === null || value === undefined || value === "") {
+        return "";
+    }
+
+    return String(value).replaceAll("\"", "&quot;");
 }

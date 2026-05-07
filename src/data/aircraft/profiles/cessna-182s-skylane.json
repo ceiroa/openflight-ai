@@ -5,15 +5,21 @@
   "manufacturer": "Cessna",
   "model": "182S Skylane",
   "engine": "Lycoming IO-540-AB1A5",
-  "source_notes": "Seed profile based on Textron Aviation Skylane specifications for climb rate, VNE, and stall speed, with representative climb and cruise values aligned to commonly cited 182S POH performance rows mirrored online. Treat as a practical planning seed and verify against the exact aircraft POH.",
+  "source_notes": "Seed profile based on the Cessna 182S Skylane POH standard-temperature time, fuel, and distance to climb chart, plus representative cruise and limits values. The climb table is backfilled from the published climb chart instead of a single sea-level climb rate.",
   "profiles": {
     "climb": {
       "speed_kts": 84,
       "rpm": 2400,
       "fuel_burn_gph": 13.8,
-      "rate_of_climb_fpm": 924,
       "climbTable": [
-        { "altitude_ft": 0, "speed_kts": 84, "rate_of_climb_fpm": 924 }
+        { "altitude_ft": 0, "speed_kts": 80, "rate_of_climb_fpm": 925 },
+        { "altitude_ft": 2000, "speed_kts": 79, "rate_of_climb_fpm": 835 },
+        { "altitude_ft": 4000, "speed_kts": 78, "rate_of_climb_fpm": 750 },
+        { "altitude_ft": 6000, "speed_kts": 77, "rate_of_climb_fpm": 660 },
+        { "altitude_ft": 8000, "speed_kts": 75, "rate_of_climb_fpm": 565 },
+        { "altitude_ft": 10000, "speed_kts": 74, "rate_of_climb_fpm": 470 },
+        { "altitude_ft": 12000, "speed_kts": 73, "rate_of_climb_fpm": 375 },
+        { "altitude_ft": 14000, "speed_kts": 72, "rate_of_climb_fpm": 285 }
       ]
     },
     "cruise65": {

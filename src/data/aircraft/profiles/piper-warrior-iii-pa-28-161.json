@@ -5,15 +5,26 @@
   "manufacturer": "Piper",
   "model": "PA-28-161 Warrior III",
   "engine": "Lycoming O-320-D3G",
-  "source_notes": "Seed profile based on the Piper PA-28-161 Warrior III POH mirrored on ManualsLib for basic climb and operating speeds, with representative cruise and fuel figures aligned to widely used Warrior III training references. Verify against the exact aircraft POH before operational use.",
+  "source_notes": "Seed profile based on the Piper PA-28-161 Warrior III POH climb performance chart and published operating speeds. The climb table is backfilled from the POH ISA climb-performance column instead of a single sea-level climb point.",
   "profiles": {
     "climb": {
       "speed_kts": 79,
       "rpm": 2700,
       "fuel_burn_gph": 9.5,
-      "rate_of_climb_fpm": 667,
       "climbTable": [
-        { "altitude_ft": 0, "speed_kts": 79, "rate_of_climb_fpm": 667 }
+        { "altitude_ft": 0, "speed_kts": 79, "rate_of_climb_fpm": 644 },
+        { "altitude_ft": 1000, "speed_kts": 79, "rate_of_climb_fpm": 595 },
+        { "altitude_ft": 2000, "speed_kts": 79, "rate_of_climb_fpm": 545 },
+        { "altitude_ft": 3000, "speed_kts": 79, "rate_of_climb_fpm": 495 },
+        { "altitude_ft": 4000, "speed_kts": 79, "rate_of_climb_fpm": 446 },
+        { "altitude_ft": 5000, "speed_kts": 79, "rate_of_climb_fpm": 396 },
+        { "altitude_ft": 6000, "speed_kts": 79, "rate_of_climb_fpm": 346 },
+        { "altitude_ft": 7000, "speed_kts": 79, "rate_of_climb_fpm": 298 },
+        { "altitude_ft": 8000, "speed_kts": 79, "rate_of_climb_fpm": 248 },
+        { "altitude_ft": 9000, "speed_kts": 79, "rate_of_climb_fpm": 198 },
+        { "altitude_ft": 10000, "speed_kts": 79, "rate_of_climb_fpm": 149 },
+        { "altitude_ft": 11000, "speed_kts": 79, "rate_of_climb_fpm": 99 },
+        { "altitude_ft": 12000, "speed_kts": 79, "rate_of_climb_fpm": 49 }
       ]
     },
     "cruise65": {

@@ -1315,6 +1315,18 @@ test.describe('CieloRumbo - UI Tests', () => {
         ]);
     });
 
+    test('should show climb performance as a table instead of raw JSON on the aircraft profiles page', async ({ page }) => {
+        await page.click('#menu-toggle');
+        await page.click('#open-aircraft-btn');
+
+        await expect(page).toHaveURL(/aircraft\.html$/);
+        await expect(page.locator('#climb-table-body tr')).not.toHaveCount(0);
+        await expect(page.locator('#add-climb-row-btn')).toBeVisible();
+        await expect(page.locator('#climb-rate')).toHaveCount(0);
+        await expect(page.locator('#climb-table-json')).toHaveCount(0);
+        await expect(page.locator('.table-section-copy')).toContainText('density altitude');
+    });
+
     test('should keep the aircraft profiles page usable on narrower layouts', async ({ page }) => {
         await page.setViewportSize({ width: 430, height: 932 });
         await page.reload();

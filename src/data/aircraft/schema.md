@@ -18,7 +18,6 @@ Each file uses this shape:
       "speed_kts": 65,
       "rpm": 5500,
       "fuel_burn_gph": 6.6,
-      "rate_of_climb_fpm": 850,
       "climbTable": [
         { "altitude_ft": 0, "speed_kts": 67, "rate_of_climb_fpm": 900 }
       ]
@@ -59,5 +58,5 @@ Conventions:
 - `id` should be lowercase kebab-case
 - speeds are in knots
 - fuel burn is in gallons per hour
-- climb table altitude is in feet
+- climb table altitude is density altitude in feet
 - if a value is unknown, use `null` rather than inventing a number

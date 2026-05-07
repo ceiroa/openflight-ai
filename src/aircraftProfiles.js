@@ -90,7 +90,6 @@ export function normalizeAircraftProfile(profile) {
                 speed_kts: normalizeNumber(profile?.profiles?.climb?.speed_kts),
                 rpm: normalizeNumber(profile?.profiles?.climb?.rpm),
                 fuel_burn_gph: normalizeNumber(profile?.profiles?.climb?.fuel_burn_gph),
-                rate_of_climb_fpm: normalizeNumber(profile?.profiles?.climb?.rate_of_climb_fpm),
                 climbTable: normalizeClimbTable(profile?.profiles?.climb?.climbTable),
             },
             ...(profile?.profiles?.cruise65 || profile?.profiles?.cruise ? {

@@ -11,7 +11,6 @@
       "speed_kts": 65,
       "rpm": 5500,
       "fuel_burn_gph": 6.6,
-      "rate_of_climb_fpm": 850,
       "climbTable": [
         { "altitude_ft": 0, "speed_kts": 67, "rate_of_climb_fpm": 900 },
         { "altitude_ft": 2000, "speed_kts": 65, "rate_of_climb_fpm": 780 },

@@ -70,6 +70,7 @@ const MIN_PROGRESS_VISIBLE_MS = 700;
 let progressTimer = null;
 let progressValue = 0;
 let progressStartedAt = 0;
+let progressIndeterminate = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
     clearExpiredSharedWeatherCacheEntries();
@@ -274,26 +275,42 @@ function startLoadingProgress(initialMessage, note = "Checkpoint generation may 
     stopLoadingProgress(true);
 
     progressValue = 8;
+    progressIndeterminate = false;
     progressStartedAt = Date.now();
     loadingProgress.classList.add("active");
+    loadingProgressBar.classList.remove("is-indeterminate");
     loadingProgressBar.style.width = `${progressValue}%`;
     loadingProgressLabel.textContent = initialMessage;
     loadingProgressNote.textContent = note;
 
     const phases = [
-        { until: 28, label: "Loading route data..." },
-        { until: 56, label: "Calculating checkpoints..." },
-        { until: 82, label: "Preparing nav log tables..." },
-        { until: 98, label: "Finishing up..." },
+        { until: 24, label: "Loading route data..." },
+        { until: 50, label: "Calculating checkpoints..." },
+        { until: 74, label: "Preparing nav log tables..." },
+        { until: 82, label: "Finalizing nav log..." },
     ];
 
     progressTimer = window.setInterval(() => {
-        const increment = progressValue < 56 ? 7 : progressValue < 82 ? 5 : 2;
-        progressValue = Math.min(progressValue + increment, 98);
+        if (progressIndeterminate) {
+            return;
+        }
+        const increment = progressValue < 24
+            ? 4
+            : progressValue < 50
+                ? 3
+                : progressValue < 74
+                    ? 2
+                    : 1;
+        progressValue = Math.min(progressValue + increment, 82);
         loadingProgressBar.style.width = `${progressValue}%`;
         const currentPhase = phases.find((phase) => progressValue <= phase.until) ?? phases[phases.length - 1];
         loadingProgressLabel.textContent = currentPhase.label;
-    }, 320);
+        if (progressValue >= 82) {
+            progressIndeterminate = true;
+            loadingProgressBar.classList.add("is-indeterminate");
+            loadingProgressLabel.textContent = "Finalizing nav log...";
+        }
+    }, 380);
 }
 
 function stopLoadingProgress(immediate = false) {
@@ -307,6 +324,8 @@ function stopLoadingProgress(immediate = false) {
     }
 
     const finish = () => {
+        progressIndeterminate = false;
+        loadingProgressBar.classList.remove("is-indeterminate");
         loadingProgressBar.style.width = "100%";
         return new Promise((resolve) => {
             window.setTimeout(() => {
@@ -972,8 +991,8 @@ function validateFlightInputs(inputs) {
     return errors;
 }
 
-function appendRow(tableBody, cells) {
-    tableBody.innerHTML += `<tr>${cells.map((cell) => `<td>${cell}</td>`).join("")}</tr>`;
+function buildRowMarkup(cells) {
+    return `<tr>${cells.map((cell) => `<td>${cell}</td>`).join("")}</tr>`;
 }
 
 function saveCurrentFlightDraft() {
@@ -1058,6 +1077,12 @@ async function loadPlanFromFile(file) {
         showStatus("Loading live weather for imported plan...", "info");
         setCheckpointStatus("");
         await refreshImportedPlanWeather();
+        if (normalizedPlan.checkpointPlan) {
+            saveCheckpointPlan({
+                ...normalizedPlan.checkpointPlan,
+                routeSignature: createRouteSignature(collectFlightInputs()),
+            });
+        }
         showStatus("Flight plan loaded. Weather was refreshed live.", "info");
         log("Flight plan imported successfully.");
     } catch (error) {
@@ -1309,6 +1334,9 @@ async function generateLog() {
     const table1Body = document.getElementById("table1-body");
     const table2Body = document.getElementById("table2-body");
     const table3Body = document.getElementById("table3-body");
+    const table1Rows = [];
+    const table2Rows = [];
+    const table3Rows = [];
     table1Body.innerHTML = "";
     table2Body.innerHTML = "";
     table3Body.innerHTML = "";
@@ -1316,7 +1344,7 @@ async function generateLog() {
 
     const departurePressureAlt = calculatePressureAltitude(inputs.departure.airportAlt, inputs.departure.altimeter);
     const departureDensityAlt = calculateDensityAltitude(departurePressureAlt, inputs.departure.temp);
-    appendRow(table1Body, [
+    const departurePerfRow = [
         `${inputs.departure.icao} (APT)`,
         inputs.departure.airportAlt,
         departurePressureAlt,
@@ -1326,7 +1354,8 @@ async function generateLog() {
         profiles.climb.rpm,
         profiles.climb.speed_kts,
         profiles.climb.fuel_burn_gph,
-    ]);
+    ];
+    table1Rows.push(buildRowMarkup(departurePerfRow));
 
     let totalDistanceRemaining = 0;
     let prevLat = inputs.departure.lat;
@@ -1364,7 +1393,7 @@ async function generateLog() {
         if (index > 0) {
             const aptPressureAlt = calculatePressureAltitude(previousAltitude, leg.altimeter);
             const aptDensityAlt = calculateDensityAltitude(aptPressureAlt, leg.temp);
-            appendRow(table1Body, [
+            table1Rows.push(buildRowMarkup([
                 `${previousIcao} (APT)`,
                 previousAltitude,
                 aptPressureAlt,
@@ -1374,12 +1403,12 @@ async function generateLog() {
                 profiles.climb.rpm,
                 profiles.climb.speed_kts,
                 profiles.climb.fuel_burn_gph,
-            ]);
+            ]));
         }
 
         const cruisePressureAlt = calculatePressureAltitude(leg.plannedAlt, leg.altimeter);
         const cruiseDensityAlt = calculateDensityAltitude(cruisePressureAlt, leg.temp);
-        appendRow(table1Body, [
+        table1Rows.push(buildRowMarkup([
             `CRUISE TO ${leg.icao}`,
             leg.plannedAlt,
             cruisePressureAlt,
@@ -1389,7 +1418,7 @@ async function generateLog() {
             profiles.cruise.rpm,
             profiles.cruise.speed_kts,
             profiles.cruise.fuel_burn_gph,
-        ]);
+        ]));
 
         const climbDelta = Math.max(0, leg.plannedAlt - previousAltitude);
         let climbTimeMinutes = 0;
@@ -1410,7 +1439,7 @@ async function generateLog() {
             const climbTrueHeading = (trueCourse + climbWind.windCorrectionAngle + 360) % 360;
             const climbMagHeading = (climbTrueHeading - previousVariation + 360) % 360;
 
-            appendRow(table2Body, [
+            table2Rows.push(buildRowMarkup([
                 `${previousIcao}-TOC`,
                 trueCourse.toFixed(0),
                 `${previousSurfaceWindDirection}/${previousSurfaceWindSpeed} (SFC)`,
@@ -1421,7 +1450,7 @@ async function generateLog() {
                 climbDistanceNm.toFixed(1),
                 climbTimeMinutes.toFixed(1),
                 ((climbTimeMinutes / 60) * profiles.climb.fuel_burn_gph).toFixed(1),
-            ]);
+            ]));
         }
 
         const cruiseDistance = Math.max(0, legDistance - climbDistanceNm);
@@ -1430,7 +1459,7 @@ async function generateLog() {
         const cruiseTrueHeading = (trueCourse + cruiseWind.windCorrectionAngle + 360) % 360;
         const cruiseMagHeading = (cruiseTrueHeading - leg.variation + 360) % 360;
 
-        appendRow(table2Body, [
+        table2Rows.push(buildRowMarkup([
             `TOC-${leg.icao}`,
             trueCourse.toFixed(0),
             `${leg.windDirection}/${leg.windSpeed} (ALT)`,
@@ -1441,14 +1470,14 @@ async function generateLog() {
             cruiseDistance.toFixed(1),
             cruiseTimeMinutes.toFixed(1),
             ((cruiseTimeMinutes / 60) * profiles.cruise.fuel_burn_gph).toFixed(1),
-        ]);
+        ]));
 
         const legCheckpoints = Array.isArray(approvedCheckpoints?.[index]?.checkpoints)
             ? approvedCheckpoints[index].checkpoints
             : [];
 
         if (legCheckpoints.length === 0) {
-                appendRow(table3Body, [
+                table3Rows.push(buildRowMarkup([
                     leg.icao,
                     cruiseMagHeading.toFixed(0),
                     legDistance.toFixed(1),
@@ -1456,7 +1485,7 @@ async function generateLog() {
                     cruiseWind.groundspeed.toFixed(0),
                     (climbTimeMinutes + cruiseTimeMinutes).toFixed(0),
                     airportCommsByCode.get(leg.icao)?.summary || "N/A",
-                ]);
+                ]));
         } else {
             let previousCheckpointDistance = 0;
             for (const checkpoint of legCheckpoints) {
@@ -1464,7 +1493,7 @@ async function generateLog() {
                 const segmentDistance = cumulativeDistance - previousCheckpointDistance;
                 const segmentMinutes = cruiseWind.groundspeed === 0 ? 0 : (segmentDistance / cruiseWind.groundspeed) * 60;
 
-                appendRow(table3Body, [
+                table3Rows.push(buildRowMarkup([
                     checkpoint.name || "CHECKPOINT",
                     cruiseMagHeading.toFixed(0),
                     segmentDistance.toFixed(1),
@@ -1472,14 +1501,14 @@ async function generateLog() {
                     cruiseWind.groundspeed.toFixed(0),
                     segmentMinutes.toFixed(0),
                     checkpoint.comms || "VIS",
-                ]);
+                ]));
 
                 previousCheckpointDistance = cumulativeDistance;
             }
 
             const finalSegmentDistance = Math.max(0, legDistance - previousCheckpointDistance);
             const finalMinutes = cruiseWind.groundspeed === 0 ? 0 : (finalSegmentDistance / cruiseWind.groundspeed) * 60;
-            appendRow(table3Body, [
+            table3Rows.push(buildRowMarkup([
                 leg.icao,
                 cruiseMagHeading.toFixed(0),
                 finalSegmentDistance.toFixed(1),
@@ -1487,7 +1516,7 @@ async function generateLog() {
                 cruiseWind.groundspeed.toFixed(0),
                 finalMinutes.toFixed(0),
                 airportCommsByCode.get(leg.icao)?.summary || "N/A",
-            ]);
+            ]));
         }
 
         totalDistanceRemaining -= legDistance;
@@ -1499,6 +1528,10 @@ async function generateLog() {
         previousSurfaceWindSpeed = leg.windSpeed;
         previousVariation = leg.variation;
     });
+
+    table1Body.innerHTML = table1Rows.join("");
+    table2Body.innerHTML = table2Rows.join("");
+    table3Body.innerHTML = table3Rows.join("");
 
     document.getElementById("nav-log-container").style.display = "block";
     saveCurrentNavLogSnapshot(inputs);

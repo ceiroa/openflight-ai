@@ -67,6 +67,9 @@
             max-width: 100%;
             inline-size: 100%;
         }
+        input[type="datetime-local"]::-webkit-date-and-time-value {
+            text-align: left;
+        }
 
         #flightGraph {
             width: 100%;
@@ -121,11 +124,28 @@
         .loading-progress-label { margin: 0 0 8px; font-size: 13px; color: #bae6fd; }
         .loading-progress-track { width: 100%; height: 10px; border-radius: 999px; background: rgba(15, 23, 42, 0.7); overflow: hidden; border: 1px solid rgba(71, 85, 105, 0.7); }
         .loading-progress-bar { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, #38bdf8 0%, #22d3ee 55%, #7dd3fc 100%); transition: width 0.35s ease; }
+        .loading-progress-bar.is-indeterminate {
+            width: 82% !important;
+            background: linear-gradient(
+                90deg,
+                rgba(56, 189, 248, 0.55) 0%,
+                rgba(125, 211, 252, 0.95) 35%,
+                rgba(34, 211, 238, 0.55) 70%,
+                rgba(56, 189, 248, 0.55) 100%
+            );
+            background-size: 220% 100%;
+            animation: loading-progress-pulse 1.1s linear infinite;
+        }
         .loading-progress-note { margin: 8px 0 0; font-size: 12px; color: #94a3b8; }
         .loading-progress.inline-progress { margin: 0 auto 0 0; padding: 8px 10px; min-width: 280px; max-width: 420px; flex: 1; }
         .loading-progress.inline-progress .loading-progress-label { margin-bottom: 6px; font-size: 12px; }
         .loading-progress.inline-progress .loading-progress-track { height: 8px; }
         .loading-progress.inline-progress .loading-progress-note { display: none; }
+
+        @keyframes loading-progress-pulse {
+            from { background-position: 200% 0; }
+            to { background-position: -20% 0; }
+        }
 
         #nav-log-container {
             display: none;
@@ -289,12 +309,23 @@
             #debug-toggle {
                 width: 100%;
             }
+            #date {
+                padding: 8px 9px;
+                font-size: 12px;
+            }
             #nav-log-container {
                 padding: 18px 14px;
             }
             .nav-log-header {
                 flex-direction: column;
                 gap: 4px;
+            }
+        }
+
+        @media (max-width: 420px) {
+            #date {
+                padding: 7px 8px;
+                font-size: 11px;
             }
         }
 

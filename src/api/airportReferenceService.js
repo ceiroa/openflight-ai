@@ -35,18 +35,25 @@ const ENHANCED_MAX_SPACING_NM = 10;
 
 let airportReferencePromise;
 let airportFrequenciesPromise;
+let airportReferenceIndexPromise;
+let airportFrequenciesIndexPromise;
+let airportCommsCache;
 
 export function __resetAirportReferenceCaches() {
     airportReferencePromise = undefined;
     airportFrequenciesPromise = undefined;
+    airportReferenceIndexPromise = undefined;
+    airportFrequenciesIndexPromise = undefined;
+    airportCommsCache = undefined;
 }
 
 export async function findAirportInReferenceData(candidateIds) {
-    const airports = await loadAirportReferenceData();
-    const normalizedIds = new Set(candidateIds.map((id) => id.trim().toUpperCase()));
+    const airportIndex = await loadAirportReferenceIndex();
+    const normalizedIds = candidateIds.map((id) => id.trim().toUpperCase()).filter(Boolean);
 
-    for (const airport of airports) {
-        if (normalizedIds.has(airport.ident) || normalizedIds.has(airport.gpsCode) || normalizedIds.has(airport.localCode)) {
+    for (const id of normalizedIds) {
+        const airport = airportIndex.get(id);
+        if (airport) {
             return airport;
         }
     }
@@ -55,8 +62,8 @@ export async function findAirportInReferenceData(candidateIds) {
 }
 
 export async function getAirportCommsByCode(code) {
-    const airport = await findAirportInReferenceData([code]);
-    if (!airport) {
+    const normalizedCode = String(code || '').trim().toUpperCase();
+    if (!normalizedCode) {
         return {
             airportName: code,
             weather: null,
@@ -65,8 +72,25 @@ export async function getAirportCommsByCode(code) {
         };
     }
 
-    const frequencies = await loadAirportFrequencies();
-    const matches = frequencies.filter((entry) => entry.airportIdent === airport.ident);
+    airportCommsCache ||= new Map();
+    if (airportCommsCache.has(normalizedCode)) {
+        return airportCommsCache.get(normalizedCode);
+    }
+
+    const airport = await findAirportInReferenceData([normalizedCode]);
+    if (!airport) {
+        const fallback = {
+            airportName: normalizedCode,
+            weather: null,
+            traffic: null,
+            summary: 'N/A',
+        };
+        airportCommsCache.set(normalizedCode, fallback);
+        return fallback;
+    }
+
+    const frequencyIndex = await loadAirportFrequenciesIndex();
+    const matches = frequencyIndex.get(airport.ident) || [];
     const weather = matches.find((entry) => /ATIS|ASOS|AWOS/i.test(`${entry.type} ${entry.description}`)) ?? null;
     const tower = matches.find((entry) => /TWR|TOWER/i.test(`${entry.type} ${entry.description}`)) ?? null;
     const ctaf = matches.find((entry) => /CTAF|UNICOM|MULTICOM/i.test(`${entry.type} ${entry.description}`)) ?? null;
@@ -81,12 +105,14 @@ export async function getAirportCommsByCode(code) {
         summaryParts.push(`${compactLabel(ctaf)} ${ctaf.frequencyMhz}`);
     }
 
-    return {
+    const result = {
         airportName: airport.name || airport.ident,
         weather,
         traffic: tower ?? ctaf ?? null,
         summary: summaryParts.join(' | ') || 'N/A',
     };
+    airportCommsCache.set(normalizedCode, result);
+    return result;
 }
 
 export async function generateNamedCheckpointsForRoute(draft) {
@@ -114,29 +140,20 @@ export function getCuratedVisualCheckpointsInBounds(bounds) {
 export async function generateClassicCheckpointsForRoute(draft) {
     const airports = await loadAirportReferenceData();
     const usableAirports = airports.filter((airport) => AIRPORT_TYPES_FOR_CHECKPOINTS.has(airport.type));
-
-    let previousPoint = {
-        icao: draft.departure.icao,
-        lat: Number(draft.departure.lat),
-        lon: Number(draft.departure.lon),
-    };
-
+    const legDefinitions = buildLegDefinitions(draft);
+    const landmarksByLeg = await Promise.all(
+        legDefinitions.map(({ previousPoint, nextPoint }) => fetchLandmarkCandidatesForLeg(previousPoint, nextPoint)),
+    );
     const legs = [];
 
-    for (let index = 0; index < draft.legs.length; index += 1) {
-        const leg = draft.legs[index];
-        const nextPoint = {
-            icao: leg.icao,
-            lat: Number(leg.lat),
-            lon: Number(leg.lon),
-        };
-
+    for (let index = 0; index < legDefinitions.length; index += 1) {
+        const { previousPoint, nextPoint } = legDefinitions[index];
         const legDistanceNm = calculateDistanceNm(previousPoint.lat, previousPoint.lon, nextPoint.lat, nextPoint.lon);
         const segmentCount = Math.max(1, Math.round(legDistanceNm / CLASSIC_TARGET_SPACING_NM));
         const spacingNm = legDistanceNm / segmentCount;
         const checkpoints = [];
         const usedAirportIds = new Set([previousPoint.icao, nextPoint.icao]);
-        const landmarks = await fetchLandmarkCandidatesForLeg(previousPoint, nextPoint);
+        const landmarks = landmarksByLeg[index];
         const usedLandmarkNames = new Set();
 
         for (let checkpointNumber = 1; checkpointNumber < segmentCount; checkpointNumber += 1) {
@@ -187,8 +204,6 @@ export async function generateClassicCheckpointsForRoute(draft) {
             spacingNm,
             checkpoints,
         });
-
-        previousPoint = nextPoint;
     }
 
     return legs;
@@ -197,23 +212,14 @@ export async function generateClassicCheckpointsForRoute(draft) {
 export async function generateEnhancedCheckpointsForRoute(draft) {
     const airports = await loadAirportReferenceData();
     const usableAirports = airports.filter((airport) => AIRPORT_TYPES_FOR_CHECKPOINTS.has(airport.type));
-
-    let previousPoint = {
-        icao: draft.departure.icao,
-        lat: Number(draft.departure.lat),
-        lon: Number(draft.departure.lon),
-    };
-
+    const legDefinitions = buildLegDefinitions(draft);
+    const landmarksByLeg = await Promise.all(
+        legDefinitions.map(({ previousPoint, nextPoint }) => fetchLandmarkCandidatesForLeg(previousPoint, nextPoint)),
+    );
     const legs = [];
 
-    for (let index = 0; index < draft.legs.length; index += 1) {
-        const leg = draft.legs[index];
-        const nextPoint = {
-            icao: leg.icao,
-            lat: Number(leg.lat),
-            lon: Number(leg.lon),
-        };
-
+    for (let index = 0; index < legDefinitions.length; index += 1) {
+        const { previousPoint, nextPoint } = legDefinitions[index];
         const legDistanceNm = calculateDistanceNm(previousPoint.lat, previousPoint.lon, nextPoint.lat, nextPoint.lon);
         const sampleFractions = buildEnhancedSampleFractions(legDistanceNm);
         const spacingNm = sampleFractions.length > 0 ? legDistanceNm / (sampleFractions.length + 1) : legDistanceNm;
@@ -221,7 +227,7 @@ export async function generateEnhancedCheckpointsForRoute(draft) {
         const usedAirportIds = new Set([previousPoint.icao, nextPoint.icao]);
         const usedLandmarkNames = new Set();
         const usedVisualCheckpointNames = new Set();
-        const landmarks = await fetchLandmarkCandidatesForLeg(previousPoint, nextPoint);
+        const landmarks = landmarksByLeg[index];
         const visualCheckpoints = findCuratedVisualCheckpointsForLeg(previousPoint, nextPoint);
 
         for (const fraction of sampleFractions) {
@@ -279,8 +285,6 @@ export async function generateEnhancedCheckpointsForRoute(draft) {
             mode: 'enhanced',
             checkpoints,
         });
-
-        previousPoint = nextPoint;
     }
 
     return legs;
@@ -353,6 +357,25 @@ async function loadAirportReferenceData() {
     return airportReferencePromise;
 }
 
+async function loadAirportReferenceIndex() {
+    if (!airportReferenceIndexPromise) {
+        airportReferenceIndexPromise = loadAirportReferenceData()
+            .then((airports) => {
+                const index = new Map();
+                for (const airport of airports) {
+                    for (const code of [airport.ident, airport.gpsCode, airport.localCode]) {
+                        if (code) {
+                            index.set(code, airport);
+                        }
+                    }
+                }
+                return index;
+            });
+    }
+
+    return airportReferenceIndexPromise;
+}
+
 async function loadAirportFrequencies() {
     if (!airportFrequenciesPromise) {
         airportFrequenciesPromise = fetch(AIRPORT_FREQUENCIES_CSV_URL)
@@ -367,6 +390,45 @@ async function loadAirportFrequencies() {
     }
 
     return airportFrequenciesPromise;
+}
+
+async function loadAirportFrequenciesIndex() {
+    if (!airportFrequenciesIndexPromise) {
+        airportFrequenciesIndexPromise = loadAirportFrequencies()
+            .then((frequencies) => {
+                const index = new Map();
+                for (const entry of frequencies) {
+                    if (!index.has(entry.airportIdent)) {
+                        index.set(entry.airportIdent, []);
+                    }
+                    index.get(entry.airportIdent).push(entry);
+                }
+                return index;
+            });
+    }
+
+    return airportFrequenciesIndexPromise;
+}
+
+function buildLegDefinitions(draft) {
+    let previousPoint = {
+        icao: draft.departure.icao,
+        lat: Number(draft.departure.lat),
+        lon: Number(draft.departure.lon),
+    };
+
+    const definitions = [];
+    for (const leg of draft.legs) {
+        const nextPoint = {
+            icao: leg.icao,
+            lat: Number(leg.lat),
+            lon: Number(leg.lon),
+        };
+        definitions.push({ previousPoint, nextPoint });
+        previousPoint = nextPoint;
+    }
+
+    return definitions;
 }
 
 function parseAirportReferenceCsv(csv) {

@@ -91,3 +91,4 @@ CieloRumbo is a dark-themed flight planning and navigation log generator for GA 
 - Add more aircraft profiles and profile-selection UX beyond the current data files.
 - Improve checkpoint communications and ETA generation from real data sources.
 - Add explicit top-of-descent logic if descent planning becomes part of the nav log.
+- Revisit nav-log generation performance, especially the final enhanced-checkpoint and rendering phase, so first-run creation feels faster on public/mobile deployments.

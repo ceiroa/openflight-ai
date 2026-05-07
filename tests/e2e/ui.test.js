@@ -211,6 +211,8 @@ test.describe('CieloRumbo - UI Tests', () => {
             await expect(page.locator('.setup-required-state')).toContainText('departure');
             await expect(page.locator('.setup-required-state')).toContainText('destination');
         }
+        await page.goto('/checkpoints.html');
+        await expect(page.locator('#planner-controls')).toBeHidden();
     });
 
     test('@smoke @map @planner @airspace should keep showing setup guidance when a draft exists but the route is still incomplete', async ({ page }) => {

@@ -22,6 +22,7 @@ const openMapButton = document.getElementById("open-map-btn");
 const clearButton = document.getElementById("clear-btn");
 const checkpointTypeFilter = document.getElementById("checkpoint-type-filter");
 const checkpointSourceFilter = document.getElementById("checkpoint-source-filter");
+const plannerControls = document.getElementById("planner-controls");
 const menuToggleButton = document.getElementById("menu-toggle");
 const sideMenu = document.getElementById("side-menu");
 const menuMapLink = document.getElementById("menu-map-link");
@@ -331,6 +332,7 @@ function renderEmptyState(message) {
 }
 
 function renderSetupRequiredState(message) {
+    setPlannerSetupRequiredMode(true);
     plannerRoot.innerHTML = `
         <div class="empty-state setup-required-state">
             <h2>Set Up a Flight First</h2>
@@ -343,6 +345,18 @@ function renderSetupRequiredState(message) {
     regenerateButton.disabled = true;
     saveButton.disabled = true;
     clearButton.disabled = true;
+}
+
+function setPlannerSetupRequiredMode(isRequired) {
+    if (plannerControls) {
+        plannerControls.hidden = isRequired;
+    }
+    if (statusBanner) {
+        statusBanner.hidden = isRequired;
+    }
+    if (loadingProgress) {
+        loadingProgress.hidden = isRequired;
+    }
 }
 
 function showStatus(message, type) {

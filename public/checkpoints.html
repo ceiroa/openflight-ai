@@ -276,7 +276,8 @@
                 <p id="loading-progress-note" class="loading-progress-note">Enhanced checkpoint generation may take a few seconds on longer routes.</p>
             </div>
 
-            <div class="planner-toolbar">
+            <div id="planner-controls">
+            <div id="planner-toolbar" class="planner-toolbar">
                 <div class="mode-group">
                     <div class="mode-header">
                         <label>Checkpoint Mode</label>
@@ -291,7 +292,7 @@
                     <button type="button" id="clear-btn" class="ghost">Clear Saved Checkpoints</button>
                 </div>
             </div>
-            <div class="planner-filters">
+            <div id="planner-filters" class="planner-filters">
                 <div class="filter-group">
                     <label for="checkpoint-type-filter">Filter By Type</label>
                     <select id="checkpoint-type-filter">
@@ -317,7 +318,8 @@
                 </div>
             </div>
 
-            <p class="hint">This first version samples each leg geometrically at about 7 NM spacing. You can edit names and comms before saving.</p>
+            <p id="planner-hint" class="hint">This first version samples each leg geometrically at about 7 NM spacing. You can edit names and comms before saving.</p>
+            </div>
 
             <div id="planner-root"></div>
         </div>

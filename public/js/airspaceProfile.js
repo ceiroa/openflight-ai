@@ -1089,9 +1089,12 @@ function isUsableDraft(draft) {
         && draft.departure
         && Array.isArray(draft.legs)
         && draft.legs.length > 0
+        && String(draft.departure.icao || "").trim().length === 4
         && Number.isFinite(Number(draft.departure.lat))
         && Number.isFinite(Number(draft.departure.lon))
-        && draft.legs.every((leg) => Number.isFinite(Number(leg.lat)) && Number.isFinite(Number(leg.lon)));
+        && draft.legs.some((leg) => String(leg?.icao || "").trim().length === 4
+            && Number.isFinite(Number(leg.lat))
+            && Number.isFinite(Number(leg.lon)));
 }
 
 function renderEmptyState(message) {

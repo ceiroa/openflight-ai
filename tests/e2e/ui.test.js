@@ -213,6 +213,32 @@ test.describe('CieloRumbo - UI Tests', () => {
         }
     });
 
+    test('@smoke @map @planner @airspace should keep showing setup guidance when a draft exists but the route is still incomplete', async ({ page }) => {
+        await page.evaluate(() => {
+            localStorage.clear();
+            localStorage.setItem('openflight-ai-flight-draft', JSON.stringify({
+                departure: {
+                    icao: '',
+                    lat: 41.9602,
+                    lon: -87.9316,
+                },
+                legs: [
+                    {
+                        icao: '',
+                        lat: 41.7713,
+                        lon: -88.4815,
+                    },
+                ],
+            }));
+        });
+
+        for (const path of ['/map.html', '/checkpoints.html', '/airspace-profile.html']) {
+            await page.goto(path);
+            await expect(page.locator('.setup-required-state')).toBeVisible();
+            await expect(page.locator('.setup-required-state')).toContainText('Flight Setup');
+        }
+    });
+
     test('@smoke @home should populate departure weather when ICAO is entered', async ({ page }) => {
         const depInput = page.locator('#departure-icao');
         await depInput.fill('KORD');

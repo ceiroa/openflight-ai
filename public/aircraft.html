@@ -21,9 +21,9 @@
             --success-color: #10b981;
             --warning-color: #f59e0b;
         }
-        .container { width: min(100%, 1200px); max-width: 1200px; margin: 0 auto; background: var(--container-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; }
-        .layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
-        .sidebar, .editor { border: 1px solid var(--border-color); border-radius: 10px; background: rgba(15, 23, 42, 0.55); padding: 18px; }
+        .container { width: min(100%, 1200px); max-width: 1200px; margin: 0 auto; background: var(--container-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 24px; box-sizing: border-box; overflow-x: clip; }
+        .layout { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 20px; min-width: 0; }
+        .sidebar, .editor { border: 1px solid var(--border-color); border-radius: 10px; background: rgba(15, 23, 42, 0.55); padding: 18px; min-width: 0; box-sizing: border-box; }
         .profile-list { display: flex; flex-direction: column; gap: 10px; }
         .profile-card { border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; background: rgba(30, 41, 59, 0.8); cursor: pointer; }
         .profile-card.active { border-color: var(--accent-color); }
@@ -125,6 +125,9 @@
             .grid {
                 grid-template-columns: 1fr;
                 gap: 10px;
+            }
+            .climb-table {
+                min-width: 0;
             }
             .profile-card-header {
                 flex-direction: column;

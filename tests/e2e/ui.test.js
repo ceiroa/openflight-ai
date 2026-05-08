@@ -690,14 +690,18 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('body')).toHaveClass(/map-focus-mode/);
         await expect(page.locator('#route-panel')).toHaveClass(/collapsed/);
         await expect(page.locator('.container > h1')).toBeHidden();
-        await expect(page.locator('#toggle-route-panel-btn')).toHaveText('Show Panel');
+        await expect(page.locator('#toggle-route-panel-btn')).toBeHidden();
+        await expect(page.locator('#toggle-map-controls-btn')).toHaveText('Show Controls');
+        await page.click('#toggle-map-controls-btn');
+        await expect(page.locator('#toggle-map-controls-btn')).toHaveText('Hide Controls');
+        await expect(page.locator('#maximize-map-btn')).toBeVisible();
+        await expect(page.locator('#recenter-route-btn')).toBeVisible();
+        await page.click('#toggle-map-controls-btn');
+        await expect(page.locator('#maximize-map-btn')).toBeVisible();
+        await expect(page.locator('#recenter-route-btn')).toBeVisible();
+        await expect(page.locator('#map-toolbar')).toBeHidden();
 
-        await page.click('#toggle-route-panel-btn');
-        await expect(page.locator('#route-panel')).not.toHaveClass(/collapsed/);
-        await expect(page.locator('#toggle-route-panel-btn')).toHaveText('Hide Panel');
-        await page.click('#toggle-route-panel-btn');
-        await expect(page.locator('#route-panel')).toHaveClass(/collapsed/);
-
+        await page.click('#toggle-map-controls-btn');
         await page.click('#maximize-map-btn');
         await expect(page.locator('.container')).not.toHaveClass(/map-maximized/);
         await page.click('#toggle-reference-checkpoints-btn');

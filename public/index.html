@@ -70,6 +70,12 @@
         input[type="datetime-local"]::-webkit-date-and-time-value {
             text-align: left;
         }
+        input[type="datetime-local"]::-webkit-datetime-edit {
+            padding: 0;
+        }
+        input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+            margin: 0;
+        }
 
         #flightGraph {
             width: 100%;
@@ -312,6 +318,7 @@
             #date {
                 padding: 8px 9px;
                 font-size: 12px;
+                letter-spacing: -0.02em;
             }
             #nav-log-container {
                 padding: 18px 14px;
@@ -324,8 +331,9 @@
 
         @media (max-width: 420px) {
             #date {
-                padding: 7px 8px;
-                font-size: 11px;
+                padding: 7px 6px;
+                font-size: 10px;
+                letter-spacing: -0.03em;
             }
         }
 

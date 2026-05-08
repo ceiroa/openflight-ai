@@ -91,6 +91,7 @@ const state = {
     referenceCheckpointMarkers: [],
     showReferenceCheckpoints: false,
     mapMaximized: false,
+    mapOverlayControlsCollapsed: false,
     activeCheckpointIndex: null,
     activeLegIndex: null,
     currentMode: MAP_MODES.street,
@@ -165,16 +166,18 @@ function renderMapPage(draft) {
         <div class="map-layout">
             <section class="map-panel">
                 <h2>Route Plot</h2>
-                <div class="map-toolbar">
-                    <button type="button" class="map-mode-button active" data-map-mode="${MAP_MODES.street}">Street</button>
-                    <button type="button" class="map-mode-button" data-map-mode="${MAP_MODES.terrain}">Terrain</button>
-                    <button type="button" class="map-mode-button" data-map-mode="${MAP_MODES.sectional}">FAA Sectional Ref</button>
-                    <button type="button" class="map-secondary-button" id="toggle-airspace-btn">Show FAA Airspace</button>
-                    <button type="button" class="map-secondary-button" id="toggle-weather-btn">Show Airport Weather Layer</button>
-                    <button type="button" class="map-secondary-button" id="toggle-location-btn">Show Current Location</button>
-                    <button type="button" class="map-secondary-button" id="toggle-reference-checkpoints-btn">Show Nearby Reference Checkpoints</button>
-                    <span class="map-toolbar-spacer"></span>
-                    <button type="button" class="map-export-button" id="export-kml-btn">Export KML</button>
+                <div id="map-toolbar-anchor">
+                    <div class="map-toolbar" id="map-toolbar">
+                        <button type="button" class="map-mode-button active" data-map-mode="${MAP_MODES.street}">Street</button>
+                        <button type="button" class="map-mode-button" data-map-mode="${MAP_MODES.terrain}">Terrain</button>
+                        <button type="button" class="map-mode-button" data-map-mode="${MAP_MODES.sectional}">FAA Sectional Ref</button>
+                        <button type="button" class="map-secondary-button" id="toggle-airspace-btn">Show FAA Airspace</button>
+                        <button type="button" class="map-secondary-button" id="toggle-weather-btn">Show Airport Weather Layer</button>
+                        <button type="button" class="map-secondary-button" id="toggle-location-btn">Show Current Location</button>
+                        <button type="button" class="map-secondary-button" id="toggle-reference-checkpoints-btn">Show Nearby Reference Checkpoints</button>
+                        <span class="map-toolbar-spacer"></span>
+                        <button type="button" class="map-export-button" id="export-kml-btn">Export KML</button>
+                    </div>
                 </div>
                 <div class="map-status-stack">
                     <p id="map-status" class="route-summary">Route plotted for ${draft.legs.length} leg${draft.legs.length === 1 ? "" : "s"}.</p>
@@ -191,9 +194,17 @@ function renderMapPage(draft) {
                     <p id="map-weather-layer-status" class="map-weather-status"></p>
                 </div>
                 <div class="route-map-shell">
-                    <button type="button" class="map-secondary-button map-overlay-button" id="maximize-map-btn">Maximize Map</button>
-                    <button type="button" class="map-secondary-button map-overlay-button map-recenter-button" id="recenter-route-btn">Recenter Route</button>
-                    <button type="button" class="map-secondary-button map-overlay-button map-panel-toggle-button" id="toggle-route-panel-btn">Hide Panel</button>
+                    <div class="map-overlay-controls" id="map-overlay-controls">
+                        <div class="map-overlay-core-actions">
+                            <button type="button" class="map-secondary-button map-overlay-button" id="maximize-map-btn">Maximize Map</button>
+                            <button type="button" class="map-secondary-button map-overlay-button map-recenter-button" id="recenter-route-btn">Recenter Route</button>
+                        </div>
+                        <button type="button" class="map-secondary-button map-overlay-button map-overlay-toggle-button" id="toggle-map-controls-btn">Show Controls</button>
+                        <div class="map-overlay-controls-panel" id="map-overlay-controls-panel">
+                            <button type="button" class="map-secondary-button map-overlay-button map-panel-toggle-button" id="toggle-route-panel-btn">Hide Panel</button>
+                            <div id="map-overlay-toolbar-host"></div>
+                        </div>
+                    </div>
                     <div id="route-map" role="img" aria-label="Map of the current route"></div>
                 </div>
             </section>
@@ -479,10 +490,12 @@ function attachMapPageHandlers(checkpointMarkers) {
     document.getElementById("maximize-map-btn")?.addEventListener("click", toggleMapMaximized);
     document.getElementById("recenter-route-btn")?.addEventListener("click", recenterRouteMap);
     document.getElementById("toggle-route-panel-btn")?.addEventListener("click", toggleRoutePanel);
+    document.getElementById("toggle-map-controls-btn")?.addEventListener("click", toggleMapOverlayControls);
     applyCheckpointFilters();
     syncResponsiveMapLayout();
     window.addEventListener("resize", handleViewportResize);
     updateRoutePanelState();
+    updateMapOverlayControlsState();
 }
 
 function recenterRouteMap() {
@@ -1712,8 +1725,10 @@ function toggleMapMaximized() {
     state.mapMaximized = !state.mapMaximized;
     if (state.mapMaximized) {
         state.routePanelCollapsed = true;
+        state.mapOverlayControlsCollapsed = true;
     } else {
         state.routePanelCollapsed = false;
+        state.mapOverlayControlsCollapsed = false;
     }
     container.classList.toggle("map-maximized", state.mapMaximized);
     document.body.classList.toggle("map-focus-mode", state.mapMaximized);
@@ -1722,6 +1737,7 @@ function toggleMapMaximized() {
         button.textContent = state.mapMaximized ? "Exit Fullscreen" : "Maximize Map";
     }
     updateRoutePanelState();
+    updateMapOverlayControlsState();
 
     window.setTimeout(() => {
         state.map?.invalidateSize();
@@ -1742,6 +1758,11 @@ function toggleRoutePanel() {
     }, 100);
 }
 
+function toggleMapOverlayControls() {
+    state.mapOverlayControlsCollapsed = !state.mapOverlayControlsCollapsed;
+    updateMapOverlayControlsState();
+}
+
 function updateRoutePanelState() {
     const routePanel = document.getElementById("route-panel");
     const toggleButton = document.getElementById("toggle-route-panel-btn");
@@ -1754,7 +1775,39 @@ function updateRoutePanelState() {
     routePanel.classList.toggle("collapsed", shouldCollapse);
     toggleButton.textContent = shouldCollapse ? "Show Panel" : "Hide Panel";
     toggleButton.classList.toggle("active", !shouldCollapse);
-    toggleButton.style.display = collapsible ? "inline-flex" : "none";
+    toggleButton.style.display = collapsible && !state.mapMaximized ? "inline-flex" : "none";
+}
+
+function updateMapOverlayControlsState() {
+    const controlsRoot = document.getElementById("map-overlay-controls");
+    const controlsPanel = document.getElementById("map-overlay-controls-panel");
+    const controlsToggleButton = document.getElementById("toggle-map-controls-btn");
+    const toolbar = document.getElementById("map-toolbar");
+    const toolbarAnchor = document.getElementById("map-toolbar-anchor");
+    const overlayToolbarHost = document.getElementById("map-overlay-toolbar-host");
+    if (!controlsRoot || !controlsPanel || !controlsToggleButton || !toolbar || !toolbarAnchor || !overlayToolbarHost) {
+        return;
+    }
+
+    const useDrawer = state.mapMaximized;
+    if (useDrawer) {
+        if (toolbar.parentElement !== overlayToolbarHost) {
+            overlayToolbarHost.appendChild(toolbar);
+        }
+        toolbar.classList.add("map-toolbar-overlay");
+    } else {
+        if (toolbar.parentElement !== toolbarAnchor) {
+            toolbarAnchor.appendChild(toolbar);
+        }
+        toolbar.classList.remove("map-toolbar-overlay");
+    }
+
+    controlsRoot.classList.toggle("drawer-mode", useDrawer);
+    controlsPanel.classList.toggle("collapsed", useDrawer && state.mapOverlayControlsCollapsed);
+    controlsToggleButton.textContent = useDrawer
+        ? (state.mapOverlayControlsCollapsed ? "Show Controls" : "Hide Controls")
+        : "";
+    controlsToggleButton.style.display = useDrawer ? "inline-flex" : "none";
 }
 
 async function toggleCurrentLocation() {

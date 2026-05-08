@@ -119,3 +119,15 @@ body {
     margin-top: 12px;
     width: 100%;
 }
+
+@media (max-width: 720px) {
+    body {
+        margin: 12px;
+    }
+}
+
+@media (max-width: 420px) {
+    body {
+        margin: 8px;
+    }
+}

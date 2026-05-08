@@ -700,6 +700,9 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#maximize-map-btn')).toBeVisible();
         await expect(page.locator('#recenter-route-btn')).toBeVisible();
         await expect(page.locator('#map-toolbar')).toBeHidden();
+        await page.click('#route-map');
+        await expect(page.locator('#toggle-map-controls-btn')).toHaveText('Show Controls');
+        await expect(page.locator('#map-toolbar')).toBeHidden();
 
         await page.click('#toggle-map-controls-btn');
         await page.click('#maximize-map-btn');

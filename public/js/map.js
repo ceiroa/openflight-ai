@@ -425,6 +425,7 @@ function initializeLeafletMap(routePoints, legSegments, checkpointMarkers) {
             void refreshAreaWeatherLayer();
         }
     });
+    map.on("click", handleMapSurfaceClick);
 }
 
 function attachMapPageHandlers(checkpointMarkers) {
@@ -1760,6 +1761,15 @@ function toggleRoutePanel() {
 
 function toggleMapOverlayControls() {
     state.mapOverlayControlsCollapsed = !state.mapOverlayControlsCollapsed;
+    updateMapOverlayControlsState();
+}
+
+function handleMapSurfaceClick() {
+    if (!state.mapMaximized || state.mapOverlayControlsCollapsed) {
+        return;
+    }
+
+    state.mapOverlayControlsCollapsed = true;
     updateMapOverlayControlsState();
 }
 

@@ -32,6 +32,7 @@ const CLASSIC_TARGET_SPACING_NM = 7;
 const ENHANCED_TARGET_SPACING_NM = 6.5;
 const ENHANCED_MIN_SPACING_NM = 4.5;
 const ENHANCED_MAX_SPACING_NM = 10;
+const VISUAL_CHECKPOINT_NOTE = 'Visual checkpoint';
 
 let airportReferencePromise;
 let airportFrequenciesPromise;
@@ -170,7 +171,7 @@ export async function generateClassicCheckpointsForRoute(draft) {
                     name: namedLandmark.name,
                     distanceFromLegStartNm,
                     fraction,
-                    comms: nearbyAirportComms?.summary && nearbyAirportComms.summary !== 'N/A' ? nearbyAirportComms.summary : 'VIS',
+                    comms: nearbyAirportComms?.summary && nearbyAirportComms.summary !== 'N/A' ? nearbyAirportComms.summary : VISUAL_CHECKPOINT_NOTE,
                     featureType: namedLandmark.featureType,
                     notes: nearbyAirportComms?.summary && nearbyAirportComms.summary !== 'N/A'
                         ? `Nearby airport communications: ${nearbyAirportComms.summary}.`
@@ -191,7 +192,7 @@ export async function generateClassicCheckpointsForRoute(draft) {
                     name: `${previousPoint.icao}-${nextPoint.icao} CP${checkpointNumber}`,
                     distanceFromLegStartNm,
                     fraction,
-                    comms: 'VIS',
+                    comms: VISUAL_CHECKPOINT_NOTE,
                 });
             }
         }
@@ -252,7 +253,7 @@ export async function generateEnhancedCheckpointsForRoute(draft) {
                     name: `${previousPoint.icao}-${nextPoint.icao} CP${checkpoints.length + 1}`,
                     distanceFromLegStartNm,
                     fraction,
-                    comms: 'VIS',
+                    comms: VISUAL_CHECKPOINT_NOTE,
                     type: 'synthetic',
                     source: 'fallback',
                     score: 0,
@@ -582,7 +583,7 @@ function buildRankedEnhancedCandidates({
             name: checkpoint.name,
             distanceFromLegStartNm,
             fraction: legDistanceNm === 0 ? 0 : distanceFromLegStartNm / legDistanceNm,
-            comms: 'VIS',
+            comms: VISUAL_CHECKPOINT_NOTE,
             type: 'visual_checkpoint',
             source: 'curated_visual_checkpoint',
             featureType: 'visual_checkpoint',
@@ -615,7 +616,7 @@ function buildRankedEnhancedCandidates({
             name: landmark.name,
             distanceFromLegStartNm,
             fraction: legDistanceNm === 0 ? 0 : distanceFromLegStartNm / legDistanceNm,
-            comms: 'VIS',
+            comms: VISUAL_CHECKPOINT_NOTE,
             type: isVisualCheckpoint ? 'visual_checkpoint' : 'landmark',
             source: isVisualCheckpoint ? 'chart_candidate' : 'landmark',
             featureType: landmark.featureType,
@@ -645,7 +646,7 @@ function buildRankedEnhancedCandidates({
             name: airport.name || airport.ident,
             distanceFromLegStartNm,
             fraction: legDistanceNm === 0 ? 0 : distanceFromLegStartNm / legDistanceNm,
-            comms: 'VIS',
+            comms: VISUAL_CHECKPOINT_NOTE,
             type: 'airport',
             source: 'airport_reference',
             airportCode: airport.ident,

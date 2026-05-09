@@ -287,6 +287,60 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#dep-weather-status')).toContainText('Forecast loaded for KORD.');
     });
 
+    test('@home should reload departure and destination forecast weather when date changes after airports are entered', async ({ page }) => {
+        const weatherCalls = [];
+        await page.unroute('**/api/weather/*');
+        await page.route('**/api/weather/*', async (route) => {
+            const url = new URL(route.request().url());
+            const icao = url.pathname.split('/').pop().toUpperCase();
+            const datetime = url.searchParams.get('datetime');
+            weatherCalls.push({ icao, datetime });
+
+            const basePayload = weatherFixtures[icao];
+            if (!basePayload) {
+                await route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'Unknown ICAO in test fixture' }) });
+                return;
+            }
+
+            const isTargetForecastDate = datetime === '2026-05-01T19:30:00.000Z';
+            const payload = isTargetForecastDate
+                ? {
+                    ...basePayload,
+                    temperature: icao === 'KORD' ? 16 : 14,
+                    windSpeed: icao === 'KORD' ? 18 : 11,
+                    forecast: {
+                        isForecast: true,
+                        source: 'TAF',
+                        message: `Forecast loaded for ${icao}.`,
+                    },
+                }
+                : basePayload;
+
+            await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) });
+        });
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+
+        await expect(page.locator('#dep-temp')).toHaveValue('21.1');
+        await expect(page.locator('.leg-temp').first()).toHaveValue('18.9');
+
+        await page.fill('#date', '2026-05-01T14:30');
+
+        await expect(page.locator('#dep-temp')).toHaveValue('16');
+        await expect(page.locator('.leg-temp').first()).toHaveValue('14');
+        await expect(page.locator('#dep-weather-status')).toContainText('Forecast loaded for KORD.');
+        await expect(page.locator('.leg-weather-status').first()).toContainText('Forecast loaded for KARR.');
+        expect(weatherCalls).toEqual(expect.arrayContaining([
+            expect.objectContaining({ icao: 'KORD' }),
+            expect.objectContaining({ icao: 'KARR' }),
+            expect.objectContaining({ icao: 'KORD', datetime: '2026-05-01T19:30:00.000Z' }),
+            expect.objectContaining({ icao: 'KARR', datetime: '2026-05-01T19:30:00.000Z' }),
+        ]));
+    });
+
     test('should show a clear message when no FAA forecast is available for the selected future time', async ({ page }) => {
         await page.unroute('**/api/weather/*');
         await page.route('**/api/weather/*', async (route) => {

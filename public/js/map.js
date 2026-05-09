@@ -14,6 +14,7 @@ const FAA_TAC_INFO_URL = "https://www.faa.gov/air_traffic/flight_info/aeronav/pr
 const AIRSPACE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const WEATHER_FETCH_TIMEOUT_MS = 15000;
 const WEATHER_CACHE_TTL_MS = 15 * 60 * 1000;
+const DEFAULT_CHECKPOINT_NOTE = "Visual checkpoint";
 
 const SECTIONAL_CHARTS = [
     { name: "Chicago Sectional", lat: 41.8781, lon: -87.6298, type: "sectional" },
@@ -1359,7 +1360,7 @@ function buildCheckpointMarkers(routePoints, checkpointPlan) {
 
             return {
                 name: checkpoint.name || "Checkpoint",
-                comms: checkpoint.comms || "VIS",
+                comms: normalizeCheckpointComms(checkpoint.comms),
                 fromIcao: leg.fromIcao,
                 toIcao: leg.toIcao,
                 distanceFromLegStartNm,
@@ -2184,6 +2185,13 @@ function buildCheckpointPopup(checkpoint) {
     }
 
     return details.join("<br>");
+}
+
+function normalizeCheckpointComms(value) {
+    const normalized = String(value || "").trim();
+    return normalized && normalized.toUpperCase() !== "VIS"
+        ? normalized
+        : DEFAULT_CHECKPOINT_NOTE;
 }
 
 function getCheckpointMarkerStyle(checkpoint) {

@@ -39,6 +39,7 @@ let progressTimer = null;
 let progressValue = 0;
 let progressStartedAt = 0;
 let plannerBusy = false;
+const DEFAULT_CHECKPOINT_NOTE = "Visual checkpoint";
 
 document.addEventListener("DOMContentLoaded", () => {
     menuToggleButton.addEventListener("click", () => {
@@ -186,7 +187,7 @@ function renderPlanner() {
                                     </div>
                                 </td>
                                 <td data-label="Comms / Notes">
-                                    <input type="text" value="${escapeHtml(checkpoint.comms || "VIS")}" data-field="comms">
+                                    <input type="text" value="${escapeHtml(normalizeCheckpointComms(checkpoint.comms))}" data-field="comms">
                                     ${checkpoint.notes ? `<div class="checkpoint-note">${escapeHtml(checkpoint.notes)}</div>` : ""}
                                 </td>
                                 <td data-label="Action"><button type="button" class="ghost remove-checkpoint-btn">Remove</button></td>
@@ -293,7 +294,7 @@ function clearPlan() {
 function updateCheckpointFromRow(legIndex, checkpointIndex, row) {
     const checkpoint = currentPlan.legs[legIndex].checkpoints[checkpointIndex];
     checkpoint.name = row.querySelector('[data-field="name"]').value.trim() || checkpoint.name;
-    checkpoint.comms = row.querySelector('[data-field="comms"]').value.trim() || "VIS";
+    checkpoint.comms = row.querySelector('[data-field="comms"]').value.trim() || DEFAULT_CHECKPOINT_NOTE;
 }
 
 async function regeneratePlan(message = "Draft checkpoints regenerated for the current route.") {
@@ -357,6 +358,13 @@ function setPlannerSetupRequiredMode(isRequired) {
     if (loadingProgress) {
         loadingProgress.hidden = isRequired;
     }
+}
+
+function normalizeCheckpointComms(value) {
+    const normalized = String(value || "").trim();
+    return normalized && normalized.toUpperCase() !== "VIS"
+        ? normalized
+        : DEFAULT_CHECKPOINT_NOTE;
 }
 
 function showStatus(message, type) {

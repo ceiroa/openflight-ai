@@ -8,15 +8,28 @@ const AIRPORT_INFO_BASE_URL = 'https://aviationweather.gov/api/data/airport';
 const STATIONS_CACHE_URL = 'https://aviationweather.gov/data/cache/stations.cache.json.gz';
 const RETRYABLE_STATUS_CODES = new Set([502, 503, 504]);
 const MAX_FETCH_ATTEMPTS = 3;
+const FUTURE_TIME_TOLERANCE_MS = 60 * 1000;
+const METAR_COVERAGE_AFTER_OBSERVATION_MS = 90 * 60 * 1000;
+const METAR_COVERAGE_BEFORE_OBSERVATION_MS = 15 * 60 * 1000;
+const MAX_NEAREST_TAF_DISTANCE_NM = 75;
+const MAX_NEAREST_TAF_CANDIDATES = 8;
 
 let stationCachePromise;
+let metarStationCachePromise;
+let tafStationCachePromise;
 const AREA_WEATHER_CONCURRENCY = 6;
 const MAX_AREA_WEATHER_STATIONS = 24;
 
 export async function getWeatherData(icao, options = {}) {
     const requestedTime = parseRequestedTime(options.datetime);
-    if (requestedTime && requestedTime.getTime() > Date.now() + 60000) {
-        return getForecastWeatherData(icao, requestedTime);
+    const isFutureRequest = requestedTime && requestedTime.getTime() > Date.now() + FUTURE_TIME_TOLERANCE_MS;
+    if (isFutureRequest) {
+        const metar = await fetchFirstRecord(`${METAR_BASE_URL}?ids=${icao}&format=json`, `METAR API`, { allowNoContent: true });
+        if (metar && isRequestedTimeCoveredByMetar(metar, requestedTime)) {
+            return buildObservedWeatherData(icao, metar);
+        }
+
+        return getForecastWeatherData(icao, requestedTime, metar);
     }
 
     return getObservedWeatherData(icao);
@@ -68,6 +81,12 @@ export async function getWeatherStationsInBounds(bounds, options = {}) {
     };
 }
 
+export function resetWeatherServiceCachesForTests() {
+    stationCachePromise = undefined;
+    metarStationCachePromise = undefined;
+    tafStationCachePromise = undefined;
+}
+
 async function getObservedWeatherData(icao) {
     const metarUrl = `${METAR_BASE_URL}?ids=${icao}&format=json`;
 
@@ -76,6 +95,10 @@ async function getObservedWeatherData(icao) {
         return getNearestStationWeather(icao);
     }
 
+    return buildObservedWeatherData(icao, metar);
+}
+
+async function buildObservedWeatherData(icao, metar) {
     let altimeter = metar.altim;
     if (altimeter > 50) {
         altimeter = altimeter / 33.8639;
@@ -103,25 +126,29 @@ async function getObservedWeatherData(icao) {
     };
 }
 
-async function getForecastWeatherData(icao, requestedTime) {
-    const [taf, latestMetar] = await Promise.all([
+async function getForecastWeatherData(icao, requestedTime, latestMetar = null) {
+    const [taf, metarForAltimeter] = await Promise.all([
         fetchFirstRecord(`${TAF_BASE_URL}?ids=${icao}&format=json`, 'TAF API', { allowNoContent: true }),
-        fetchFirstRecord(`${METAR_BASE_URL}?ids=${icao}&format=json`, 'METAR API', { allowNoContent: true }),
+        latestMetar
+            ? Promise.resolve(latestMetar)
+            : fetchFirstRecord(`${METAR_BASE_URL}?ids=${icao}&format=json`, 'METAR API', { allowNoContent: true }),
     ]);
 
-    if (!taf) {
-        throw new Error(`No FAA forecast data is available for ${icao} at the selected date and time.`);
-    }
+    const location = metarForAltimeter
+        ? await resolveLocationData(icao, metarForAltimeter)
+        : await resolveAirportLocationWithoutMetar(icao);
+    const directForecastSegment = taf ? selectTafForecastSegment(taf, requestedTime) : null;
+    const nearestForecast = directForecastSegment || taf
+        ? null
+        : await findNearestTafForecast(location.lat, location.lon, icao, requestedTime);
+    const forecastSegment = directForecastSegment ?? nearestForecast?.segment ?? null;
+    const forecastSourceIcao = directForecastSegment ? icao : nearestForecast?.station?.icaoId;
 
-    const forecastSegment = selectTafForecastSegment(taf, requestedTime);
     if (!forecastSegment) {
         throw new Error(`No FAA forecast data is available for ${icao} at the selected date and time. TAF coverage is usually limited to about 24 to 30 hours.`);
     }
 
-    const location = latestMetar
-        ? await resolveLocationData(icao, latestMetar)
-        : await resolveAirportLocationWithoutMetar(icao);
-    const altimeter = normalizeAltimeter(latestMetar?.altim);
+    const altimeter = normalizeAltimeter(metarForAltimeter?.altim);
     if (!Number.isFinite(altimeter)) {
         throw new Error(`Forecast data is available for ${icao}, but no current altimeter setting is available to support the nav log calculations.`);
     }
@@ -130,6 +157,7 @@ async function getForecastWeatherData(icao, requestedTime) {
         forecastSegment,
         ['temp', 'tempC', 'temperature', 'temperatureC', 'airTemp'],
     );
+    const latestObservedTemperature = extractFirstFiniteNumber(metarForAltimeter, ['temp', 'tempC', 'temperature', 'temperatureC', 'airTemp']);
     const windSpeed = extractFirstFiniteNumber(
         forecastSegment,
         ['wspd', 'windSpeed', 'wind_speed_kt', 'speed', 'spd'],
@@ -140,15 +168,23 @@ async function getForecastWeatherData(icao, requestedTime) {
         0,
     );
 
-    if (![temperature, windSpeed].every(Number.isFinite)) {
+    const usableTemperature = Number.isFinite(temperature) ? temperature : latestObservedTemperature;
+
+    if (![usableTemperature, windSpeed].every(Number.isFinite)) {
         throw new Error(`Incomplete forecast data returned for ${icao} at the selected date and time.`);
     }
 
     const variation = calculateMagneticVariation(location.lat, location.lon, location.elevation);
     const details = extractWeatherDetails(forecastSegment);
+    const sourcePrefix = forecastSourceIcao && forecastSourceIcao !== icao
+        ? `Forecast loaded for ${icao} from nearby TAF station ${forecastSourceIcao}.`
+        : `Forecast loaded for ${icao}.`;
+    const sourceDetail = Number.isFinite(temperature)
+        ? 'Wind and temperature come from the FAA TAF; altimeter uses the latest available observation.'
+        : 'Wind, visibility, and clouds come from the FAA TAF; temperature and altimeter use the latest available observation.';
 
     return {
-        temperature,
+        temperature: usableTemperature,
         altimeter: Number(altimeter.toFixed(2)),
         windSpeed,
         windDirection,
@@ -163,7 +199,9 @@ async function getForecastWeatherData(icao, requestedTime) {
             requestedTime: requestedTime.toISOString(),
             validFrom: extractDateValue(forecastSegment, ['fcstTimeFrom', 'startTime', 'validTimeFrom', 'timeFrom'])?.toISOString() || null,
             validTo: extractDateValue(forecastSegment, ['fcstTimeTo', 'endTime', 'validTimeTo', 'timeTo'])?.toISOString() || null,
-            message: `Forecast loaded for ${icao}. Wind and temperature come from the FAA TAF; altimeter uses the latest available observation.`,
+            sourceIcao: forecastSourceIcao || icao,
+            sourceDistanceNm: Number.isFinite(nearestForecast?.distanceNm) ? Number(nearestForecast.distanceNm.toFixed(1)) : 0,
+            message: `${sourcePrefix} ${sourceDetail}`,
         },
     };
 }
@@ -238,10 +276,25 @@ function normalizeAltimeter(value) {
     return altimeter;
 }
 
+function isRequestedTimeCoveredByMetar(metar, requestedTime) {
+    const observedAt = extractMetarObservationTime(metar);
+    if (!observedAt) {
+        return requestedTime.getTime() <= Date.now() + FUTURE_TIME_TOLERANCE_MS;
+    }
+
+    const earliestCoveredTime = observedAt.getTime() - METAR_COVERAGE_BEFORE_OBSERVATION_MS;
+    const latestCoveredTime = observedAt.getTime() + METAR_COVERAGE_AFTER_OBSERVATION_MS;
+    return requestedTime.getTime() >= earliestCoveredTime && requestedTime.getTime() <= latestCoveredTime;
+}
+
+function extractMetarObservationTime(metar) {
+    return extractDateValue(metar, ['obsTime', 'reportTime', 'receiptTime', 'issueTime', 'validTime', 'time']);
+}
+
 function selectTafForecastSegment(taf, requestedTime) {
     const forecastSegments = []
-        .concat(taf)
         .concat(Array.isArray(taf?.fcsts) ? taf.fcsts : [])
+        .concat(taf)
         .filter(Boolean);
 
     const match = forecastSegments.find((segment) => {
@@ -257,14 +310,45 @@ function selectTafForecastSegment(taf, requestedTime) {
     return match ?? null;
 }
 
+async function findNearestTafForecast(lat, lon, excludedIcao, requestedTime) {
+    const candidates = await findNearestTafStations(lat, lon, excludedIcao);
+    for (const candidate of candidates) {
+        const taf = await fetchFirstRecord(`${TAF_BASE_URL}?ids=${candidate.station.icaoId}&format=json`, 'TAF API', { allowNoContent: true });
+        const segment = taf ? selectTafForecastSegment(taf, requestedTime) : null;
+        if (segment) {
+            return {
+                station: candidate.station,
+                distanceNm: candidate.distanceNm,
+                segment,
+            };
+        }
+    }
+
+    return null;
+}
+
+async function findNearestTafStations(lat, lon, excludedIcao) {
+    const normalizedExcluded = String(excludedIcao || '').trim().toUpperCase();
+    const stations = await loadTafStations();
+    return stations
+        .map((station) => ({
+            station,
+            distanceNm: calculateDistanceNm(lat, lon, Number(station.lat), Number(station.lon)),
+        }))
+        .filter((candidate) => candidate.station.icaoId !== normalizedExcluded)
+        .filter((candidate) => Number.isFinite(candidate.distanceNm) && candidate.distanceNm <= MAX_NEAREST_TAF_DISTANCE_NM)
+        .sort((left, right) => left.distanceNm - right.distanceNm)
+        .slice(0, MAX_NEAREST_TAF_CANDIDATES);
+}
+
 function extractDateValue(record, keys) {
     for (const key of keys) {
         const value = record?.[key];
-        if (!value) {
+        if (value === null || value === undefined || value === '') {
             continue;
         }
 
-        const parsed = new Date(value);
+        const parsed = parseDateValue(value);
         if (Number.isFinite(parsed.getTime())) {
             return parsed;
         }
@@ -273,9 +357,30 @@ function extractDateValue(record, keys) {
     return null;
 }
 
+function parseDateValue(value) {
+    if (value instanceof Date) {
+        return value;
+    }
+
+    if (Number.isFinite(Number(value))) {
+        const numericValue = Number(value);
+        const milliseconds = numericValue > 100000000000
+            ? numericValue
+            : numericValue * 1000;
+        return new Date(milliseconds);
+    }
+
+    return new Date(value);
+}
+
 function extractFirstFiniteNumber(record, keys, fallback = null) {
     for (const key of keys) {
-        const value = Number(record?.[key]);
+        const rawValue = record?.[key];
+        if (Array.isArray(rawValue) || (rawValue && typeof rawValue === 'object')) {
+            continue;
+        }
+
+        const value = Number(rawValue);
         if (Number.isFinite(value)) {
             return value;
         }
@@ -685,6 +790,27 @@ async function findNearestMetarStation(lat, lon) {
 }
 
 async function loadMetarStations() {
+    if (!metarStationCachePromise) {
+        metarStationCachePromise = loadStationsBySiteType('METAR');
+    }
+
+    return metarStationCachePromise;
+}
+
+async function loadTafStations() {
+    if (!tafStationCachePromise) {
+        tafStationCachePromise = loadStationsBySiteType('TAF');
+    }
+
+    return tafStationCachePromise;
+}
+
+async function loadStationsBySiteType(siteType) {
+    const stations = await loadStationCache();
+    return stations.filter((station) => Array.isArray(station.siteType) && station.siteType.includes(siteType));
+}
+
+async function loadStationCache() {
     if (!stationCachePromise) {
         stationCachePromise = fetchWithRetry(STATIONS_CACHE_URL, 'stations cache')
             .then(async (response) => {
@@ -696,7 +822,6 @@ async function loadMetarStations() {
                 const { gunzipSync } = await import('node:zlib');
                 const parsed = JSON.parse(gunzipSync(compressed).toString('utf8'));
                 return parsed
-                    .filter((station) => Array.isArray(station.siteType) && station.siteType.includes('METAR'))
                     .filter((station) => station.icaoId && Number.isFinite(Number(station.lat)) && Number.isFinite(Number(station.lon)));
             });
     }

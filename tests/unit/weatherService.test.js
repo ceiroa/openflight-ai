@@ -1,11 +1,12 @@
 import { jest } from '@jest/globals';
-import { getWeatherData } from '../../src/api/weatherService.js';
+import { getWeatherData, resetWeatherServiceCachesForTests } from '../../src/api/weatherService.js';
 
 describe('getWeatherData', () => {
     const originalFetch = global.fetch;
 
     afterEach(() => {
         global.fetch = originalFetch;
+        resetWeatherServiceCachesForTests();
         jest.restoreAllMocks();
     });
 
@@ -291,6 +292,21 @@ describe('getWeatherData', () => {
                 ok: true,
                 json: async () => ({
                     value: [{
+                        obsTime: '2026-04-30T17:00:00.000Z',
+                        temp: 21,
+                        altim: 1006.9,
+                        wspd: 16,
+                        wdir: 250,
+                        lat: 41.6031,
+                        lon: -88.1017,
+                        elev: 205,
+                    }],
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    value: [{
                         fcsts: [
                             {
                                 fcstTimeFrom: '2026-04-30T18:00:00.000Z',
@@ -305,20 +321,6 @@ describe('getWeatherData', () => {
                                 ],
                             },
                         ],
-                    }],
-                }),
-            })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
-                    value: [{
-                        temp: 21,
-                        altim: 1006.9,
-                        wspd: 16,
-                        wdir: 250,
-                        lat: 41.6031,
-                        lon: -88.1017,
-                        elev: 205,
                     }],
                 }),
             });
@@ -349,14 +351,211 @@ describe('getWeatherData', () => {
                 source: 'TAF',
             }),
         });
-        expect(global.fetch.mock.calls[0][0]).toContain('/taf?ids=KLOT');
-        expect(global.fetch.mock.calls[1][0]).toContain('/metar?ids=KLOT');
+        expect(global.fetch.mock.calls[0][0]).toContain('/metar?ids=KLOT');
+        expect(global.fetch.mock.calls[1][0]).toContain('/taf?ids=KLOT');
+        nowSpy.mockRestore();
+    });
+
+    test('matches FAA TAF segments that use epoch-second validity times and falls back to latest METAR temperature', async () => {
+        const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-05-09T03:15:00.000Z'));
+        global.fetch = jest.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    value: [{
+                        obsTime: '2026-05-09T02:51:00.000Z',
+                        temp: 17,
+                        altim: 29.94,
+                        wspd: 8,
+                        wdir: 170,
+                        lat: 41.9602,
+                        lon: -87.9316,
+                        elev: 202,
+                    }],
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    value: [{
+                        validTimeFrom: 1778295600,
+                        validTimeTo: 1778392800,
+                        fcsts: [
+                            {
+                                timeFrom: 1778338800,
+                                timeTo: 1778360400,
+                                wdir: 260,
+                                wspd: 12,
+                                visib: '6+',
+                                clouds: [
+                                    { cover: 'SCT', base: 10000 },
+                                    { cover: 'BKN', base: 20000 },
+                                ],
+                                temp: [],
+                            },
+                        ],
+                    }],
+                }),
+            });
+
+        const result = await getWeatherData('KORD', {
+            datetime: '2026-05-09T15:00:00.000Z',
+        });
+
+        expect(result).toMatchObject({
+            temperature: 17,
+            altimeter: 29.94,
+            windSpeed: 12,
+            windDirection: 260,
+            visibilitySm: 6,
+            ceilingFt: 20000,
+            forecast: expect.objectContaining({
+                isForecast: true,
+                source: 'TAF',
+                validFrom: '2026-05-09T15:00:00.000Z',
+                validTo: '2026-05-09T21:00:00.000Z',
+                message: expect.stringContaining('temperature and altimeter use the latest available observation'),
+            }),
+        });
+        expect(global.fetch.mock.calls[0][0]).toContain('/metar?ids=KORD');
+        expect(global.fetch.mock.calls[1][0]).toContain('/taf?ids=KORD');
+        nowSpy.mockRestore();
+    });
+
+    test('uses a nearby TAF station when the airport has METAR but no direct TAF', async () => {
+        const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-05-09T03:17:00.000Z'));
+        global.fetch = jest.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    value: [{
+                        obsTime: '2026-05-09T03:00:00.000Z',
+                        temp: 14,
+                        altim: 1005.8,
+                        wspd: 10,
+                        wdir: 210,
+                        lat: 41.7713,
+                        lon: -88.4815,
+                        elev: 213,
+                    }],
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ value: [] }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                arrayBuffer: async () => {
+                    const { gzipSync } = await import('node:zlib');
+                    const stations = JSON.stringify([
+                        { icaoId: 'KDPA', lat: 41.9078, lon: -88.2486, siteType: ['METAR', 'TAF'] },
+                        { icaoId: 'KORD', lat: 41.9602, lon: -87.9316, siteType: ['METAR', 'TAF'] },
+                    ]);
+                    const gzipped = gzipSync(Buffer.from(stations, 'utf8'));
+                    return gzipped.buffer.slice(gzipped.byteOffset, gzipped.byteOffset + gzipped.byteLength);
+                },
+                status: 200,
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    value: [{
+                        icaoId: 'KDPA',
+                        fcsts: [
+                            {
+                                timeFrom: 1778338800,
+                                timeTo: 1778360400,
+                                wdir: 260,
+                                wspd: 12,
+                                visib: '6+',
+                                clouds: [
+                                    { cover: 'BKN', base: 7000 },
+                                ],
+                                temp: [],
+                            },
+                        ],
+                    }],
+                }),
+            });
+
+        const result = await getWeatherData('KARR', {
+            datetime: '2026-05-09T15:17:00.000Z',
+        });
+
+        expect(result).toMatchObject({
+            temperature: 14,
+            altimeter: 29.7,
+            windSpeed: 12,
+            windDirection: 260,
+            lat: 41.7713,
+            lon: -88.4815,
+            elevation: 699,
+            forecast: expect.objectContaining({
+                isForecast: true,
+                source: 'TAF',
+                sourceIcao: 'KDPA',
+                message: expect.stringContaining('nearby TAF station KDPA'),
+            }),
+        });
+        expect(global.fetch.mock.calls[1][0]).toContain('/taf?ids=KARR');
+        expect(global.fetch.mock.calls[3][0]).toContain('/taf?ids=KDPA');
+        nowSpy.mockRestore();
+    });
+
+    test('uses the latest METAR when a near-future selected time is still covered by the observation', async () => {
+        const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-04-30T18:00:00.000Z'));
+        global.fetch = jest.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    value: [{
+                        obsTime: '2026-04-30T17:45:00.000Z',
+                        temp: 21,
+                        altim: 1006.9,
+                        wspd: 16,
+                        wdir: 250,
+                        lat: 41.6031,
+                        lon: -88.1017,
+                        elev: 205,
+                    }],
+                }),
+            });
+
+        const result = await getWeatherData('KLOT', {
+            datetime: '2026-04-30T18:30:00.000Z',
+        });
+
+        expect(result).toMatchObject({
+            temperature: 21,
+            altimeter: 29.73,
+            windSpeed: 16,
+            windDirection: 250,
+            forecast: null,
+        });
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+        expect(global.fetch.mock.calls[0][0]).toContain('/metar?ids=KLOT');
         nowSpy.mockRestore();
     });
 
     test('returns a clear error when no FAA forecast covers the selected future time', async () => {
         const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-04-29T12:00:00.000Z'));
         global.fetch = jest.fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    value: [{
+                        obsTime: '2026-04-29T11:00:00.000Z',
+                        temp: 21,
+                        altim: 1006.9,
+                        wspd: 16,
+                        wdir: 250,
+                        lat: 41.6031,
+                        lon: -88.1017,
+                        elev: 205,
+                    }],
+                }),
+            })
             .mockResolvedValueOnce({
                 ok: true,
                 json: async () => ({
@@ -370,20 +569,6 @@ describe('getWeatherData', () => {
                                 wdir: 210,
                             },
                         ],
-                    }],
-                }),
-            })
-            .mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({
-                    value: [{
-                        temp: 21,
-                        altim: 1006.9,
-                        wspd: 16,
-                        wdir: 250,
-                        lat: 41.6031,
-                        lon: -88.1017,
-                        elev: 205,
                     }],
                 }),
             });

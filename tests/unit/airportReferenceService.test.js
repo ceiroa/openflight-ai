@@ -67,7 +67,7 @@ describe('airport reference service', () => {
         });
 
         expect(plan[0].checkpoints[0].name).toBe('Silver Springs Lake');
-        expect(plan[0].checkpoints[0].comms).toBe('VIS');
+        expect(plan[0].checkpoints[0].comms).toBe('Visual checkpoint');
     });
 
     test('enhanced mode prioritizes curated visual checkpoints when available', async () => {

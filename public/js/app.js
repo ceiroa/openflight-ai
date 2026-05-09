@@ -31,6 +31,7 @@ const AIRSPACE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const AIRSPACE_PREFETCH_CLASSES = "B,C,D,E";
 const AIRSPACE_PREFETCH_CORRIDOR_NM = 8;
 const WEATHER_CACHE_TTL_MS = 15 * 60 * 1000;
+const DEFAULT_CHECKPOINT_NOTE = "Visual checkpoint";
 
 const state = {
     aircraftData: null,
@@ -1500,7 +1501,7 @@ async function generateLog() {
                     Math.max(0, totalDistanceRemaining - cumulativeDistance).toFixed(1),
                     cruiseWind.groundspeed.toFixed(0),
                     segmentMinutes.toFixed(0),
-                    checkpoint.comms || "VIS",
+                    normalizeCheckpointComms(checkpoint.comms),
                 ]));
 
                 previousCheckpointDistance = cumulativeDistance;
@@ -1606,6 +1607,13 @@ function toIsoFromDateTimeLocal(value) {
 function isFutureFlightDateTime(value) {
     const parsed = new Date(value);
     return Number.isFinite(parsed.getTime()) && parsed.getTime() > Date.now() + 60000;
+}
+
+function normalizeCheckpointComms(value) {
+    const normalized = String(value || "").trim();
+    return normalized && normalized.toUpperCase() !== "VIS"
+        ? normalized
+        : DEFAULT_CHECKPOINT_NOTE;
 }
 
 function formatFlightDateTime(value) {

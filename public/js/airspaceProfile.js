@@ -675,6 +675,8 @@ function buildProfileSvg(segments, classGSegments, elevationSamples, routeLength
     const classGPaths = buildClassGPaths(classGSegments, xScale, yScale);
     let labelsPlaced = 0;
     let lastLabelRight = -Infinity;
+    let altitudeLabelsPlaced = 0;
+    let lastAltitudeLabelRight = -Infinity;
 
     const airspaceRects = segments.map((segment) => {
         const x = xScale(segment.startNm);
@@ -691,10 +693,16 @@ function buildProfileSvg(segments, classGSegments, elevationSamples, routeLength
             labelsPlaced += 1;
             lastLabelRight = x + width;
         }
+        const showAltitudeLabel = shouldShowAirspaceAltitudeLabel(segment, x, width, top, altitudeLabelsPlaced, lastAltitudeLabelRight);
+        if (showAltitudeLabel) {
+            altitudeLabelsPlaced += 1;
+            lastAltitudeLabelRight = x + width;
+        }
         return `
             <g>
                 <rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${width.toFixed(1)}" height="${height.toFixed(1)}"
                     fill="${colors.fill}" stroke="${colors.stroke}" stroke-width="2" ${segment.classCode === "E" ? 'stroke-dasharray="6 4"' : ""}/>
+                ${showAltitudeLabel ? buildAirspaceAltitudeLabel(segment, x, width, top, colors) : ""}
                 ${showInlineLabel ? `
                     <text x="${(x + 6).toFixed(1)}" y="${(top + 14).toFixed(1)}" fill="${colors.stroke}" font-size="11" font-weight="700">
                         ${escapeHtml(`${segment.name} (${segment.classCode})`)}
@@ -724,6 +732,36 @@ function buildProfileSvg(segments, classGSegments, elevationSamples, routeLength
             ${buildDistanceTicks(routeLengthNm, xScale)}
         </svg>
     `;
+}
+
+function shouldShowAirspaceAltitudeLabel(segment, x, width, top, labelsPlaced, lastLabelRight) {
+    return ["B", "C", "D"].includes(segment.classCode)
+        && labelsPlaced < 16
+        && width >= 42
+        && top >= MARGIN.top + 14
+        && x >= lastLabelRight + 18;
+}
+
+function buildAirspaceAltitudeLabel(segment, x, width, top, colors) {
+    const label = formatCompactAltitude(segment.upperFt);
+    const labelX = Math.max(MARGIN.left + 18, Math.min(x + width / 2, x + width - 18));
+    const labelY = Math.max(MARGIN.top + 12, top - 5);
+    return `
+        <text x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}" fill="${colors.stroke}" font-size="10" font-weight="700" text-anchor="middle">
+            ${escapeHtml(label)}
+        </text>
+    `;
+}
+
+function formatCompactAltitude(value) {
+    const feet = Number(value);
+    if (!Number.isFinite(feet)) {
+        return "";
+    }
+    if (feet >= 10000) {
+        return `${Math.round(feet / 1000)}k`;
+    }
+    return String(Math.round(feet));
 }
 
 function buildCruiseProfileMarkup(legSegments, xScale, yScale) {
@@ -865,10 +903,15 @@ function deriveClassGSegments(projectedSegments, elevationSamples) {
         return segments;
     }
 
-    for (let index = 0; index < elevationSamples.length - 1; index += 1) {
-        const start = elevationSamples[index];
-        const end = elevationSamples[index + 1];
-        const midpointNm = (start.alongNm + end.alongNm) / 2;
+    const boundaries = buildClassGBoundaries(projectedSegments, elevationSamples);
+    for (let index = 0; index < boundaries.length - 1; index += 1) {
+        const startNm = boundaries[index];
+        const endNm = boundaries[index + 1];
+        if (endNm - startNm <= 0.001) {
+            continue;
+        }
+
+        const midpointNm = (startNm + endNm) / 2;
         const activeFloors = projectedSegments
             .filter((segment) => midpointNm >= segment.startNm && midpointNm <= segment.endNm)
             .map((segment) => Number(segment.lowerFt))
@@ -879,8 +922,8 @@ function deriveClassGSegments(projectedSegments, elevationSamples) {
             continue;
         }
 
-        const startGroundFt = Number(start.elevationFt);
-        const endGroundFt = Number(end.elevationFt);
+        const startGroundFt = getGroundElevationAtAlongNm(elevationSamples, startNm);
+        const endGroundFt = getGroundElevationAtAlongNm(elevationSamples, endNm);
         const avgGroundFt = (startGroundFt + endGroundFt) / 2;
         const upperFt = activeFloors[0];
         if (!Number.isFinite(avgGroundFt) || !Number.isFinite(upperFt) || upperFt <= avgGroundFt + 50) {
@@ -888,8 +931,8 @@ function deriveClassGSegments(projectedSegments, elevationSamples) {
         }
 
         segments.push({
-            startNm: start.alongNm,
-            endNm: end.alongNm,
+            startNm,
+            endNm,
             startGroundFt,
             endGroundFt,
             upperFt,
@@ -897,6 +940,27 @@ function deriveClassGSegments(projectedSegments, elevationSamples) {
     }
 
     return mergeClassGSegments(segments);
+}
+
+function buildClassGBoundaries(projectedSegments, elevationSamples) {
+    const boundaries = new Set();
+    elevationSamples.forEach((sample) => {
+        if (Number.isFinite(Number(sample.alongNm))) {
+            boundaries.add(Number(sample.alongNm));
+        }
+    });
+    projectedSegments.forEach((segment) => {
+        if (Number.isFinite(Number(segment.startNm))) {
+            boundaries.add(Number(segment.startNm));
+        }
+        if (Number.isFinite(Number(segment.endNm))) {
+            boundaries.add(Number(segment.endNm));
+        }
+    });
+
+    return Array.from(boundaries)
+        .sort((left, right) => left - right)
+        .filter((value, index, sorted) => index === 0 || Math.abs(value - sorted[index - 1]) > 0.001);
 }
 
 function mergeClassGSegments(segments) {

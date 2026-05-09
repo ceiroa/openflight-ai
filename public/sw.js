@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'cielorumbo-shell-v1';
+const SHELL_CACHE = 'cielorumbo-shell-v2';
 const RUNTIME_CACHE = 'cielorumbo-runtime-v1';
 const SHELL_ASSETS = [
     '/',
@@ -6,13 +6,16 @@ const SHELL_ASSETS = [
     '/checkpoints.html',
     '/map.html',
     '/airspace-profile.html',
+    '/airport-briefs.html',
     '/aircraft.html',
     '/manifest.webmanifest',
     '/icons/app-icon.svg',
     '/styles/app-shell.css',
     '/styles/map.css',
     '/styles/airspace-profile.css',
+    '/styles/airport-briefs.css',
     '/js/pwa.js',
+    '/js/airportBriefs.js',
 ];
 
 self.addEventListener('install', (event) => {

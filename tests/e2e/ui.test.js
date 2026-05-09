@@ -89,6 +89,50 @@ test.describe('CieloRumbo - UI Tests', () => {
             });
         });
 
+        await page.route('**/api/airport/*/diagram', async (route) => {
+            const url = new URL(route.request().url());
+            const parts = url.pathname.split('/');
+            const icao = parts[parts.length - 2].toUpperCase();
+            const diagrams = {
+                KORD: {
+                    icao: 'KORD',
+                    airportIdent: 'ORD',
+                    airportName: "CHICAGO O'HARE INTL",
+                    available: true,
+                    source: 'FAA d-TPP',
+                    cycle: '2604',
+                    effectiveLabel: 'Apr 16-May 14, 2026',
+                    chartName: 'AIRPORT DIAGRAM',
+                    pdfUrl: 'https://aeronav.faa.gov/d-tpp/2604/00166AD.PDF',
+                    hotSpotCharts: [
+                        {
+                            chartName: 'HOT SPOT',
+                            pdfUrl: 'https://aeronav.faa.gov/d-tpp/2604/EC3HOTSPOT.PDF',
+                        },
+                    ],
+                },
+                KARR: {
+                    icao: 'KARR',
+                    airportName: 'AURORA MUNI',
+                    available: false,
+                    source: 'FAA d-TPP',
+                    cycle: '2604',
+                    effectiveLabel: 'Apr 16-May 14, 2026',
+                    message: 'No FAA airport diagram is published for KARR.',
+                },
+            };
+
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify(diagrams[icao] || {
+                    icao,
+                    available: false,
+                    message: `No FAA airport diagram is published for ${icao}.`,
+                }),
+            });
+        });
+
         await page.route('**/api/airspace*', async (route) => {
             await route.fulfill({
                 status: 200,
@@ -203,7 +247,7 @@ test.describe('CieloRumbo - UI Tests', () => {
             sessionStorage.clear();
         });
 
-        for (const path of ['/map.html', '/checkpoints.html', '/airspace-profile.html']) {
+        for (const path of ['/map.html', '/checkpoints.html', '/airspace-profile.html', '/airport-briefs.html']) {
             await page.goto(path);
             await expect(page.locator('.setup-required-state')).toBeVisible();
             await expect(page.locator('.setup-required-state h2')).toHaveText('Set Up a Flight First');
@@ -234,11 +278,37 @@ test.describe('CieloRumbo - UI Tests', () => {
             }));
         });
 
-        for (const path of ['/map.html', '/checkpoints.html', '/airspace-profile.html']) {
+        for (const path of ['/map.html', '/checkpoints.html', '/airspace-profile.html', '/airport-briefs.html']) {
             await page.goto(path);
             await expect(page.locator('.setup-required-state')).toBeVisible();
             await expect(page.locator('.setup-required-state')).toContainText('Flight Setup');
         }
+    });
+
+    test('@smoke should show airport briefs for the current route', async ({ page }) => {
+        await page.evaluate(() => {
+            localStorage.setItem('openflight-ai-flight-draft', JSON.stringify({
+                departure: {
+                    icao: 'KORD',
+                    lat: 41.9602,
+                    lon: -87.9316,
+                },
+                legs: [
+                    {
+                        icao: 'KARR',
+                        lat: 41.7713,
+                        lon: -88.4815,
+                    },
+                ],
+            }));
+        });
+
+        await page.goto('/airport-briefs.html');
+
+        await expect(page.locator('[data-airport-brief="KORD"]')).toContainText("CHICAGO O'HARE INTL");
+        await expect(page.locator('[data-airport-brief="KORD"] .link-button').first()).toHaveAttribute('href', 'https://aeronav.faa.gov/d-tpp/2604/00166AD.PDF');
+        await expect(page.locator('[data-airport-brief="KORD"] iframe')).toHaveAttribute('src', 'https://aeronav.faa.gov/d-tpp/2604/00166AD.PDF');
+        await expect(page.locator('[data-airport-brief="KARR"]')).toContainText('No FAA airport diagram is published for KARR.');
     });
 
     test('@smoke @home should populate departure weather when ICAO is entered', async ({ page }) => {

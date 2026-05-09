@@ -50,11 +50,13 @@ const sideMenu = document.getElementById("side-menu");
 const openCheckpointsButton = document.getElementById("open-checkpoints-btn");
 const openMapButton = document.getElementById("open-map-btn");
 const openAirspaceProfileButton = document.getElementById("open-airspace-profile-btn");
+const openAirportBriefsButton = document.getElementById("open-airport-briefs-btn");
 const openAircraftButton = document.getElementById("open-aircraft-btn");
 const postNavlogActions = document.getElementById("post-navlog-actions");
 const postOpenCheckpointsButton = document.getElementById("post-open-checkpoints-btn");
 const postOpenMapButton = document.getElementById("post-open-map-btn");
 const postOpenAirspaceProfileButton = document.getElementById("post-open-airspace-profile-btn");
+const postOpenAirportBriefsButton = document.getElementById("post-open-airport-briefs-btn");
 const testFillButton = document.getElementById("test-fill-btn");
 const savePlanButton = document.getElementById("save-plan-btn");
 const loadPlanButton = document.getElementById("load-plan-btn");
@@ -111,10 +113,12 @@ function registerEventHandlers() {
     openCheckpointsButton.addEventListener("click", openCheckpointPlanner);
     openMapButton.addEventListener("click", openRouteMap);
     openAirspaceProfileButton.addEventListener("click", openAirspaceProfilePage);
+    openAirportBriefsButton.addEventListener("click", openAirportBriefsPage);
     openAircraftButton.addEventListener("click", openAircraftProfiles);
     postOpenCheckpointsButton.addEventListener("click", openCheckpointPlanner);
     postOpenMapButton.addEventListener("click", openRouteMap);
     postOpenAirspaceProfileButton.addEventListener("click", openAirspaceProfilePage);
+    postOpenAirportBriefsButton.addEventListener("click", openAirportBriefsPage);
     testFillButton.addEventListener("click", populateTestRoute);
     savePlanButton.addEventListener("click", savePlanToFile);
     loadPlanButton.addEventListener("click", () => loadPlanInput.click());
@@ -819,6 +823,11 @@ function openRouteMap() {
 function openAirspaceProfilePage() {
     saveCurrentFlightDraft();
     window.location.assign("/airspace-profile.html");
+}
+
+function openAirportBriefsPage() {
+    saveCurrentFlightDraft();
+    window.location.assign("/airport-briefs.html");
 }
 
 function restoreFlightDraft() {

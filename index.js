@@ -17,6 +17,7 @@ import {
     getCuratedVisualCheckpointsInBounds,
     getAirportCommsByCode,
 } from './src/api/airportReferenceService.js';
+import { getAirportDiagram } from './src/api/airportDiagramService.js';
 import { getAirspaceForBounds } from './src/api/airspaceService.js';
 import { getCurrentSectionalChartMetadata } from './src/api/faaChartsService.js';
 import { getElevationsForPoints } from './src/api/elevationService.js';
@@ -56,6 +57,10 @@ app.get('/map.html', (req, res) => {
 
 app.get('/airspace-profile.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'airspace-profile.html'));
+});
+
+app.get('/airport-briefs.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'airport-briefs.html'));
 });
 
 app.get('/aircraft.html', (req, res) => {
@@ -121,6 +126,15 @@ app.get('/api/airport/:icao/comms', async (req, res) => {
         res.json(comms);
     } catch (error) {
         res.status(500).json({ error: error.message || 'Failed to load airport communications' });
+    }
+});
+
+app.get('/api/airport/:icao/diagram', async (req, res) => {
+    try {
+        const diagram = await getAirportDiagram(req.params.icao.toUpperCase());
+        res.json(diagram);
+    } catch (error) {
+        res.status(500).json({ error: error.message || 'Failed to load airport diagram' });
     }
 });
 

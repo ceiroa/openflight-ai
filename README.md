@@ -1,22 +1,36 @@
 # CieloRumbo
 
-CieloRumbo is a sophisticated tool designed to assist pilots in VFR (Visual Flight Rules) cross-country planning. By leveraging modern computational logic, it simplifies complex navigational calculations, ensuring safer and more efficient flight preparation.
+CieloRumbo is an experimental browser-first VFR planning tool for pilots and students. It helps build cross-country nav logs, review route weather, generate visual checkpoints, inspect FAA airspace, and open current FAA airport diagrams from one workflow.
 
 ## Disclaimer
 
-This project is provided for educational purposes only. Do not rely exclusively on it for real-world navigation planning, weather evaluation, or flight decision-making. Always use official aeronautical charts, current weather briefings, approved flight-planning tools, and your own pilot judgment.
+This project is provided for educational purposes only. Do not rely exclusively on it for real-world navigation planning, weather evaluation, chart review, or flight decision-making. Always use official aeronautical charts, current weather briefings, approved flight-planning tools, and your own pilot judgment.
 
-## Features
+## Current Beta Features
 
-- **Wind Correction Angle (WCA) Calculation:** Determine the necessary heading correction to maintain a desired course under varying wind conditions.
-- **Groundspeed Estimation:** Calculate accurate groundspeed based on cruise performance and ambient wind vectors.
-- **Automated Planning:** (Future) Intelligent route optimization and fuel planning.
+- Multi-leg VFR flight setup with aircraft profile selection and per-leg planned altitudes.
+- Weather-aware nav-log generation using AviationWeather METARs and TAFs.
+- Future-date forecast handling, including nearby TAF fallback when an airport has METAR but no direct TAF.
+- Route map with checkpoints, airport weather markers, current-location/recenter controls, FAA airspace, terrain, and sectional-reference modes.
+- Checkpoints planner with editable route checkpoints, visual/airport/category badges, and saved checkpoint reuse.
+- Airspace profile page showing route altitude, terrain, Class B/C/D/E/G controls, and selectable airspace classes.
+- Airport Briefs page that loads current FAA d-TPP airport diagrams by URL instead of storing chart PDFs in the repo.
+- Editable aircraft profiles with climb tables used for density-altitude-aware climb calculations.
+- Save/load plan files that intentionally exclude live weather so weather is refreshed after loading.
+
+## Known Limitations
+
+- CieloRumbo is not a certified EFB and is not suitable as a sole source for flight planning.
+- FAA, AviationWeather, USGS, OpenStreetMap, and other external services can be unavailable or change formats.
+- Not every airport has a published FAA airport diagram or TAF; the app shows unavailable states or nearby forecast-source labels when appropriate.
+- Airspace and terrain views are planning aids and must be checked against current official FAA charts and publications.
+- Aircraft profiles are seed planning profiles and should be verified against the exact aircraft POH/AFM.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v14 or higher recommended)
+- Node.js 20 or newer recommended
 
 ### Installation
 
@@ -24,59 +38,69 @@ This project is provided for educational purposes only. Do not rely exclusively 
 npm install
 ```
 
-### Usage
-
-To run the local app:
+### Local Development
 
 ```bash
 npm start
 ```
 
+Open `http://localhost:3000`.
+
 ### Tests
 
-Run the full safety check before committing:
+Run the full check before pushing significant changes:
 
 ```bash
 npm test
 ```
 
-You can also run the suites separately:
+Useful focused suites:
 
 ```bash
 npm run test:unit
-npm run test:ui
+npm run test:ui:home
+npm run test:ui:map
+npm run test:ui:planner
+npm run test:ui:airspace
+npm run test:ui:smoke
 ```
 
-## Engineering Principles
+## Data Sources
 
-CieloRumbo is built with a focus on precision and reliability. Our navigation engine uses the Law of Sines to provide exact trigonometric solutions for the wind triangle, a fundamental requirement for accurate cross-country navigation.
+- AviationWeather.gov for METAR, TAF, station, and airport weather data.
+- FAA airspace services for class-airspace map/profile geometry and vertical limits.
+- FAA d-TPP metadata for current airport diagram PDF links.
+- FAA chart metadata for sectional/TAC reference workflows.
+- USGS elevation service for terrain samples.
+- OpenStreetMap/OpenTopoMap for base-map and terrain context.
+- Local `magvar` calculations for magnetic variation.
+- Repository aircraft profile JSON files for aircraft performance assumptions.
 
-## Change Workflow
+See `docs/data-sources.html` for the public data-source reference page.
 
-To keep future AI-generated edits from breaking the app:
+## Engineering Notes
+
+To keep future changes stable:
 
 1. Keep calculation logic in `public/js/navigation.js`.
-2. Keep UI orchestration in `public/js/app.js`.
-3. Keep aircraft performance data in `src/data/*.json`.
-4. Keep server-side weather normalization in `src/api/weatherService.js`.
-5. Run `npm test` after every change before pushing.
-6. Prefer adding or updating tests in the same change that modifies behavior.
-
-The repository CI workflow runs the same checks on GitHub for every push and pull request.
+2. Keep home-page orchestration in `public/js/app.js`.
+3. Keep server-side weather normalization in `src/api/weatherService.js`.
+4. Keep airport diagram lookup in `src/api/airportDiagramService.js`.
+5. Keep aircraft profile data in `src/data/aircraft/profiles/*.json`.
+6. Add or update tests in the same change that modifies behavior.
+7. Run an appropriate focused test suite for small changes and `npm test` for release-level changes.
 
 ## GitHub Pages
 
-The repository now includes a static technical overview site under `docs/`.
+The public landing/docs site lives under `docs/`.
 
-To publish it with GitHub Pages:
+To publish with GitHub Pages:
 
 1. Open the repository on GitHub.
 2. Go to `Settings` -> `Pages`.
 3. Under `Build and deployment`, choose `Deploy from a branch`.
 4. Select branch `main` and folder `/docs`.
 5. Save the setting.
-
-After that, GitHub will publish the site automatically from the contents of `docs/`.
 
 ## License
 

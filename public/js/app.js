@@ -85,7 +85,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (shouldRestoreDraftFromUrl()) {
         restoreFlightDraft();
         clearRestoreDraftFlagFromUrl();
-    } else {
+    } else if (destinationsContainer.children.length === 0) {
         addLeg();
     }
     restoreMatchingNavLog();
@@ -1088,10 +1088,7 @@ async function loadPlanFromFile(file) {
         setCheckpointStatus("");
         await refreshImportedPlanWeather();
         if (normalizedPlan.checkpointPlan) {
-            saveCheckpointPlan({
-                ...normalizedPlan.checkpointPlan,
-                routeSignature: createRouteSignature(collectFlightInputs()),
-            });
+            saveCheckpointPlan(normalizeImportedCheckpointPlanForCurrentRoute(normalizedPlan.checkpointPlan));
         }
         showStatus("Flight plan loaded. Weather was refreshed live.", "info");
         log("Flight plan imported successfully.");
@@ -1167,6 +1164,8 @@ function normalizeFlightPlanFile(payload) {
 function normalizeImportedCheckpointPlan(plan, draft) {
     return {
         ...plan,
+        version: CHECKPOINT_PLAN_VERSION,
+        mode: plan.mode || DEFAULT_CHECKPOINT_MODE,
         legs: (Array.isArray(plan.legs) ? plan.legs : []).map((leg, index) => {
             const fromPoint = index === 0 ? draft.departure : draft.legs[index - 1];
             const toPoint = draft.legs[index];
@@ -1184,6 +1183,15 @@ function normalizeImportedCheckpointPlan(plan, draft) {
             };
         }),
     };
+}
+
+function normalizeImportedCheckpointPlanForCurrentRoute(plan) {
+    const currentInputs = collectFlightInputs();
+    return normalizeImportedCheckpointPlan({
+        ...plan,
+        routeSignature: createRouteSignature(currentInputs),
+        savedAt: new Date().toISOString(),
+    }, currentInputs);
 }
 
 async function refreshImportedPlanWeather() {

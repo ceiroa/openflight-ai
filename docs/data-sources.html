@@ -4,19 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CieloRumbo | Data Sources</title>
-    <meta name="description" content="Detailed data-source guide for CieloRumbo: where the data comes from, how it is used, and what is cached locally.">
-    <meta name="keywords" content="CieloRumbo data sources, aviation weather data, FAA airspace data, USGS elevation, VFR planning data">
+    <meta name="description" content="Detailed data-source guide for CieloRumbo: where weather, airspace, terrain, airport diagrams, and planning data come from.">
+    <meta name="keywords" content="CieloRumbo data sources, aviation weather data, FAA airspace data, FAA airport diagrams, USGS elevation, VFR planning data">
     <meta name="robots" content="index,follow">
     <link rel="canonical" href="https://ceiroa.github.io/cielorumbo/data-sources.html">
     <meta property="og:type" content="article">
     <meta property="og:site_name" content="CieloRumbo">
     <meta property="og:title" content="CieloRumbo | Data Sources">
-    <meta property="og:description" content="Detailed reference for where CieloRumbo gets weather, airspace, terrain, variation, and aircraft-profile data.">
+    <meta property="og:description" content="Detailed reference for where CieloRumbo gets weather, airspace, airport diagrams, terrain, variation, and aircraft-profile data.">
     <meta property="og:url" content="https://ceiroa.github.io/cielorumbo/data-sources.html">
     <meta property="og:image" content="https://ceiroa.github.io/cielorumbo/icons/app-icon.svg">
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="CieloRumbo | Data Sources">
-    <meta name="twitter:description" content="Reference page for CieloRumbo weather, airspace, terrain, and aircraft-profile inputs.">
+    <meta name="twitter:description" content="Reference page for CieloRumbo weather, airspace, airport diagrams, terrain, and aircraft-profile inputs.">
     <meta name="twitter:image" content="https://ceiroa.github.io/cielorumbo/icons/app-icon.svg">
     <link rel="stylesheet" href="./styles.css">
 </head>
@@ -54,6 +54,7 @@
                         <li><strong>AviationWeather.gov:</strong> METAR, TAF, station info, airport lookup, and fallback weather resolution.</li>
                         <li><strong>FAA Class Airspace service:</strong> polygon geometry and numeric B/C/D/E shelf values for map and altitude-profile work.</li>
                         <li><strong>FAA chart metadata:</strong> sectional and TAC reference lookup for chart-review workflows.</li>
+                        <li><strong>FAA d-TPP metadata:</strong> current airport diagram PDF links for route-airport brief pages.</li>
                         <li><strong>USGS elevation service:</strong> route elevation samples used to derive terrain-aware Class E/G behavior.</li>
                         <li><strong>OpenStreetMap / OpenTopoMap:</strong> base maps for route review, terrain context, and checkpoint visualization.</li>
                     </ul>
@@ -89,8 +90,33 @@
                     <h3>Future-Dated Planning</h3>
                     <p>
                         When the selected flight date/time is in the future, the app switches to FAA TAF forecast data where
-                        available. Wind and temperature come from the forecast segment, while the latest usable observation can
-                        still supply context like altimeter or location fallback when appropriate.
+                        available. If an airport has METAR but no direct TAF, the app can label and use a nearby TAF source.
+                        Wind and forecast conditions come from the selected TAF segment, while the latest usable observation can
+                        still supply context like altimeter, temperature fallback, or location fallback when appropriate.
+                    </p>
+                </article>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-heading">
+                <p class="eyebrow">Airport Briefs</p>
+                <h2>Airport Diagrams</h2>
+            </div>
+            <div class="grid two">
+                <article class="card">
+                    <h3>FAA d-TPP Metadata</h3>
+                    <p>
+                        Airport Briefs use the current FAA d-TPP metafile to find airport diagram records
+                        (<code>APD</code>) and link directly to FAA-hosted PDFs. The app caches metadata in memory for a short
+                        period but does not store diagram PDFs in the repository.
+                    </p>
+                </article>
+                <article class="card">
+                    <h3>Availability</h3>
+                    <p>
+                        Not every airport has a published FAA airport diagram. When no diagram exists, the app shows a clear
+                        unavailable state instead of inventing a diagram or bundling stale chart files.
                     </p>
                 </article>
             </div>
@@ -185,6 +211,7 @@
                     <h3>Good Fit Today</h3>
                     <ul class="bullet-list">
                         <li>Airport weather retrieval and forecast fallback</li>
+                        <li>Current FAA airport diagram lookup</li>
                         <li>Offline variation calculation</li>
                         <li>FAA airspace map overlays</li>
                         <li>B/C/D-focused altitude-profile rendering</li>
@@ -196,6 +223,7 @@
                         <li>True FAA raster chart overlay experience</li>
                         <li>Broader landmark and checkpoint ranking quality</li>
                         <li>More complete treatment of all Class E edge cases</li>
+                        <li>Airport brief expansion beyond diagrams and hot-spot PDFs</li>
                         <li>Future weather overlays directly on the route map</li>
                     </ul>
                 </article>

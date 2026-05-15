@@ -7,6 +7,12 @@
     --border-color: #475569;
 }
 
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
 body {
     font-family: "Inter", sans-serif;
     margin: 20px;

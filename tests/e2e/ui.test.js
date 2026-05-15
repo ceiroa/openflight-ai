@@ -14,6 +14,17 @@ const routeSignature = JSON.stringify({
     legs: [{ icao: 'KARR', lat: 41.7713, lon: -88.4815 }],
 });
 
+async function expectNoPageHorizontalOverflow(page) {
+    const overflow = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+        bodyScrollWidth: document.body.scrollWidth,
+    }));
+
+    expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 2);
+    expect(overflow.bodyScrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 2);
+}
+
 const airportCommsFixtures = {
     KORD: { summary: 'ATIS 135.4 | TWR 120.75' },
     KLOT: { summary: 'AWOS 118.125 | CTAF 123.0' },
@@ -1049,6 +1060,27 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#nav-log-container')).toBeVisible();
         await expect(page.locator('#post-navlog-actions')).toHaveClass(/visible/);
         await expect(page.locator('#post-open-map-btn')).toBeVisible();
+    });
+
+    test('@smoke @home @map @planner @airspace should keep iPhone shell pages within the viewport', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.reload();
+
+        await expectNoPageHorizontalOverflow(page);
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#generate-btn');
+        await expect(page.locator('#nav-log-container')).toBeVisible();
+
+        const paths = ['/checkpoints.html', '/map.html', '/airspace-profile.html', '/airport-briefs.html'];
+        for (const path of paths) {
+            await page.goto(path);
+            await expect(page.locator('.setup-required-state')).toHaveCount(0);
+            await expectNoPageHorizontalOverflow(page);
+        }
     });
 
     test('@map should toggle current location on the route map', async ({ page }) => {

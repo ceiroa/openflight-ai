@@ -25,6 +25,20 @@ async function expectNoPageHorizontalOverflow(page) {
     expect(overflow.bodyScrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 2);
 }
 
+async function expectElementWithinViewport(locator) {
+    await expect(locator).toBeVisible();
+    const box = await locator.boundingBox();
+    expect(box).not.toBeNull();
+
+    const viewport = locator.page().viewportSize();
+    expect(viewport).not.toBeNull();
+
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 2);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 2);
+}
+
 const airportCommsFixtures = {
     KORD: { summary: 'ATIS 135.4 | TWR 120.75' },
     KLOT: { summary: 'AWOS 118.125 | CTAF 123.0' },
@@ -1062,7 +1076,7 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('#post-open-map-btn')).toBeVisible();
     });
 
-    test('@smoke @home @map @planner @airspace should keep iPhone shell pages within the viewport', async ({ page }) => {
+    test('@smoke @mobile @home @map @planner @airspace should keep iPhone shell pages within the viewport', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await page.reload();
 
@@ -1075,10 +1089,55 @@ test.describe('CieloRumbo - UI Tests', () => {
         await page.click('#generate-btn');
         await expect(page.locator('#nav-log-container')).toBeVisible();
 
-        const paths = ['/checkpoints.html', '/map.html', '/airspace-profile.html', '/airport-briefs.html'];
+        const paths = ['/checkpoints.html', '/map.html', '/airspace-profile.html', '/airport-briefs.html', '/aircraft.html'];
         for (const path of paths) {
             await page.goto(path);
             await expect(page.locator('.setup-required-state')).toHaveCount(0);
+            await expectNoPageHorizontalOverflow(page);
+        }
+    });
+
+    test('@mobile @map should keep fullscreen route map controls reachable on iPhone', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.reload();
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#menu-toggle');
+        await page.click('#open-map-btn');
+
+        await page.click('#maximize-map-btn');
+        await expect(page.locator('.container')).toHaveClass(/map-maximized/);
+        await expectNoPageHorizontalOverflow(page);
+        await expectElementWithinViewport(page.locator('#toggle-map-controls-btn'));
+        await expectElementWithinViewport(page.locator('#maximize-map-btn'));
+        await expectElementWithinViewport(page.locator('#recenter-route-btn'));
+        await expect(page.locator('#toggle-map-controls-btn')).toHaveText('Show Controls');
+
+        await page.click('#toggle-map-controls-btn');
+        await expect(page.locator('#toggle-map-controls-btn')).toHaveText('Hide Controls');
+        await expectElementWithinViewport(page.locator('#map-toolbar'));
+
+        await page.click('#route-map', { position: { x: 80, y: 280 } });
+        await expect(page.locator('#toggle-map-controls-btn')).toHaveText('Show Controls');
+        await expect(page.locator('#map-toolbar')).toBeHidden();
+    });
+
+    test('@mobile @home @map @planner @airspace should keep iPad shell pages within the viewport', async ({ page }) => {
+        await page.setViewportSize({ width: 820, height: 1180 });
+        await page.reload();
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#generate-btn');
+        await expect(page.locator('#nav-log-container')).toBeVisible();
+
+        for (const path of ['/checkpoints.html', '/map.html', '/airspace-profile.html', '/airport-briefs.html', '/aircraft.html']) {
+            await page.goto(path);
             await expectNoPageHorizontalOverflow(page);
         }
     });

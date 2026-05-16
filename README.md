@@ -62,6 +62,7 @@ npm run test:ui:home
 npm run test:ui:map
 npm run test:ui:planner
 npm run test:ui:airspace
+npm run test:ui:mobile
 npm run test:ui:smoke
 ```
 

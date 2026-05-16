@@ -13,7 +13,8 @@
     "test:ui:home": "npx playwright test --grep \"@home\"",
     "test:ui:map": "npx playwright test --grep \"@map\"",
     "test:ui:planner": "npx playwright test --grep \"@planner\"",
-    "test:ui:airspace": "npx playwright test --grep \"@airspace\""
+    "test:ui:airspace": "npx playwright test --grep \"@airspace\"",
+    "test:ui:mobile": "npx playwright test --grep \"@mobile\""
   },
   "repository": {
     "type": "git",

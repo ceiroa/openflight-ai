@@ -39,6 +39,7 @@ app.get('/healthz', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/docs', express.static(path.join(__dirname, 'docs')));
 app.use('/vendor/jszip', express.static(path.join(__dirname, 'node_modules', 'jszip', 'dist')));
+app.use('/vendor/leaflet', express.static(path.join(__dirname, 'node_modules', 'leaflet', 'dist')));
 app.use('/vendor/georaster', express.static(path.join(__dirname, 'node_modules', 'georaster', 'dist')));
 app.use('/vendor/georaster-layer-for-leaflet', express.static(path.join(__dirname, 'node_modules', 'georaster-layer-for-leaflet', 'dist')));
 app.use(express.json());

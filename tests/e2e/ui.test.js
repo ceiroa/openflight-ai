@@ -1438,6 +1438,43 @@ test.describe('CieloRumbo - UI Tests', () => {
         await expect(page.locator('.checkpoint-button .checkpoint-badge')).toContainText(['Visual Checkpoint', 'Visual Priority']);
     });
 
+    test('@map should add from the map context menu and edit or remove from checkpoint popups', async ({ page }) => {
+        const dialogResponses = ['FOX RIVER', '122.8'];
+        page.on('dialog', async (dialog) => {
+            if (dialog.type() === 'prompt') {
+                await dialog.accept(dialogResponses.shift());
+                return;
+            }
+
+            await dialog.accept();
+        });
+
+        await page.fill('#departure-icao', 'KORD');
+        await page.locator('#departure-icao').blur();
+        await page.fill('.destination-icao', 'KARR');
+        await page.locator('.destination-icao').blur();
+        await page.click('#menu-toggle');
+        await page.click('#open-map-btn');
+
+        await page.click('[data-accordion-toggle="checkpoints"]');
+        await page.locator('#route-map').click({ button: 'right', position: { x: 220, y: 180 } });
+        await page.click('[data-map-context-add]');
+
+        await page.click('[data-accordion-toggle="checkpoints"]');
+        await expect(page.locator('.checkpoint-button')).toContainText(['Map Checkpoint 1']);
+
+        await page.click('[data-checkpoint-index="0"]');
+        await page.click('[data-checkpoint-popup-edit="0"]');
+        await page.click('[data-accordion-toggle="checkpoints"]');
+        await expect(page.locator('.checkpoint-button')).toContainText(['FOX RIVER']);
+
+        await page.click('[data-checkpoint-index="0"]');
+        await page.click('[data-checkpoint-popup-remove="0"]');
+        await page.click('[data-accordion-toggle="checkpoints"]');
+        await expect(page.locator('.checkpoint-button')).toHaveCount(0);
+        await expect(page.locator('[data-accordion-section="checkpoints"] .empty-state')).toContainText('No saved checkpoints');
+    });
+
     test('@planner @map should filter enhanced checkpoints in the planner and route map', async ({ page }) => {
         await page.fill('#departure-icao', 'KORD');
         await page.locator('#departure-icao').blur();

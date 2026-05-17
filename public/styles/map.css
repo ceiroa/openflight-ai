@@ -839,6 +839,90 @@ body.map-focus-mode .container > .status-banner {
     background: rgba(30, 41, 59, 0.96);
 }
 
+.map-secondary-button:disabled,
+.map-mode-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.map-secondary-button.danger {
+    border-color: rgba(248, 113, 113, 0.55);
+    color: #fecaca;
+}
+
+.checkpoint-item-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.checkpoint-item-actions .map-secondary-button {
+    padding: 7px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    text-decoration: none;
+}
+
+.checkpoint-panel-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+.checkpoint-planner-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid rgba(71, 85, 105, 0.9);
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.72);
+    color: #cbd5e1;
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.checkpoint-planner-link:hover {
+    border-color: rgba(56, 189, 248, 0.6);
+    color: #f8fafc;
+    background: rgba(30, 41, 59, 0.96);
+}
+
+.checkpoint-popup,
+.map-context-popup {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.checkpoint-popup-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.map-popup-button {
+    border: 1px solid rgba(71, 85, 105, 0.9);
+    border-radius: 6px;
+    background: #0f172a;
+    color: #e2e8f0;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 6px 9px;
+}
+
+.map-popup-button:hover {
+    border-color: rgba(56, 189, 248, 0.65);
+    background: #1e293b;
+}
+
+.map-popup-button.danger {
+    border-color: rgba(248, 113, 113, 0.6);
+    color: #fecaca;
+}
+
 .checkpoint-button,
 .chart-link-button {
     width: 100%;

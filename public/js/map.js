@@ -1,9 +1,11 @@
 import {
+    CHECKPOINT_PLAN_VERSION,
     createRouteSignature,
     getCheckpointPlanForRoute,
     loadFlightDraft,
     loadAirspaceCache,
     loadWeatherCache,
+    saveCheckpointPlan,
     saveAirspaceCache,
     saveWeatherCache,
 } from "./flightStore.js";
@@ -108,6 +110,9 @@ const state = {
     airspaceLayer: null,
     showAirspace: false,
     routeSignature: "",
+    currentDraft: null,
+    contextAddLatLng: null,
+    isFaaCoverageRoute: true,
     weatherByIcao: new Map(),
     mobileMapLayout: false,
     hasInitializedResponsiveLayout: false,
@@ -119,6 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     document.addEventListener("click", handleDocumentClick, true);
     document.addEventListener("keydown", handleDocumentKeydown);
+    mapRoot.addEventListener("click", handleMapRootClick);
 
     const draft = loadFlightDraft();
     if (!isUsableDraft(draft)) {
@@ -149,6 +155,25 @@ function handleDocumentKeydown(event) {
     }
 }
 
+function handleMapRootClick(event) {
+    const popupEditButton = event.target.closest("[data-checkpoint-popup-edit]");
+    if (popupEditButton) {
+        editCheckpoint(Number(popupEditButton.getAttribute("data-checkpoint-popup-edit")));
+        return;
+    }
+
+    const popupRemoveButton = event.target.closest("[data-checkpoint-popup-remove]");
+    if (popupRemoveButton) {
+        removeCheckpoint(Number(popupRemoveButton.getAttribute("data-checkpoint-popup-remove")));
+        return;
+    }
+
+    const contextAddButton = event.target.closest("[data-map-context-add]");
+    if (contextAddButton) {
+        addCheckpointFromMapClick(state.contextAddLatLng);
+    }
+}
+
 function setMenuOpenState(isOpen) {
     sideMenu.classList.toggle("open", isOpen);
     menuToggleButton.classList.toggle("open", isOpen);
@@ -157,11 +182,15 @@ function setMenuOpenState(isOpen) {
 function renderMapPage(draft) {
     state.airportMarkers = [];
     state.weatherByIcao = new Map();
+    state.currentDraft = draft;
+    state.contextAddLatLng = null;
     const routePoints = buildRoutePoints(draft);
     const legSegments = buildLegSegments(routePoints);
     const checkpointPlan = getCheckpointPlanForRoute(draft);
     const checkpointMarkers = buildCheckpointMarkers(routePoints, checkpointPlan);
     const chartReferences = buildChartReferences(routePoints);
+    const isFaaCoverageRoute = routePoints.every((point) => isConterminousUsPoint(point.lat, point.lon));
+    state.isFaaCoverageRoute = isFaaCoverageRoute;
 
     mapRoot.innerHTML = `
         <div class="map-layout">
@@ -171,8 +200,8 @@ function renderMapPage(draft) {
                     <div class="map-toolbar" id="map-toolbar">
                         <button type="button" class="map-mode-button active" data-map-mode="${MAP_MODES.street}">Street</button>
                         <button type="button" class="map-mode-button" data-map-mode="${MAP_MODES.terrain}">Terrain</button>
-                        <button type="button" class="map-mode-button" data-map-mode="${MAP_MODES.sectional}">FAA Sectional Ref</button>
-                        <button type="button" class="map-secondary-button" id="toggle-airspace-btn">Show FAA Airspace</button>
+                        <button type="button" class="map-mode-button" data-map-mode="${MAP_MODES.sectional}"${isFaaCoverageRoute ? "" : " disabled"}>FAA Sectional Ref</button>
+                        <button type="button" class="map-secondary-button" id="toggle-airspace-btn"${isFaaCoverageRoute ? "" : " disabled"}>Show FAA Airspace</button>
                         <button type="button" class="map-secondary-button" id="toggle-weather-btn">Show Airport Weather Layer</button>
                         <button type="button" class="map-secondary-button" id="toggle-location-btn">Show Current Location</button>
                         <button type="button" class="map-secondary-button" id="toggle-reference-checkpoints-btn">Show Nearby Reference Checkpoints</button>
@@ -183,6 +212,8 @@ function renderMapPage(draft) {
                 <div class="map-status-stack">
                     <p id="map-status" class="route-summary">Route plotted for ${draft.legs.length} leg${draft.legs.length === 1 ? "" : "s"}.</p>
                     <p id="map-weather-status" class="map-weather-status">Loading airport weather for this route...</p>
+                    <p id="map-airspace-status" class="map-weather-status">${isFaaCoverageRoute ? "" : "FAA charts and FAA controlled-airspace overlays are U.S.-coverage only. Airports, weather stations, and visual checkpoints can still load outside the U.S. when source data is available."}</p>
+                    <p id="map-checkpoint-edit-status" class="map-weather-status"></p>
                     <div id="weather-legend-bar" class="weather-legend-bar hidden" aria-label="Weather legend">
                         <span class="weather-legend-label">Weather Legend</span>
                         <div class="weather-legend" aria-label="Weather legend">
@@ -294,6 +325,9 @@ function renderMapPage(draft) {
                                     </select>
                                 </div>
                             </div>
+                            <div class="checkpoint-panel-actions">
+                                <a class="checkpoint-planner-link" href="/checkpoints.html">Open Planner</a>
+                            </div>
                         </div>
                         ${checkpointMarkers.length === 0
                             ? `<div class="empty-state">No saved checkpoints for this route yet.</div>`
@@ -307,6 +341,10 @@ function renderMapPage(draft) {
                                                 <span class="checkpoint-subtitle">${escapeHtml(checkpoint.fromIcao)} to ${escapeHtml(checkpoint.toIcao)} at ${checkpoint.distanceFromLegStartNm.toFixed(1)} NM</span>
                                                 ${checkpoint.notes ? `<span class="checkpoint-subtitle">${escapeHtml(checkpoint.notes)}</span>` : ""}
                                             </button>
+                                            <div class="checkpoint-item-actions">
+                                                <button type="button" class="map-secondary-button" data-checkpoint-edit="${index}">Edit</button>
+                                                <button type="button" class="map-secondary-button danger" data-checkpoint-remove="${index}">Remove</button>
+                                            </div>
                                         </li>
                                     `).join("")}
                                 </ol>
@@ -399,7 +437,7 @@ function initializeLeafletMap(routePoints, legSegments, checkpointMarkers) {
             weight: 2,
         }).addTo(map);
 
-        checkpoint.marker.bindPopup(buildCheckpointPopup(checkpoint));
+        checkpoint.marker.bindPopup(buildCheckpointPopup(checkpoint, index));
         checkpoint.marker.on("click", () => highlightCheckpoint(index));
     });
 
@@ -427,6 +465,7 @@ function initializeLeafletMap(routePoints, legSegments, checkpointMarkers) {
         }
     });
     map.on("click", handleMapSurfaceClick);
+    map.on("contextmenu", handleMapContextMenu);
 }
 
 function attachMapPageHandlers(checkpointMarkers) {
@@ -474,6 +513,16 @@ function attachMapPageHandlers(checkpointMarkers) {
     document.getElementById("map-checkpoint-source-filter")?.addEventListener("change", (event) => {
         state.checkpointFilters.source = event.target.value;
         applyCheckpointFilters();
+    });
+    document.querySelectorAll("[data-checkpoint-edit]").forEach((button) => {
+        button.addEventListener("click", () => {
+            editCheckpoint(Number(button.getAttribute("data-checkpoint-edit")));
+        });
+    });
+    document.querySelectorAll("[data-checkpoint-remove]").forEach((button) => {
+        button.addEventListener("click", () => {
+            removeCheckpoint(Number(button.getAttribute("data-checkpoint-remove")));
+        });
     });
 
     document.getElementById("export-kml-btn")?.addEventListener("click", exportCurrentRouteKml);
@@ -555,6 +604,11 @@ function syncRouteSectionToggle(sectionName) {
 }
 
 function applyMapMode(mode) {
+    if (mode === MAP_MODES.sectional && !state.isFaaCoverageRoute) {
+        mode = MAP_MODES.street;
+        updateMapStatus("FAA sectional references are unavailable for this route. Street mode remains active.");
+    }
+
     state.currentMode = mode;
     document.querySelectorAll("[data-map-mode]").forEach((button) => {
         button.classList.toggle("active", button.getAttribute("data-map-mode") === mode);
@@ -720,6 +774,214 @@ function matchesCheckpointFilters(checkpoint) {
     const matchesType = state.checkpointFilters.type === "all" || checkpoint.type === state.checkpointFilters.type;
     const matchesSource = state.checkpointFilters.source === "all" || checkpoint.source === state.checkpointFilters.source;
     return matchesType && matchesSource;
+}
+
+function handleMapContextMenu(event) {
+    if (!state.map || !event?.latlng) {
+        return;
+    }
+
+    state.contextAddLatLng = event.latlng;
+    updateCheckpointEditStatus("Add a checkpoint from the map popup.");
+    window.L.popup()
+        .setLatLng(event.latlng)
+        .setContent(buildMapContextAddPopup(event.latlng))
+        .openOn(state.map);
+}
+
+function addCheckpointFromMapClick(latlng) {
+    if (!state.currentDraft || !latlng) {
+        return;
+    }
+
+    const nearest = findNearestLegProjection(latlng);
+    if (!nearest) {
+        updateCheckpointEditStatus("No route leg is available for checkpoint placement.");
+        return;
+    }
+
+    const plan = ensureEditableCheckpointPlan(state.currentDraft);
+    const legPlan = plan.legs[nearest.legIndex];
+    const checkpoints = Array.isArray(legPlan.checkpoints) ? legPlan.checkpoints : [];
+    legPlan.checkpoints = checkpoints;
+    const distanceFromLegStartNm = Math.round(nearest.distanceFromLegStartNm * 10) / 10;
+
+    checkpoints.push({
+        name: `Map Checkpoint ${checkpoints.length + 1}`,
+        distanceFromLegStartNm,
+        lat: Math.round(latlng.lat * 100000) / 100000,
+        lon: Math.round(latlng.lng * 100000) / 100000,
+        comms: DEFAULT_CHECKPOINT_NOTE,
+        type: "manual",
+        source: "user",
+        notes: "User-added checkpoint from the route map.",
+    });
+    checkpoints.sort((left, right) => (Number(left.distanceFromLegStartNm) || 0) - (Number(right.distanceFromLegStartNm) || 0));
+    saveCheckpointPlan(plan);
+    updateCheckpointEditStatus(`Added checkpoint on leg ${nearest.legIndex + 1} at ${distanceFromLegStartNm.toFixed(1)} NM.`);
+    renderMapPage(state.currentDraft);
+}
+
+function editCheckpoint(index) {
+    const checkpoint = state.checkpointMarkers[index];
+    if (!checkpoint || !state.currentDraft) {
+        return;
+    }
+
+    const name = window.prompt("Checkpoint name", checkpoint.name);
+    if (name === null) {
+        return;
+    }
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+        updateCheckpointEditStatus("Checkpoint name cannot be empty.");
+        return;
+    }
+
+    const comms = window.prompt("Checkpoint comms/note", checkpoint.comms || DEFAULT_CHECKPOINT_NOTE);
+    if (comms === null) {
+        return;
+    }
+
+    const plan = ensureEditableCheckpointPlan(state.currentDraft);
+    const planCheckpoint = plan.legs[checkpoint.legIndex]?.checkpoints?.[checkpoint.checkpointIndex];
+    if (!planCheckpoint) {
+        updateCheckpointEditStatus("Checkpoint could not be edited because it is no longer in the saved plan.");
+        return;
+    }
+
+    planCheckpoint.name = trimmedName;
+    planCheckpoint.comms = normalizeCheckpointComms(comms);
+    planCheckpoint.notes = planCheckpoint.notes || "User-edited checkpoint.";
+    saveCheckpointPlan(plan);
+    updateCheckpointEditStatus(`Updated ${trimmedName}.`);
+    renderMapPage(state.currentDraft);
+}
+
+function removeCheckpoint(index) {
+    const checkpoint = state.checkpointMarkers[index];
+    if (!checkpoint || !state.currentDraft) {
+        return;
+    }
+
+    if (!window.confirm(`Remove checkpoint "${checkpoint.name}"?`)) {
+        return;
+    }
+
+    const plan = ensureEditableCheckpointPlan(state.currentDraft);
+    const checkpoints = plan.legs[checkpoint.legIndex]?.checkpoints;
+    if (!Array.isArray(checkpoints) || !checkpoints[checkpoint.checkpointIndex]) {
+        updateCheckpointEditStatus("Checkpoint could not be removed because it is no longer in the saved plan.");
+        return;
+    }
+
+    checkpoints.splice(checkpoint.checkpointIndex, 1);
+    saveCheckpointPlan(plan);
+    updateCheckpointEditStatus(`Removed ${checkpoint.name}.`);
+    renderMapPage(state.currentDraft);
+}
+
+function ensureEditableCheckpointPlan(draft) {
+    const existingPlan = getCheckpointPlanForRoute(draft);
+    if (existingPlan && Array.isArray(existingPlan.legs)) {
+        return {
+            ...existingPlan,
+            version: CHECKPOINT_PLAN_VERSION,
+            routeSignature: createRouteSignature(draft),
+            legs: state.legSegments.map((segment, index) => ({
+                ...existingPlan.legs[index],
+                legIndex: index,
+                fromIcao: existingPlan.legs[index]?.fromIcao || segment.fromIcao,
+                toIcao: existingPlan.legs[index]?.toIcao || segment.toIcao,
+                legDistanceNm: Number(existingPlan.legs[index]?.legDistanceNm) || calculateDistanceNm(
+                    segment.latLngs[0][0],
+                    segment.latLngs[0][1],
+                    segment.latLngs[1][0],
+                    segment.latLngs[1][1],
+                ),
+                spacingNm: Number(existingPlan.legs[index]?.spacingNm) || 7,
+                checkpoints: Array.isArray(existingPlan.legs[index]?.checkpoints)
+                    ? [...existingPlan.legs[index].checkpoints]
+                    : [],
+            })),
+        };
+    }
+
+    return {
+        version: CHECKPOINT_PLAN_VERSION,
+        routeSignature: createRouteSignature(draft),
+        mode: "map",
+        savedAt: new Date().toISOString(),
+        legs: state.legSegments.map((segment, index) => ({
+            legIndex: index,
+            fromIcao: segment.fromIcao,
+            toIcao: segment.toIcao,
+            legDistanceNm: calculateDistanceNm(
+                segment.latLngs[0][0],
+                segment.latLngs[0][1],
+                segment.latLngs[1][0],
+                segment.latLngs[1][1],
+            ),
+            spacingNm: 7,
+            checkpoints: [],
+        })),
+    };
+}
+
+function findNearestLegProjection(latlng) {
+    let best = null;
+
+    state.legSegments.forEach((segment) => {
+        const start = { lat: segment.latLngs[0][0], lon: segment.latLngs[0][1] };
+        const end = { lat: segment.latLngs[1][0], lon: segment.latLngs[1][1] };
+        const projection = projectPointToSegment({ lat: latlng.lat, lon: latlng.lng }, start, end);
+        const crossTrackNm = calculateDistanceNm(latlng.lat, latlng.lng, projection.lat, projection.lon);
+        const legDistanceNm = calculateDistanceNm(start.lat, start.lon, end.lat, end.lon);
+        const distanceFromLegStartNm = legDistanceNm * projection.fraction;
+        if (!best || crossTrackNm < best.crossTrackNm) {
+            best = {
+                legIndex: segment.index,
+                crossTrackNm,
+                distanceFromLegStartNm,
+                fraction: projection.fraction,
+            };
+        }
+    });
+
+    return best;
+}
+
+function projectPointToSegment(point, start, end) {
+    const dx = end.lon - start.lon;
+    const dy = end.lat - start.lat;
+    const denominator = (dx * dx) + (dy * dy);
+    const rawFraction = denominator === 0
+        ? 0
+        : (((point.lon - start.lon) * dx) + ((point.lat - start.lat) * dy)) / denominator;
+    const fraction = Math.max(0, Math.min(1, rawFraction));
+
+    return {
+        fraction,
+        lat: start.lat + ((end.lat - start.lat) * fraction),
+        lon: start.lon + ((end.lon - start.lon) * fraction),
+    };
+}
+
+function updateCheckpointEditStatus(message) {
+    const statusNode = document.getElementById("map-checkpoint-edit-status");
+    if (statusNode) {
+        statusNode.textContent = message;
+    }
+}
+
+function buildMapContextAddPopup(latlng) {
+    return `
+        <div class="map-context-popup">
+            <strong>Add checkpoint here?</strong>
+            <span>${escapeHtml(latlng.lat.toFixed(5))}, ${escapeHtml(latlng.lng.toFixed(5))}</span>
+            <button type="button" class="map-popup-button" data-map-context-add="1">Add Checkpoint</button>
+        </div>
+    `;
 }
 
 function buildRoutePoints(draft) {
@@ -1352,17 +1614,19 @@ function buildCheckpointMarkers(routePoints, checkpointPlan) {
         const toPoint = routePoints[legIndex + 1];
         const legDistanceNm = calculateDistanceNm(fromPoint.lat, fromPoint.lon, toPoint.lat, toPoint.lon);
 
-        return checkpoints.map((checkpoint) => {
+        return checkpoints.map((checkpoint, checkpointIndex) => {
             const distanceFromLegStartNm = Number(checkpoint.distanceFromLegStartNm) || 0;
             const fraction = legDistanceNm === 0
                 ? 0
                 : Math.max(0, Math.min(1, distanceFromLegStartNm / legDistanceNm));
 
             return {
+                legIndex,
+                checkpointIndex,
                 name: checkpoint.name || "Checkpoint",
                 comms: normalizeCheckpointComms(checkpoint.comms),
-                fromIcao: leg.fromIcao,
-                toIcao: leg.toIcao,
+                fromIcao: leg.fromIcao || fromPoint.icao,
+                toIcao: leg.toIcao || toPoint.icao,
                 distanceFromLegStartNm,
                 lat: Number.isFinite(Number(checkpoint.lat))
                     ? Number(checkpoint.lat)
@@ -1445,6 +1709,11 @@ function updateReferenceCheckpointButton() {
 }
 
 async function toggleAirspaceOverlay() {
+    if (!state.isFaaCoverageRoute) {
+        updateAirspaceStatus("FAA airspace overlay is only available for conterminous U.S. routes.");
+        return;
+    }
+
     state.showAirspace = !state.showAirspace;
     updateAirspaceToggleButton();
 
@@ -1478,7 +1747,7 @@ async function refreshAirspaceOverlay() {
         return;
     }
 
-    updateAirspaceStatus("Loading FAA airspace…");
+    updateAirspaceStatus("Loading FAA airspace...");
 
     const response = await fetch(buildAirspaceUrl(bounds));
     if (!response.ok) {
@@ -2165,7 +2434,7 @@ function renderCheckpointMeta(checkpoint) {
     return `<span class="checkpoint-meta">${badges.join("")}</span>`;
 }
 
-function buildCheckpointPopup(checkpoint) {
+function buildCheckpointPopup(checkpoint, index) {
     const details = [
         `<strong>${escapeHtml(checkpoint.name)}</strong>`,
         `${escapeHtml(checkpoint.fromIcao)} to ${escapeHtml(checkpoint.toIcao)}`,
@@ -2184,7 +2453,14 @@ function buildCheckpointPopup(checkpoint) {
         details.push(escapeHtml(checkpoint.notes));
     }
 
-    return details.join("<br>");
+    details.push(`
+        <div class="checkpoint-popup-actions">
+            <button type="button" class="map-popup-button" data-checkpoint-popup-edit="${index}">Edit</button>
+            <button type="button" class="map-popup-button danger" data-checkpoint-popup-remove="${index}">Remove</button>
+        </div>
+    `);
+
+    return `<div class="checkpoint-popup">${details.join("<br>")}</div>`;
 }
 
 function normalizeCheckpointComms(value) {
